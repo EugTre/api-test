@@ -1,0 +1,26 @@
+{
+    "ListOfUsers": {
+        "$schema": "http://json-schema.org/draft-04/schema#",
+        "type": "object",
+        "properties": {
+            "data": {
+                "type": "array"
+            },
+            "total": {
+                "type": "number"
+            },
+            "page": {
+                "type": "number"
+            },
+            "limit": {
+                "type": "number"
+            }
+        },
+        "required": [
+            "data",
+            "total",
+            "page",
+            "limit"
+        ]
+    }
+}

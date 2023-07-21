@@ -1,0 +1,26 @@
+{
+    "GetProjectUsers": {
+        "comment": "Returns list of users created for test project",
+        "request": {
+            "method": "GET",
+            "path": "/user",
+            "query_params": {
+                "comment": [
+                    "This is example of params and it's value.",
+                    "However params defined in @use section will be",
+                    "automatically added to request by ApiRequestHelper"
+                ],
+                "created": 1,
+                "page": 0,
+                "limit": 20,
+                "@use": [
+                    "created"
+                ]
+            }
+        },
+        "response": {
+            "status_code": 200,
+            "schema_name": "ListOfUsers"
+        }
+    }
+}

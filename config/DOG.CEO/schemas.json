@@ -1,0 +1,52 @@
+{
+    "single_image_response": {
+        "$schema": "http://json-schema.org/draft-04/schema#",
+        "type": "object",
+        "properties": {
+            "message": {
+                "type": "string",
+                "format": "uri",
+                "pattern": "^(https|http)://"
+            },
+            "status": {
+                "type": "string",
+                "enum": ["success","error"]
+            }
+        },
+        "required": [
+            "message",
+            "status"
+        ],
+        "additionalProperties": {
+            "code": {
+                "type": "number"
+            }
+        }
+    },
+
+    "multiple_images_response": {
+        "$schema": "http://json-schema.org/draft-04/schema#",
+        "type": "object",
+        "properties": {
+            "message": {
+                "type": "array",
+                "items": {
+                    "type": "string",
+                    "format": "uri",
+                    "pattern": "^(https|http)://"
+                }
+            },
+            "status": {
+                "type": "string",
+                "enum": ["success","error"]
+            }
+        },
+        "required": [
+            "message",
+            "status"
+        ]
+    }
+
+
+
+}
