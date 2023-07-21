@@ -24,6 +24,8 @@ pip install -r requirements.txt
 6. Install Allure commandline - see https://docs.qameta.io/allure/#_installing_a_commandline
 
 ### Run tests
+For 'DummyAPI' test one need to get `app-id` value for header. Go to https://dummyapi.io/ and SignIn using prefered method, then generate `app-id` and add it as headers in DummyAPI section of API configuration (see below).
+
 Start **tests from specific file**:
 ```
 pytest .\tests\dummy_api\test_1.py --alluredir=./tmp --clean-alluredir -vv -s
@@ -154,9 +156,18 @@ Property | Value Example | Description
 `path` | */user* | Path to specific API method. May have placeholders - e.g. */user/{amount}*.
 `path_params` | *{"amount": 3, "@use": ["amount"]}* | List of key-value pairs for path placeholder. By default values won't be used anyhow, but if key is listed in *"@use"* array -- path will be automatically formatted using defined value.
 `query_params` | *{"amount": 3, "@use": ["amount"]}* | List of key-values pairs for request params. Same as `path_params` - only params listed in *"@use"* will be automatically added to request
-`headers` | *{"Content-Type": "text/html; charset=utf-8"}* | Headers to add in request. Will be combined with base config level headers, overwritting headers with the same name.
-`cookies` | *{"cookie1": "1"}* | Cookies to add in request. Will be combined with base config level cookies, overwritting cookies with the same name.
+`headers`* | *{"Content-Type": "text/html; charset=utf-8"}* | Headers to add in request. Will be combined with base config level headers, overwritting headers with the same name.
+`cookies`* | *{"cookie1": "1"}* | Cookies to add in request. Will be combined with base config level cookies, overwritting cookies with the same name.
 `auth` | *["user","path"]* | Auth params to add in request. Overwrittes base config level auth values.
+
+****Note:*** both `headers` and `cookies` properties may be a reference to *.json* file with actual data in JSON format. Property value should be in format `"path/to/file.json"`. E.g.
+```json
+"request": {
+    "method": "GET",
+    "path": "/users",
+    "headers": "config/MyAPI/headers_non_authorized.json"
+}
+```
 
 #### `response` object
 Property | Value Example | Description
