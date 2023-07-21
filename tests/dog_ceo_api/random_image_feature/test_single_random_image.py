@@ -5,7 +5,7 @@ Feautre: 'Random image'
 Story:   'Getting single random image of random breed.'
 """
 import allure
-from utils.api_helpers.request_helper import ApiRequestHelper
+from utils.api_helpers.api_request_helper import ApiRequestHelper
 from utils.helper import Helper
 
 

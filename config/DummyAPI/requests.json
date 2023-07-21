@@ -16,10 +16,13 @@
                 "@use": [
                     "created"
                 ]
+            },
+            "headers": {
+                "app-id": "adsddsad"
             }
         },
         "response": {
-            "status_code": 200,
+            "status_code": 403,
             "schema_name": "ListOfUsers"
         }
     }

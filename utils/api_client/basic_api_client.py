@@ -135,7 +135,8 @@ class BasicApiClient():
              **kwargs
         )
 
-    def request(self, method: str|HTTPMethod, path: str, **params) -> requests.Response:
+    def request(self, method: str|HTTPMethod, path: str,
+                override_defaults: bool = False, **params) -> requests.Response:
         """Performs request with given method and paramerters to given path of API.
         Send request and response data to logger.
 
@@ -146,10 +147,17 @@ class BasicApiClient():
         Returns:
             `requests.Response:`: :class:`Response <Response>` object
         """
+        print(method)
+        print(path)
+        print(override_defaults)
+        print(params)
+
         if isinstance(method, HTTPMethod):
             method = method.value
 
-        request_params = self._prepare_request_params(method, path, **params)
+        request_params = self._prepare_request_params(method, path,
+                                                      override_defaults,
+                                                      **params)
         response = None
         try:
             response = requests.request(**request_params)
@@ -167,26 +175,56 @@ class BasicApiClient():
         '''Returns API URL - base url + endpoint'''
         return self._compose_url('')
 
-    def _prepare_request_params(self, method: str, path: str, **params) -> dict:
+    def _prepare_request_params(self, method: str, path: str,
+                                override_defaults: bool, **params) -> dict:
         """Compose request parameters into a dictionary.
         Sets defaults to `timeout` parameter if missign to `self.default_timeout`.
 
         Args:
             method (str): method name ('get', 'post', etc.).
             path (str): path relative to API base url (e.g. 'v1/check').
+            override_defaults (bool): flag to override params if given; if True -
+            given params will be used as is; otherwise given params will be
+            appended/set with values from request_defaults.
 
         Returns:
             dict: dictionary of the request parameters.
         """
+
+        print('_prepare_request_params:')
+        print(params)
+
         request_params = {
             'method': method.lower(),
             'url': self._compose_url(path),
             **params
         }
+        print('\n')
+        print(request_params)
 
-        for param in ('timeout', 'headers', 'cookies', 'auth'):
-            if not request_params.get(param):
+        for param in ('headers', 'cookies'):
+            if param in request_params:
+                # If override flag is False, request will be appended
+                # with request_defaults values.
+                print(f'"{param}" param is in request_params')
+                if not override_defaults:
+                    value = request_params[param]
+                    print(f'Gonna append to "{value}" value (is not none? {value is not None})')
+                    if value is not None:
+                        request_params[param] = self.request_defaults[param] | value
+                        print(f'Merged "{param}" param in request_params => {request_params[param]}')
+            else:
+                # Apply defaults if param is not defined yet
+                print(f'Add new "{param}" = "{self.request_defaults[param]}"')
                 request_params[param] = self.request_defaults[param]
+
+
+        # Auth param will be set to defaults if not set in request, but never overwritten
+        if not 'auth' in request_params:
+            request_params['auth'] = self.request_defaults['auth']
+
+        if not 'timeout' in request_params:
+            request_params['timeout'] = self.request_defaults['timeout']
 
         return request_params
 

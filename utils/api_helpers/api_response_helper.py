@@ -83,7 +83,8 @@ class ApiResponseHelper:
     # Response overall verification
     @allure.step('Validate response against JSON schema')
     def validate(self, schema: dict = None) -> Self:
-        """Validates response against given JSONSchema or schema from request config.
+        """Validates response against given JSONSchema or schema from request config,
+        if pre-configured request was made.
         Wrapped with Allure.Step.
 
         Args:
@@ -131,11 +132,11 @@ class ApiResponseHelper:
     def is_not_empty(self) -> Self:
         """Checks that response content is not empty.
 
-        Returns:
-            Self: instance of class `ApiResponseHelper`
-
         Raises:
             RuntimeError: if response wan't acquired yet.
+
+        Returns:
+            Self: instance of class `ApiResponseHelper`
         """
         self.__except_on_response_missing()
 
@@ -151,7 +152,7 @@ class ApiResponseHelper:
             latency (float | int): _description_
 
         Returns:
-            _type_: _description_
+            Self: instance of class `ApiResponseHelper`
         """
         self.__except_on_response_missing()
         response_latency = int(self.response_object.elapsed.microseconds / 1000)
@@ -184,7 +185,8 @@ class ApiResponseHelper:
         except KeyError:
             is_present = False
 
-        assert is_present, f'Param [{keylist}] is not present, but expected to be.'
+        assert is_present, f'Param [{self.__keylist_to_str(keylist)}] is not present, ' \
+            'but expected to be.'
 
         return self
 
@@ -209,7 +211,8 @@ class ApiResponseHelper:
         except KeyError:
             is_present = False
 
-        assert not is_present, f'Param [{keylist}] is present, but not expected to be.'
+        assert not is_present, f'Param [{self.__keylist_to_str(keylist)}] is present, '\
+            'but not expected to be.'
 
         return self
 
@@ -229,7 +232,8 @@ class ApiResponseHelper:
         self.__except_on_response_missing()
         actual_value = self.__get_value(keylist)
         assert actual_value, \
-               f'Value of param [{keylist}] is empty, but expected to be not empty.'
+               f'Value of param [{self.__keylist_to_str(keylist)}] is empty, '\
+                   'but expected to be not empty.'
 
         return self
 
@@ -249,8 +253,8 @@ class ApiResponseHelper:
         self.__except_on_response_missing()
         actual_value = self.__get_value(keylist)
         assert not actual_value, \
-               f'Value of param [{keylist}] is not empty and equals to [{actual_value}], '\
-               'but expected to be empty.'
+               f'Value of param [{self.__keylist_to_str(keylist)}] is not empty '\
+                'and equals to [{actual_value}], but expected to be empty.'
 
         return self
 
@@ -270,9 +274,14 @@ class ApiResponseHelper:
         """
         self.__except_on_response_missing()
 
-        actual_value = self.__get_value(keylist)
+        try:
+            actual_value = self.__get_value(keylist)
+        except KeyError as exc:
+            raise KeyError(f'Failed to find "{self.__keylist_to_str(keylist)}" '  \
+                           'key in response body.') from exc
+
         assert value == actual_value, \
-               f'Value of param [{keylist}] is equal to [{actual_value}], '\
+               f'Value of param [{self.__keylist_to_str(keylist)}] is equal to [{actual_value}], '\
                f'but expected to be [{value}]'
 
         return self
@@ -465,7 +474,7 @@ class ApiResponseHelper:
                         self.__get_value(keylist, target))
 
         assert isinstance(list_content, list), \
-               f'Response\'s property at {keylist} is not an array.'
+               f'Response\'s property at {self.__keylist_to_str(keylist)} is not an array.'
         return list_content
 
     def __except_on_response_missing(self) -> None:
@@ -477,3 +486,21 @@ class ApiResponseHelper:
         if self.response_object is None:
             raise RuntimeError('Response object is not defined yet. '
                                 'Make sure to use .perform() first!')
+
+    def __keylist_to_str(self, keylist: tuple|str) -> str:
+        """Transform keylist tuple into a string of dot notaions.
+
+        Args:
+            keylist (tuple | str): key name or list of key names
+
+        Returns:
+            str: key list in dot notation.
+
+        Example:
+            > self.__keylist_to_str(('key1', 'key2', 'key3'))
+             # 'key1.key2.key3'
+        """
+        if isinstance(keylist, str):
+            return keylist
+
+        return '.'.join(keylist)

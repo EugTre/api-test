@@ -5,7 +5,7 @@ from typing import Self
 import allure
 from utils.api_client.basic_api_client import BasicApiClient, HTTPMethod
 from utils.api_client.models import RequestEntity
-from utils.api_helpers.response_helper import ApiResponseHelper
+from utils.api_helpers.api_response_helper import ApiResponseHelper
 
 class ApiRequestHelper:
     """Helper class that wraps API Client with additional function for testing response.
@@ -98,8 +98,9 @@ class ApiRequestHelper:
             ValueError: Extra path parameters given.
 
         Example:
+
         > req.by_path('random/images/{amount}').with_path_params(amount=10)
-        > # Path: 'random/images/10'
+         # Path: 'random/images/10'
         """
         self.__check_request_initialized()
 
@@ -115,7 +116,7 @@ class ApiRequestHelper:
         return self
 
     def with_query_params(self, **query_params) -> Self:
-        """Adds params which should be added as HTTP params (after ? char).
+        """Adds params which should be added as URL query params.
         Appends defaults params if defined for request.
 
         Args:
@@ -125,8 +126,9 @@ class ApiRequestHelper:
             Self: instance of class `ApiRequestHelper`
 
         Example:
+
         > req.by_path('random/images').with_params(amount=10)
-        > # Path: 'random/images?amount=10'
+         # Path: 'random/images?amount=10'
         """
         self.__check_request_initialized()
 
@@ -163,19 +165,26 @@ class ApiRequestHelper:
 
         return schema
 
-    def perform(self, **request_args) -> ApiResponseHelper:
-        """Performs HTTP request with given request parameters (headers, cookies, json, etc.)
-        and verifies response status code
+    def perform(self, override_defaults: bool = False, **request_args) -> ApiResponseHelper:
+        """Performs HTTP request with given request parameters (headers, cookies, json, etc.),
+        creates and retuns `api_helpers.response_helper.ResponseHelper` with response (also
+        verifies response status code).
+
+        By default parameters will be appended with API's default request parameters. To use
+        only given parameters set 'override_defaults' to True. However not specified parameters
+        will be set to client's defaults!
 
         Args:
+            override_defaults (bool, optional): Flag to override API Client's default parameters
+            for response - 'headers', 'cookies', 'timeout', 'auth'. Defaults to False.
             **request_args: key-values pairs of `requests.request` method
             (headers, cookies, json, etc.)
 
-        Returns:
-            Self: instance of class `ApiRequestHelper`
-
         Raises:
             RuntimeError: Path is not defined for request.
+
+        Returns:
+            Self: instance of class `ApiRequestHelper`
         """
         self.__check_request_initialized()
         if self.request.path is None:
@@ -187,6 +196,12 @@ class ApiRequestHelper:
         path = (self.request.path.format(**self.request.path_params)
                 if self.request.path_params else
                 self.request.path)
+
+        request_args['headers'] = self.request.headers | request_args.get('headers', {})
+        request_args['cookies'] = self.request.cookies | request_args.get('cookies', {})
+        request_args['auth'] = (request_args['auth']
+                                if request_args.get('auth')
+                                else tuple(self.request.auth) if self.request.auth else ())
 
         allure.dynamic.parameter(
             f'Request {self.count} (pre-configured, "{self.name}")'
@@ -204,6 +219,7 @@ class ApiRequestHelper:
             response = self.api_client.request(method = self.request.method,
                                                path = path,
                                                params = self.request.query_params,
+                                               override_defaults = override_defaults,
                                                **request_args)
 
             allure.dynamic.parameter(f'Request {self.count} completed', response.url)

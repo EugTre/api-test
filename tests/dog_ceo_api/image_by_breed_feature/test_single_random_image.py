@@ -6,7 +6,7 @@ Story:   'Random image from a breed collection.'
 """
 import pytest
 import allure
-from utils.api_helpers.request_helper import ApiRequestHelper
+from utils.api_helpers.api_request_helper import ApiRequestHelper
 from utils.helper import Helper
 
 @allure.epic('DOG CEO API')

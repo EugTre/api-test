@@ -16,7 +16,7 @@ from utils.helper import Helper
 from utils.log_database_handler import DatabaseHandler
 
 from utils.api_client.basic_api_client import BasicApiClient
-from utils.api_helpers.request_helper import ApiRequestHelper
+from utils.api_helpers.api_request_helper import ApiRequestHelper
 
 # from tests.tests_l3.rest_api_2.open_brewery_db_api import OpenBreweryDBAPI
 
