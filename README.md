@@ -3,13 +3,13 @@
 ## How to use
 ### Installation
 1. Download Python 3.10+ (see https://www.python.org/downloads/)
-1. Download and unpack project.
-2. Navigate to project directory using terminal/cmd
-3. Create virtual environment:
+2. Download and unpack project.
+3. Navigate to project directory using terminal/cmd
+4. Create virtual environment:
 ```cmd
 python -m venv venv
 ```
-4. Activate virtual environment:
+5. Activate virtual environment:
 ```
 # Windows
 venv\Scripts\activate
@@ -17,11 +17,11 @@ venv\Scripts\activate
 # Linux
 venv/bin/activate
 ```
-5. Install dependencise:
+6. Install dependencies:
 ```cmd
 pip install -r requirements.txt
 ```
-6. Install Allure commandline - see https://docs.qameta.io/allure/#_installing_a_commandline
+7. Install Allure commandline - see https://docs.qameta.io/allure/#_installing_a_commandline
 
 ### Run tests
 For 'DummyAPI' test one need to get `app-id` value for header. Go to https://dummyapi.io/ and SignIn using prefered method, then generate `app-id` and add it as headers in DummyAPI section of API configuration (see below).
@@ -57,15 +57,15 @@ Classes:
 - `utils.api_helpers.api_request_helper.ApiRequestHelper`
 - `utils.api_helpers.api_response_helper.ApiResponseHelper`
 
-`ApiRequestHelper` provides simple interface for running pre-configured requests or custom requests. Class depends on configuration system, which provide possibility to set up requests in external files.
+`ApiRequestHelper` provides simple interface for running pre-configured or custom requests. Class depends on configuration system, which provide possibility to set up requests details in external files.
 
-`ApiResponseHelper` provides number of methods for response validation and verification, including validation via JSON Schema (which may be configured in external and accessed by name).
+`ApiResponseHelper` provides number of methods for response validation and verification, including validation via JSON Schema (which may be configured in external files and accessed by name).
 
 Both classes use `allure.step` to store actions and checks information in test report.
 
 ### Usage:
-In order to access instance of `ApiRequestHelper` configured for needed API one need to:
-1. On package level `conftest.py` redefine `api_client` fixture:
+In order to access instance of `ApiRequestHelper` configured for a needed API one need to:
+1. On package level `conftest.py` re-define `api_client` fixture:
 ```python
 import pytest
 from utils.api_client.setup_api_client import setup_api_client
@@ -120,7 +120,7 @@ timeout = 120
 - **url** and **endpoint** params - base URL and path for API to test.
 - **client** - module and classname of API client class to use.
 - **logger** - name of the logger to use for API client. See 'logging.ini'.
-- **requests** - path to JSON file with pre-configured request catalog.
+- **requests** - path to JSON file with pre-configured *request catalog*.
 - **schemas** - path to JSON file with JSON Schemas.
 - **timeout** - default request timeout for API client.
 - **headers** - path to JSON file with headers, OR headers as key-value pairs.
@@ -132,8 +132,10 @@ timeout = 120
 [DummyAPI]
 url = https://dummyapi.io/data
 endpoint = /v1
+...
+; headers and cookies may be JSON key-value pairs
 headers =
-    "appid": "441112",
+    "app-id": "441112",
     "Content-Type": "text/html; charset=utf-8"
 cookies =
     "cookie1": "1",
@@ -141,19 +143,17 @@ cookies =
 ```
 
 #### Request catalog
-It's possible to pre-configure requests and use them later.
+It's possible to pre-configure requests and use them later with just a little touch.
 
-Each entity is nested under unique key (*name* of the request).
-
-Single entity should contain 2 section:
-- `request`: contains setup for requests - method, path, params, headers, cookies, etc.
-- `response`: contains data for response validation - status code, schema and schema name
+Each entity is nested under unique key (*name* of the request) and should contain 2 section:
+- `request`: contains setup data for request - method, path, params, headers, cookies, etc.
+- `response`: contains data for response validation - status code, schema and/or schema name
 
 #### `request` object
 Property | Value Example | Description
 --- | --- | ---
-`method` | *GET* | HTTP method for request. One of: GET, POST, PUT, PATCH, DELETE.
-`path` | */user* | Path to specific API method. May have placeholders - e.g. */user/{amount}*.
+`method` | *"GET"* | HTTP method for request. One of: GET, POST, PUT, PATCH, DELETE.
+`path` | *"/user"* | Path to specific API method. May have placeholders - e.g. */user/{amount}*.
 `path_params` | *{"amount": 3, "@use": ["amount"]}* | List of key-value pairs for path placeholder. By default values won't be used anyhow, but if key is listed in *"@use"* array -- path will be automatically formatted using defined value.
 `query_params` | *{"amount": 3, "@use": ["amount"]}* | List of key-values pairs for request params. Same as `path_params` - only params listed in *"@use"* will be automatically added to request
 `headers`* | *{"Content-Type": "text/html; charset=utf-8"}* | Headers to add in request. Will be combined with base config level headers, overwritting headers with the same name.
@@ -184,7 +184,7 @@ JSON file with JSON Schema (see https://json-schema.org/).
 
 
 ### Logging configuration (logging.ini)
-Path to this file should be passed as CLI argument `--logging-config` (default is *config/logging.ini*).
+Path to logging configuration file should be passed as CLI argument `--logging-config` (default is *config/logging.ini*).
 
 See https://docs.python.org/3/library/logging.config.html#configuration-file-format
 
