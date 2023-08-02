@@ -1,5 +1,5 @@
 {
-    "GetProjectUsers": {
+    "GetUsers": {
         "comment": "Returns list of users created for test project",
         "request": {
             "method": "GET",
@@ -16,12 +16,50 @@
                 "@use": [
                     "created"
                 ]
-            },
-            "headers": "config/DummyAPI/headers_non_authorized.json"
+            }
         },
         "response": {
-            "status_code": 403,
+            "status_code": 200,
             "schema_name": "ListOfUsers"
+        }
+    },
+    "GetUserByID": {
+        "request": {
+            "method": "GET",
+            "path": "/user/{user_id}"
+        },
+        "response": {
+            "status_code": 200,
+            "schema_name": "ListOfUsers"
+        }
+    },
+
+
+    "PostCreateUser_RequiredOnly": {
+        "comment": "Creates user",
+        "request": {
+            "method": "POST",
+            "path": "/user/create",
+            "headers": "config/DummyAPI/headers/headers_content_type_json.json",
+            "json": "config/DummyAPI/payload/create_user_required_only.json"
+        },
+        "response": {
+            "status_code": 200,
+            "schema_name": "UserFull",
+            "json": "config/DummyAPI/payload/expected_user_required_only.json"
+        }
+
+    },
+
+    "DeleteUser": {
+        "comment": "Deletes user by given id",
+        "request": {
+            "method": "DELETE",
+            "path": "/user/{user_id}"
+        },
+        "response": {
+            "status_code": 200,
+            "schema_name": "OnUserDeleted"
         }
     }
 }

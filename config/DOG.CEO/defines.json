@@ -1,0 +1,13 @@
+{
+    "schema": {
+        "SingleImage": "!file config/DOG.CEO/schema/single_image_response.json",
+        "MultipleImages": "!file config/DOG.CEO/schema/multiple_image_response.json"
+    },
+
+    "headers": {
+        "headers_Ok": {
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": "*"
+        }
+    }
+}

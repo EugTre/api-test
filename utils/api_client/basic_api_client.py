@@ -29,6 +29,7 @@ class BasicApiClient():
         default - None.
     """
     instnace_count = 0   # TODO: Remove debug info
+
     def __init__(self,
                  base_url: str,
                  endpoint: str = '',
@@ -37,6 +38,17 @@ class BasicApiClient():
                  request_defaults: dict = None,
                  request_catalog: dict = None,
         ):
+        """Creates an instance of `BasicApiClient` class.
+
+        Args:
+            base_url (str): base URL of API.
+            endpoint (str, optional): API's endpoint. Defaults to ''.
+            name (str, optional): API name. Defaults to ''.
+            logger_name (str, optional): logger name to use for reqeust/response
+            logging. Defaults to None.
+            request_defaults (dict, optional): settings to apply for each request. Defaults to None.
+            request_catalog (dict, optional): catalog of API requests. Defaults to None.
+        """
         self.base_url = base_url.rstrip(r'/')
         self.endpoint = endpoint.strip(r'/')
         self.request_defaults = request_defaults
@@ -53,90 +65,15 @@ class BasicApiClient():
         self.instance_id = BasicApiClient.instnace_count
         BasicApiClient.instnace_count += 1
 
-        self.request_made = 0
+        self.request_count = 0
 
         self._log(INFO, f'BasicApiClient {self.instance_id} was created!!!')
         self._log(INFO, self)
 
-    def get(self, path: str='/', **kwargs) -> requests.Response:
-        """Makes GET request with given params.
-
-        Args:
-            `path` (str, optional): specific URL sub-path. Defaults to '/';
-            `**kwargs`: other request params, see parameters for `requests.api.request()`.
-        """
-        return self.request(
-            method=HTTPMethod.GET,
-            path=path,
-            **kwargs
-        )
-
-    def post(self, path: str = '/', data: dict = None, json=None, **kwargs) -> requests.Response:
-        """Makes POST request with given params.
-
-        Args:
-            `path` (str, optional): specific URL sub-path. Defaults to '/'.
-            `data` (dict, optional): Dictionary, list of tuples, bytes, or file-like
-                object to send in the body of the :class:`Request`.
-            `json` (optional): A JSON serializable Python object to send in the body
-                of the :class:`Request`.
-            `**kwargs` (optional): other request params, see parameters for
-            `requests.api.request()`.
-        """
-        return self.request(
-            method=HTTPMethod.POST,
-            path=path,
-            data=data, json=json, **kwargs
-        )
-
-    def put(self, path: str = '/', data: dict = None, **kwargs) -> requests.Response:
-        """Makes PUT request with given params.
-
-        Args:
-            `path` (str, optional): specific URL sub-path. Defaults to '/'.
-            `data` (dict, optional): Dictionary, list of tuples, bytes, or file-like
-                object to send in the body of the :class:`Request`.
-            `**kwargs` (optional): other request params, see parameters for
-            `requests.api.request()`.
-        """
-        return self.request(
-            method=HTTPMethod.PUT,
-            path=path,
-            data=data, **kwargs
-        )
-
-    def patch(self, path: str = '/', data: dict = None, **kwargs) -> requests.Response:
-        """Makes PATCH request with given params.
-
-        Args:
-            `path` (str, optional): specific URL sub-path. Defaults to '/'.
-            `data` (dict, optional): Dictionary, list of tuples, bytes, or file-like
-                object to send in the body of the :class:`Request`.
-            `**kwargs` (optional): other request params, see parameters for
-            `requests.api.request()`.
-        """
-        return self.request(
-            method=HTTPMethod.PATCH,
-            path=path,
-            data=data, **kwargs
-        )
-
-    def delete(self, path: str = '/', **kwargs) -> requests.Response:
-        """Makes DELETE request with given params.
-
-        Args:
-            `path` (str, optional): specific URL sub-path. Defaults to '/'.
-            `**kwargs` (optional): other request params, see parameters for
-            `requests.api.request()`.
-        """
-        return self.request(
-            method=HTTPMethod.DELETE,
-            path=path,
-             **kwargs
-        )
-
-    def request(self, method: str|HTTPMethod, path: str,
-                override_defaults: bool = False, **params) -> requests.Response:
+    def request(self, method: str|HTTPMethod,
+                path: str,
+                override_defaults: bool = False,
+                **params) -> requests.Response:
         """Performs request with given method and paramerters to given path of API.
         Send request and response data to logger.
 
@@ -166,8 +103,8 @@ class BasicApiClient():
                       extra={'request': request_params, 'response': response})
             raise
 
-        self.request_made += 1
-        self._log(INFO, f'Request {self.request_made} by {self.instance_id} made {response.url}',
+        self.request_count += 1
+        self._log(INFO, f'Request {self.request_count} by {self.instance_id} made {response.url}',
                   extra={'request': request_params, 'response': response})
         return response
 
@@ -199,25 +136,33 @@ class BasicApiClient():
             'url': self._compose_url(path),
             **params
         }
+
         print('\n')
         print(request_params)
 
+        # If param is set and no override required - combine request
+        # values with defaults.
+        # If param is not set in request - apply default.
+        # So to override Client's defaults - one should just set 'header'/'cookies'
+        # with any value.
         for param in ('headers', 'cookies'):
-            if param in request_params:
-                # If override flag is False, request will be appended
-                # with request_defaults values.
-                print(f'"{param}" param is in request_params')
-                if not override_defaults:
-                    value = request_params[param]
-                    print(f'Gonna append to "{value}" value (is not none? {value is not None})')
-                    if value is not None:
-                        request_params[param] = self.request_defaults[param] | value
-                        print(f'Merged "{param}" param in request_params => {request_params[param]}')
-            else:
-                # Apply defaults if param is not defined yet
-                print(f'Add new "{param}" = "{self.request_defaults[param]}"')
-                request_params[param] = self.request_defaults[param]
+            default = self.request_defaults[param]
+            print(f'"{param}" defaults are {default}')
 
+            if param in request_params:
+                print(f'"{param}" defined in request. Override flag set to "{override_defaults}".')
+
+                if not override_defaults:
+                    print(f'"{param}" will be extended with defaults".')
+
+                    req_value = request_params.get(param, {})
+                    self._combine_values(req_value, default)
+                    request_params[param] = req_value
+
+            else:
+                print(f'"{param}" is not defined in request. Apply defaults".')
+
+                request_params[param] = default
 
         # Auth param will be set to defaults if not set in request, but never overwritten
         if not 'auth' in request_params:
@@ -227,6 +172,26 @@ class BasicApiClient():
             request_params['timeout'] = self.request_defaults['timeout']
 
         return request_params
+
+
+    def _combine_values(self, request_value: dict, default_value: dict) -> None:
+        """Safely merges 2 dictionaries (without overriding 'request_value').
+        Used to apply config level params to request.
+
+        Args:
+            request_value (dict): Request data.
+            config_value (dict): Config-level values
+        """
+
+        # If request has empty dict - just merge both
+        if not request_value:
+            request_value.update(default_value)
+            return
+
+        # Othwerwise - add missing defaults to request param
+        for key, value in default_value.items():
+            if key not in request_value:
+                request_value[key] = value
 
     def _compose_url(self, path: str) -> str:
         """Composes URL by mergin Base URL, enpoint and given path.

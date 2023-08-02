@@ -1,17 +1,19 @@
 """Helper for api request creation and execution."""
 import re
+import copy
 from typing import Self
 
 import allure
 from utils.api_client.basic_api_client import BasicApiClient, HTTPMethod
 from utils.api_client.models import RequestEntity
+from utils.json_content.json_content import JsonContent
 from utils.api_helpers.api_response_helper import ApiResponseHelper
 
 class ApiRequestHelper:
     """Helper class that wraps API Client with additional function for testing response.
     """
     count = 1
-    PATH_PATTERN = re.compile(r'{([a-zA-Z0-9]*)}')
+    PATH_PATTERN = re.compile(r'{([a-zA-Z0-9_]*)}')
 
     def __init__(self, api_client: BasicApiClient):
         """Creates instance of `ApiRequestHelper` class.
@@ -22,14 +24,19 @@ class ApiRequestHelper:
         self.api_client = api_client
         self.name = ''
         self.request = None
-        self.response = None
+        self.expected = {
+            "status_code": None,
+            "schema": None,
+            "headers": None,
+            "json": None
+        }
 
     def _reset(self):
         """Resets all properties to defaults.
         """
         self.name = ''
         self.request = None
-        self.response = None
+        self.response_helper = None
 
     # Request setup
     def by_name(self, name: str) -> Self:
@@ -51,11 +58,14 @@ class ApiRequestHelper:
         if not req_cfg:
             raise ValueError(f'Unknown request name "{name}" for API '
                              f'"{self.api_client.name}"')
-        self.request = req_cfg.request
-        self.response = ApiResponseHelper().set_expected(
-                            status_code=req_cfg.response.status_code,
-                            schema=req_cfg.response.schema
-                        )
+
+        self.request = copy.deepcopy(req_cfg.request)
+
+        self.expected["status_code"] = req_cfg.response.status_code
+        self.expected["schema"] = req_cfg.response.schema
+        self.expected["headers"] = req_cfg.response.headers
+        self.expected["json"] = req_cfg.response.json
+
         return self
 
     def by_path(self, path: str, method: HTTPMethod = HTTPMethod.GET,
@@ -78,7 +88,7 @@ class ApiRequestHelper:
             method=method,
             path=path
         )
-        self.response =  ApiResponseHelper().set_expected(status_code)
+        self.expected['status_code'] = status_code
 
         return self
 
@@ -143,36 +153,61 @@ class ApiRequestHelper:
 
         return self
 
-    def get_schema(self, name: str, fail_on_missing: bool = True) -> dict|None:
-        """Returns schema from API Client's defaults
+    def with_headers(self, headers: dict, append: bool = True) -> Self:
+        """Adds headers to request.
+        Pre-configured request may have headers defined in config, custom request may be
+        modified using this method.
 
         Args:
-            name (str): name of the schema.
-            fail_on_missing (bool, optional): flag to raise an exception if
-            schema not found. Defaults to True.
-
-        Raises:
-            ValueError: if schema not found and 'fail_on_missing' flag
-            is set to True.
+            headers (dict): headers key-value pairs.
+            append (bool, optional): If append flag is set to True - adds given headers
+            to current request's headers.. Defaults to True.
 
         Returns:
-            dict|None: schema dictionary or None, if schema not found.
+            Self: instance of class `ApiRequestHelper`
         """
-        schema = self.api_client.request_defaults['schemas'].get(name)
-        if fail_on_missing and not schema:
-            raise ValueError(f'Failed to find "{name}" schema in '
-                             f'"{self.api_client.name}" API Client.')
+        self.request.headers = self.request.headers | headers if append else headers
+        return self
 
-        return schema
+    def with_cookies(self, cookies: dict, append: bool = True) -> Self:
+
+        """Adds cookies to request.
+        Pre-configured request may have cookies defined in config, custom request may be
+        modified using this method.
+
+        Args:
+            cookies (dict): cookies key-value pairs.
+            append (bool, optional): If append flag is set to True - adds given headers
+            to current request's headers.. Defaults to True.
+
+        Returns:
+            Self: instance of class `ApiRequestHelper`
+        """
+        self.request.cookies = self.request.cookies | cookies if append else cookies
+        return self
+
+    def with_json_payload(self, payload: JsonContent|list|dict) -> Self:
+        """Adds JSON payload to request. Also sets given JSON as
+        expected in response (e.g. create request expected to return
+        mostly the same content).
+
+        Args:
+            payload (JsonContent | list | dict): JSON content.
+
+        Returns:
+            Self: instance of `ApiRequestHelper` class
+        """
+        self.request.json = payload.get() if isinstance(payload, JsonContent) else payload
+        self.response_helper.set_expected(json=self.request.json)
 
     def perform(self, override_defaults: bool = False, **request_args) -> ApiResponseHelper:
-        """Performs HTTP request with given request parameters (headers, cookies, json, etc.),
+        """Performs HTTP request with given request parameters (headers, cookies, auth, etc.),
         creates and retuns `api_helpers.response_helper.ResponseHelper` with response (also
         verifies response status code).
 
-        By default parameters will be appended with API's default request parameters. To use
+        By default parameters will be extended with API's default request parameters. To use
         only given parameters set 'override_defaults' to True. However not specified parameters
-        will be set to client's defaults!
+        will be set to client's defaults anyway!
 
         Args:
             override_defaults (bool, optional): Flag to override API Client's default parameters
@@ -182,6 +217,8 @@ class ApiRequestHelper:
 
         Raises:
             RuntimeError: Path is not defined for request.
+            KeyError: Missing path parameter.
+            ValueError: Extra path parameters given.
 
         Returns:
             Self: instance of class `ApiRequestHelper`
@@ -197,21 +234,15 @@ class ApiRequestHelper:
                 if self.request.path_params else
                 self.request.path)
 
+        # Ensure that given args will be appended to current requests settings
         request_args['headers'] = self.request.headers | request_args.get('headers', {})
         request_args['cookies'] = self.request.cookies | request_args.get('cookies', {})
         request_args['auth'] = (request_args['auth']
-                                if request_args.get('auth')
-                                else tuple(self.request.auth) if self.request.auth else ())
+                                if request_args.get('auth') else
+                                self.request.auth)
+                                #tuple(self.request.auth) if self.request.auth else ())
 
-        allure.dynamic.parameter(
-            f'Request {self.count} (pre-configured, "{self.name}")'
-            if self.name else
-            f'Request {self.count}',
-            {
-                'path': path,
-                'query': self.request.query_params if self.request.query_params else None,
-                'params': request_args if request_args else None
-            })
+        self.__allure_save_request_params(path, request_args)
 
         request_step_info = f' "{self.name}"' if self.name else ''
         with allure.step(f'Request {self.count}{request_step_info} '
@@ -220,12 +251,14 @@ class ApiRequestHelper:
                                                path = path,
                                                params = self.request.query_params,
                                                override_defaults = override_defaults,
+                                               json = self.request.json,
                                                **request_args)
 
             allure.dynamic.parameter(f'Request {self.count} completed', response.url)
             self.count += 1
 
-        return self.response.set_and_verify_response(response)
+        return ApiResponseHelper(response).set_expected(**self.expected) \
+                                          .status_code_equals()
 
     # Private methods
     def __check_request_initialized(self) -> None:
@@ -252,7 +285,10 @@ class ApiRequestHelper:
             KeyError: Missing path parameter.
             ValueError: Extra path parameters given.
         """
+
+        print(f'__check_for_missing_path_params: Invoked:\nPath={path}\nParams={params}')
         expected_path_params = set(self.PATH_PATTERN.findall(path))
+        print(f'__check_for_missing_path_params: Expected params:{expected_path_params}')
         params_set = set(params) if params else set()
 
         missing = expected_path_params - params_set
@@ -263,3 +299,24 @@ class ApiRequestHelper:
         if extra:
             raise ValueError(f'Extra path parameter(s) provided, '
                              f'but never used: {", ".join(extra)}')
+
+    def __allure_save_request_params(self, uri: str, request_args: dict) -> None:
+        """Saves request data as Allure parameters.
+
+        Args:
+            path (str): request URI.
+            request_args (dict): request parameters.
+        """
+        allure.dynamic.parameter(
+            f'Request {self.count} (pre-configured, "{self.name}")'
+            if self.name else
+            f'Request {self.count}',
+            {
+                'path': uri,
+                'query': self.request.query_params if self.request.query_params else None,
+                'params': request_args if request_args else None
+            }
+        )
+
+        if self.request.json is not None:
+            allure.dynamic.parameter(f'Request {self.count} - JSON payload', self.request.json)

@@ -1,0 +1,17 @@
+{
+	"title": "mr",
+	"firstName": "John",
+	"lastName": "Doe",
+	"gender": "male",
+	"email": "some@mail.com",
+	"dateOfBirth": "1989-04-19",
+	"phone": "78884441122",
+	"picture": null,
+	"location": {
+		"street": "Some st.",
+		"city": "Pinsk",
+		"state": "Cali",
+		"country": "USA",
+		"timezone": "+2:00"
+	}
+}

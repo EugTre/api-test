@@ -11,10 +11,10 @@ from utils.helper import Helper
 
 @allure.epic('DOG CEO API')
 @allure.feature('Random image by breed')
+@allure.story('Random image from a breed collection')
 class Test_RandomImageByBreed_SingleImage:
     """Group of tests related to DOG_API - Random image story"""
 
-    @allure.story('Random image from a breed collection')
     @allure.title('Get single random image by "{breed}" breed')
     @pytest.mark.parametrize('breed', [
         'pug',

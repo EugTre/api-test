@@ -1,8 +1,8 @@
 """Models of framework data related to API Client"""
 from dataclasses import dataclass, field
 
-@dataclass
-class BasicApiConfiguration:
+@dataclass(slots=True)
+class ApiConfiguration:
     """Model for API configuration from
        `--api-config` command-line argument
     """
@@ -18,40 +18,14 @@ class BasicApiConfiguration:
     schemas: str|dict = None
     name: str = ''
 
-@dataclass
-class RequestEntity:
-    """Model for API request"""
-    method: str
-    path: str
-    headers: dict = field(default_factory=dict)
-    query_params: dict = field(default_factory=dict)
-    path_params: dict = field(default_factory=dict)
-    cookies: dict = field(default_factory=dict)
-    auth: tuple = None
-    timeout: int = None
-
-@dataclass
-class ResponseEntity:
-    """Model for  API response"""
-    status_code: int
-    schema_name: str = None
-    schema: dict = None
-
-@dataclass
-class CatalogEntity:
-    """Model for API Request catalogue dictionary value"""
-    name: str
-    request: RequestEntity
-    response: ResponseEntity
-
-@dataclass
-class ApiClientsConfigurationCollection:
+@dataclass(slots=True)
+class ApiClientsSpecificationCollection:
     """Collection of API Clients configurations"""
     source_file: str
     configs: dict
 
-@dataclass
-class ApiSpecification:
+@dataclass(slots=True)
+class ApiClientSpecification:
     """Model to store values needed for API Client creation"""
     base_url: str
     endpoint: str
@@ -61,7 +35,7 @@ class ApiSpecification:
     request_catalog: dict
     name: str
 
-    def __init__(self, api_config: BasicApiConfiguration, req_catalog: dict):
+    def __init__(self, api_config: ApiConfiguration, req_catalog: dict):
         self.base_url = api_config.url
         self.endpoint = api_config.endpoint
         self.client = api_config.client
@@ -91,3 +65,31 @@ class ApiSpecification:
             "request_defaults": self.request_defaults,
             "request_catalog": self.request_catalog
         }
+
+@dataclass(slots=True)
+class RequestEntity:
+    """Model for API request"""
+    method: str
+    path: str
+    headers: dict = field(default_factory=dict)
+    query_params: dict = field(default_factory=dict)
+    path_params: dict = field(default_factory=dict)
+    cookies: dict = field(default_factory=dict)
+    auth: tuple = None
+    json: dict|list = None
+    timeout: int = None
+
+@dataclass(frozen=True, slots=True)
+class ResponseEntity:
+    """Model for  API response"""
+    status_code: int
+    schema: dict = None
+    json: dict|list = None
+    headers: dict = None
+
+@dataclass(frozen=True, slots=True)
+class CatalogEntity:
+    """Model for API Request catalogue dictionary value"""
+    name: str
+    request: RequestEntity
+    response: ResponseEntity

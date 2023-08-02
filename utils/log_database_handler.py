@@ -1,5 +1,6 @@
 import sqlite3
 import logging
+import logging.handlers
 from logging import Handler, LogRecord
 from datetime import datetime
 
@@ -171,3 +172,4 @@ class DatabaseHandler(Handler):
         self.db_conn.commit()
 
 
+logging.handlers.DatabaseHandler = DatabaseHandler

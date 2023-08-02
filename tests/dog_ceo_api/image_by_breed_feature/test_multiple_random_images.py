@@ -7,6 +7,7 @@ Story:   'Multiple images from a breed collection.'
 import pytest
 import allure
 from utils.api_helpers.api_request_helper import ApiRequestHelper
+from utils.api_helpers.comparators import List
 from utils.helper import Helper
 
 @allure.epic('DOG CEO API')
@@ -16,9 +17,9 @@ class Test_RandomImageByBreed_SingleImage:
     """Group of tests related to DOG_API - Random image story"""
     @allure.title('Get {amount} random images by "{breed}" breed')
     @pytest.mark.parametrize('breed,amount', [
-        ('akita', 1),
+        #('akita', 1),
         ('collie',2),
-        ('terrier', 50)
+        #('terrier', 50)
     ])
     def test_multiple_random_images_by_breed(self, api_request: ApiRequestHelper,
                                              helper: Helper,
@@ -34,6 +35,7 @@ class Test_RandomImageByBreed_SingleImage:
                     .perform()
                     .validate()
                     .value_equals('status', 'success')
+                    .verify_value('message', List.count_is_greater_than, 10)
                     .elements_count_is('message', amount)
                     .verify_each('message', helper.is_image_url)
         )

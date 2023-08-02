@@ -1,12 +1,16 @@
 {
+    "$defs": "!file config/DOG.CEO/defines.json",
+
     "GetRandomImage": {
+        "comment": "Some optional description...",
+
         "request": {
             "method": "GET",
             "path": "breeds/image/random"
         },
         "response": {
             "status_code": 200,
-            "schema_name": "single_image_response"
+            "schema": "!ref /$defs/schema/SingleImage"
         }
     },
     "GetMultipleRandomImages": {
@@ -23,7 +27,7 @@
         },
         "response": {
             "status_code": 200,
-            "schema_name": "multiple_images_response"
+            "schema": "!ref /$defs/schema/MultipleImages"
         }
     },
     "GetRandomImageByBreed": {
@@ -36,7 +40,7 @@
         },
         "response": {
             "status_code": 200,
-            "schema_name": "single_image_response"
+            "schema": "!ref /$defs/schema/SingleImage"
         }
     },
     "GetMultipleRandomImageByBreed": {
@@ -50,7 +54,7 @@
         },
         "response": {
             "status_code": 200,
-            "schema_name": "multiple_images_response"
+            "schema": "!ref /$defs/schema/MultipleImages"
         }
     }
 }

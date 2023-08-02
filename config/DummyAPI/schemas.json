@@ -22,5 +22,21 @@
             "page",
             "limit"
         ]
+    },
+    "UserFull": {
+        "$schema": "http://json-schema.org/draft-04/schema#",
+        "type": "object"
+    },
+    "OnUserDeleted": {
+
+        "$schema": "http://json-schema.org/draft-04/schema#",
+        "type": "object",
+        "properties": {
+            "id": {
+                "type": "string"
+            }
+        },
+        "required": ["id"],
+        "additionalProperties": false
     }
 }
