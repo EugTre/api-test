@@ -138,8 +138,7 @@ class DataReader:
         filename = DataReader.convert_path_to_platform_specific(filename)
 
         if not os.path.exists(filename):
-            raise FileNotFoundError(f'Failed to find "{filename}" file '
-                                     'during API configuration parsing.')
+            raise FileNotFoundError(f'Failed to find "{filename}" file.')
 
         with open(filename, 'r', encoding='utf-8') as file:
             content = None
