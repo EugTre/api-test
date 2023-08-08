@@ -1,3 +1,4 @@
+"""Data read module"""
 import os
 import platform
 import json

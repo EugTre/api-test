@@ -38,6 +38,23 @@ class Pointer:
     def __str__(self):
         return f'{self.type.name}: {self.raw}'
 
+    def get_rfc_pointer(self) -> str:
+        """Returns pointer in format defined in RFC6901.
+        For Reference pointer - only pointer part will be returned.
+        For File reference pointer - empty string will be returned.
+
+        Returns:
+            str: pointer in RFC6901 format.
+        """
+        result = ''
+        if self.is_pointer:
+            result = self.raw
+        elif self.is_reference:
+            ptr = REF_SEP.join([p.replace('~', '~0').replace('/', '~1') for p in self.pointer])
+            result = f'{REF_SEP}{ptr}'
+
+        return result
+
     @staticmethod
     def from_string(pointer_str: str) -> Self:
         """Parses given string pointer and return instance of Pointer class.
@@ -68,7 +85,8 @@ class Pointer:
         if len(tokens) > 0:
             type_token = tokens[0]
             if tokens[0] in (FILE_PREFIX, REF_PREFIX) and len(tokens) == 1:
-                raise ValueError(f'Invalid pointer syntax of pointer "{pointer_str}". {POINTER_SYNTAX_HINT_MSG}')
+                raise ValueError(f'Invalid pointer syntax of pointer "{pointer_str}". '
+                                 '{POINTER_SYNTAX_HINT_MSG}')
             tokens = tokens[1:]
 
         if type_token and type_token == FILE_PREFIX:
@@ -92,7 +110,7 @@ class Pointer:
             if not pointer.startswith(POINTER_PREFIX):
                 raise ValueError(f'Pointer "{pointer_str}" should start '
                               'from root "/" element.'
-                              if is_pointer else
+                              if is_pointer or pointer.strip() != '' else
                               'Reference to the whole document is prohibited.')
 
             if len(pointer) > 1:

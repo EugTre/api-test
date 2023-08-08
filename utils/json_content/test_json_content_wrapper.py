@@ -225,7 +225,7 @@ class TestJsonContentWrapperGet:
         self, wrapper: JsonContentWrapper, ptr: str):
         """Get using pointer to valid list node, but index is not integer
         should fail with exception"""
-        with pytest.raises(KeyError,
+        with pytest.raises(IndexError,
                            match='Invalid list index .*'):
             wrapper.get(ptr)
 
@@ -234,7 +234,7 @@ class TestJsonContentWrapperGet:
         self, wrapper: JsonContentWrapper, ptr: str):
         """Get using pointer that have not-integer index of list node in the middle
         should fail with exception"""
-        with pytest.raises(KeyError,
+        with pytest.raises(IndexError,
                            match='Invalid list index .*'):
             wrapper.get(ptr)
 
@@ -324,7 +324,7 @@ class TestJsonContentWrapperUpdate:
     def test_json_content_wrapper_update_using_append_char_in_middle_fails(self, wrapper):
         """Update attempt to modify content using '-' (append char)
         in the middle of the pointer"""
-        with pytest.raises(KeyError, match='Invalid list index ".*" at node.*'):
+        with pytest.raises(IndexError, match='Invalid list index ".*" at node.*'):
             wrapper.update('/c/-/-', 100)
 
     @pytest.mark.parametrize('ptr', TestData.INVALID_POINTERS)
@@ -350,7 +350,7 @@ class TestJsonContentWrapperUpdate:
         self, wrapper: JsonContentWrapper, ptr: str):
         """Update using pointer to valid list node, but index is not integer
         should fail with exception"""
-        with pytest.raises(KeyError,
+        with pytest.raises(IndexError,
                            match='Invalid list index .*'):
             wrapper.update(ptr, 333)
 

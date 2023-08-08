@@ -10,7 +10,7 @@ EXC_MSG__INVALID_POINTER_TYPE = 'Invalid pointer "{pointer_str}". '\
 EXC_MSG__UPDATE_ROOT_ERROR = 'Direct root modifications is not allowed! ' \
                              'Specified pointer is required to add/update keys!'
 EXC_MSG__INVALID_STORAGE = 'Path node "/{path}" at pointer "{pointer}" '\
-                           'is not a dict or list'
+                           'is not a dict or list.'
 EXC_MSG__DICT_KEY_NOT_EXISTS = 'Key "{key}" is not present ' \
                                'in node "/{path}" of pointer "{pointer}".'
 EXC_MSG__LIST_INDEX_OOB = 'Index "{key}" is out of range for given node "/{path}" ' \
@@ -233,7 +233,7 @@ class JsonContentWrapper(AbstractJsonContentWrapper):
                 if self.__suppress_exceptions:
                     return None
 
-                raise KeyError(self.__format_exc(
+                raise IndexError(self.__format_exc(
                     EXC_MSG__LIST_INDEX_ERROR,
                     key = key,
                     hint = (EXC_MSG_HINT__RANGE

@@ -2,22 +2,24 @@
 including inner content and external file references."""
 
 import copy
-import builtins
 
 from typing import Self, Any
 from utils.data_reader import DataReader
 from utils.json_content.json_content_wrapper import AbstractJsonContentWrapper, JsonContentWrapper
-from utils.json_content.pointer import Pointer, REF_SEP, ROOT_POINTER
+from utils.json_content.reference_resolver import AbstractReferenceResolver, ReferenceResolver
+from utils.json_content.pointer import ROOT_POINTER
 
 class JsonContent:
     """Class to wrap JSON with get/update/delete methods and
     reference resolution mechanism"""
-    __slots__ = ["content",
-                 "__stack_nodes", "__stack", "__ref_cache", "__file_cache"]
+    __slots__ = ["content", "resolver"]
 
-    def __init__(self, content: dict|list = None, from_file: str = None,
-                 make_copy: bool = False, allow_references: bool = False,
-                 wrapper: AbstractJsonContentWrapper = JsonContentWrapper):
+    def __init__(self, content: dict|list,
+                 allow_references: bool = False,
+                 enable_cache: bool = False,
+                 wrapper: AbstractJsonContentWrapper = JsonContentWrapper,
+                 resolver: AbstractReferenceResolver = ReferenceResolver
+                ):
         """Create a new instance of `JsonContent` wrapper class.
         One may use existing dictionary (by using 'content' arg) or read JSON
         data from a file ('from_file' arg).
@@ -34,21 +36,13 @@ class JsonContent:
             wrapper (AbstractJsonContentWrapper, optional): Content wrapper class to
             use for content wrapping. Defaults to JsonContentWrapper.
         """
-        if from_file:
-            content = DataReader.read_json_from_file(from_file)
-
         if content is None:
             content = {}
-        elif not from_file and make_copy:
-            content = copy.deepcopy(content)
 
         self.content = wrapper(content)
-        self.__stack_nodes = []
-        self.__stack = []
-        self.__file_cache = {}
-        self.__ref_cache = {}
         if allow_references:
-            self._resolve(self.get(), ROOT_POINTER)
+            self.resolver = resolver(self.content, enable_cache)
+            self.resolver.resolve(self.get(), ROOT_POINTER)
 
     def get(self, pointer: str = ROOT_POINTER, make_copy: bool = False) -> Any:
         """Returns property at given pointer.
@@ -82,10 +76,15 @@ class JsonContent:
         """Updates or add content to wrapped JSON structure.
         If end key is not exists - it will be added with new value,
         but non-existent keys in the middle cause KeyError exception.
+        On update of a list one can use:
+        - element index in range of list (starts from 0)
+        - element's negative index in range of list (e.g. -1 means last element)
+        - append char "-" to add new element in the end
 
         Args:
             pointer (str): JSON pointer to a property as string.
-            value (Any): New value to set.
+            value (Any): New value to set. May be a '!ref' or '!file' pointer which
+            will be resolved before updating content.
 
         Raises:
             ValueError: on attempt to update root node.
@@ -99,26 +98,26 @@ class JsonContent:
         ```
         # Initial
         ctn = JsonContent({
-            "a": {
-                "b": {
-                    "c": 100
-                }
-            }
+            "a": {"nested": 100}
+            "b": [1,2,3]
         })
         #  Node update:
-        ctn.update("/a/b/c", 20)
-        ctn.update("/a/b/d", 30)
+        ctn.update("/a/nested", 20)
+        ctn.update("/b/0", 20)
+        # Node add
+        ctn.update("/a/new", 40)
+        ctn.update("/b/-", 40)
         # Result:
         {
             "a": {
-                "b": {
-                    "c": 20,
-                    "d": 30
-                }
+                "nested": 20,
+                "new": 40
             }
+            "b": [20, 2, 3, 40]
         }
         """
 
+        value = self.resolver.resolve(value, '<update>')
         self.content.update(pointer, value)
         return self
 
@@ -145,172 +144,6 @@ class JsonContent:
 
         return self
 
-    def _resolve(self, value: Any, context_str: str) -> Any:
-        """Resolves given value:
-        - if value is collection - recursevly loop through and resolve nested values;
-        - if a string - check for "!ref" and "!file" prefix and resolve references if needed;
-        - otherwise - return value as is.
-
-        Args:
-            value (Any): value to resolve.
-            context_str (str | None): context descriptor (parent node), used for
-            error reporting.
-
-        Returns:
-            Any: resolved value.
-        """
-        self.__stack_nodes.append(context_str)
-
-        match type(value):
-            case builtins.dict:
-                for key, item_value in value.items():
-                    value[key] = self._resolve(item_value, key)
-
-            case builtins.list:
-                value = [self._resolve(element, str(i))
-                         for i, element in enumerate(value)]
-
-            case builtins.str:
-                if Pointer.match_ref_pointer(value):
-                    value = self._resolve_reference(value)
-                elif Pointer.match_file_ref_pointer(value):
-                    value = self._resolve_file_reference(value)
-
-        self.__stack_nodes.pop()
-        return value
-
-    def _resolve_reference(self, ptr: str) -> str|dict|list|int|float|None:
-        """Resolves node/key reference.
-        Content's values will be also resolved before returning.
-
-        Caches result for futher use, for same 'ptr' same
-        content will be returned.
-
-        Args:
-            ptr (Pointer): reference to a JSON's dict node/list index.
-
-        Raises:
-            ValueError: when recursion was detected.
-            KeyError: when fails to find node or key in dictionary.
-
-        Returns:
-            str|dict|list|int|float|None: resolved value.
-        """
-
-        if ptr in self.__ref_cache:
-            return self.__copy_value(self.__ref_cache[ptr])
-
-        self.__check_for_recursion(ptr, context_is_ref=True)
-        self.__stack.append(ptr)
-
-        try:
-            value = self.content.get(ptr)
-        except KeyError as err:
-            err.add_note(f'Failed to resolve reference "{ptr}" - '
-                         f'key "{err.args[0]}" does not exists!\n'
-                         f'{self.__get_nodepath_msg()}')
-            raise err
-
-        # Reference may point to a another reference or to a file, or nested ref/file.
-        # Therefore - resolve data before return
-        print('Resolving values from reference "%s"', ptr)
-        value = self._resolve(value, f'<by ref>{ptr}')
-
-        self.__ref_cache[ptr] = value
-        self.__stack.pop()
-
-        return self.__copy_value(value)
-
-    def _resolve_file_reference(self, ptr: str) -> dict|list|None:
-        """Resolves file reference by reading given JSON file's content.
-        Content's values will be also resolved before returning.
-
-        Caches result for futher use, for same 'filepath_str' same
-        content will be returned.
-
-        Args:
-            filepath_str (str): reference to a JSON file,
-            in format '!file path/to/file'
-
-        Raises:
-            ValueError: when recursion was detected.
-            FileNotFound: when file is missing.
-            json.decoder.JSONDecodeError: when JSON decoding failed.
-
-        Returns:
-            dict|list|None: JSON content of the file
-        """
-
-        if ptr in self.__file_cache:
-            return self.__copy_value(self.__file_cache[ptr])
-
-        self.__check_for_recursion(ptr)
-        self.__stack.append(ptr)
-
-        # File may contain references or file references, or/and nested ref/file.
-        # Therefore - resolve data before return.
-        print('Read values from file "%s"', ptr)
-        try:
-            content = DataReader.read_json_from_file(ptr.pointer)
-        except Exception as err:
-            err.add_note(self.__get_nodepath_msg())
-            raise err
-
-        print('Resolving values from reference "%s"', ptr)
-        content = self._resolve(content, '<from file>')
-
-        self.__file_cache[ptr] = content
-        self.__stack.pop()
-
-        return content
-
-    def __check_for_recursion(self, path: str, context_is_ref: bool = False) -> None:
-        """Checks for recursion during reference resolution.
-        If recursion detected - raises ValueError exception.
-
-        Recursion will be detected if given 'path' (reference or file path) already
-        in the stack, meaning that same path is already in use during resolution of
-        another reference.
-
-        Args:
-            path (str): path of reference or file to check.
-            context_is_ref (bool, optional): mark context as Reference (True), or File (False).
-            Defaults to False.
-
-        Raises:
-            ValueError: when recursion was detected.
-        """
-        if path not in self.__stack:
-            return
-
-        # Duplicate node found - raise an exception with details
-        stack_size = len(self.__stack)
-        merge_diff = 0
-        if stack_size < len(self.__stack_nodes) - 1:
-            merge_diff = len(self.__stack_nodes) - stack_size
-            nodes = [
-                REF_SEP.join(self.__stack_nodes[:merge_diff]),
-                *self.__stack_nodes[merge_diff:-1]
-            ]
-        else:
-            nodes = REF_SEP.join(self.__stack_nodes)
-
-        full_stack = '\n'.join(
-            [f'     Node "{node}" -> "{stack}"'
-            for node, stack in zip(nodes, self.__stack)]
-        )
-        failed_at = f' [x] Node: "{self.__stack_nodes[-1]}" -> "{path}"'
-
-        context_name = 'Reference' if context_is_ref else 'File'
-        raise RecursionError(
-            f'Recursion detected! {context_name} "{path}" already in the stack.\n'
-            f'Full stack:\n{full_stack}\n{failed_at}\n'
-            f'{self.__get_nodepath_msg()}' )
-
-    def __get_nodepath_msg(self) -> str:
-        """Formats reference path for error messaging."""
-        return f'Problem occured on parsing key "{REF_SEP.join(self.__stack_nodes)}"'
-
     @staticmethod
     def __copy_value(value: Any):
         """Makes deepcopy of mutable JSON value (dict or list)
@@ -322,3 +155,111 @@ class JsonContent:
             Any: copy (if value is mutable) of value or value
         """
         return copy.deepcopy(value) if isinstance(value, (dict, list)) else value
+
+class JsonContentBuilder:
+    """Builder class to create and setup isntnace of JsonContent.
+
+    By default:
+        - Content is empty dict = {};
+        - Reference resolution is disabled;
+        - Reference cache is disabled;
+        - Wrapper class is `json_content.json_content_wrapper.JsonContentWrapper`;
+        - Reference resolver is `json_content.reference_resolver.ReferenceResolver`.
+
+    """
+    def __init__(self):
+        self.content = {}
+        self.allow_reference_resolution = False
+        self.enable_reference_cache = False
+        self.wrapper_class = JsonContentWrapper
+        self.resolver_class = ReferenceResolver
+
+    def build(self) -> JsonContent:
+        """Creates instance of `JsonContent` class with desired setup."""
+        return JsonContent(content=self.content,
+                            allow_references=self.allow_reference_resolution,
+                            enable_cache=self.enable_reference_cache,
+                            wrapper=self.wrapper_class,
+                            resolver=self.resolver_class)
+
+    def from_data(self, content: dict|list, make_copy: bool = False) -> Self:
+        """Sets source of data for JsonContent object - variable or literal.
+
+        Args:
+            content (dict | list): data to wrap by JsonContent.
+            make_copy (bool, optional): Flag to use a deep copy of data. Defaults to False.
+
+        Returns:
+            Self: builder instance
+        """
+        self.content = copy.deepcopy(content) if make_copy else content
+        return self
+
+    def from_file(self, filepath: str) -> Self:
+        """Reads content data for JsonContent object from given JSON file.
+
+        Args:
+            filepath (str): path to file with JSON content.
+
+        Returns:
+            Self: builder instance.
+        """
+        self.content = DataReader.read_json_from_file(filepath)
+        return self
+
+    def set_reference_policy(self, allow: bool, cache: bool) -> Self:
+        """Sets policy of reference handling. If references allowed (`allow` = True),
+        values like '!ref /a/b' or '!file file.json' will be considered as references,
+        and will be resolved to actual values (e.g. !ref /a/b will be replaced
+        with value at pointer /a/b of content; for file - file content fill be read
+        and placed as value).
+
+        If `cache` is set to True: resolved references will be saved and if the same
+        reference occures once again - it will be instantly resolved to the very
+        same value (copy will be used).
+        Use it when your content refers to the same file or value.
+
+        Args:
+            allow (bool): allow reference resolution.
+            cache (bool): allow caching of resolved references.
+
+        Returns:
+            Self: builder instance.
+        """
+        self.allow_reference_resolution = allow
+        self.enable_reference_cache = cache
+
+    def set_wrapper(self, wrapper: AbstractJsonContentWrapper) -> Self:
+        """Sets preferred wrapper class.
+        Wrapper is a class inherited from `AbstractJsonContentWrapper`
+        that's provide get, update and delete methods to access actual
+        content by JSON pointer.
+
+        By default `json_content.json_content_wrapper.JsonContentWrapper`
+        will be used.
+
+        Args:
+            wrapper (AbstractJsonContentWrapper): _description_
+
+        Returns:
+            Self: _description_
+        """
+        self.wrapper_class = wrapper
+        return self
+
+    def set_resolver(self, resolver: AbstractReferenceResolver) -> Self:
+        """Sets preferred reference resolver class.
+        Reference resolver is a class inherited from `AbstractReferenceResolver`
+        that's provide resolve method to resolve reference values in actual data.
+
+        By default `json_content.reference_resolver.ReferenceResolver`
+        will be used.
+
+        Args:
+            wrapper (AbstractJsonContentWrapper): _description_
+
+        Returns:
+            Self: _description_
+        """
+        self.resolver_class = resolver
+        return self
