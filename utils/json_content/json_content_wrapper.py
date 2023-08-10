@@ -23,24 +23,44 @@ EXC_MSG_HINT__FORMAT = 'Index must be signed integer (to update specific '\
                        'index in list bounds) or "-" (to append new element).'
 
 
-class AbstractJsonContentWrapper(ABC):
+class AbstractContentWrapper(ABC):
     """Abstract cl1ass for json content wrappers"""
     @abstractmethod
-    def get(self, pointer) -> Any:
+    def __init__(self, content: dict|list):
+        """Instance should be created using "content" variable"""
+
+    @abstractmethod
+    def has(self, pointer: str) -> bool:
+        """Returns True if key exists in the content"""
+
+    @abstractmethod
+    def get(self, pointer: str) -> Any:
         """Returns value at given pointer from the content
         or return entire content."""
 
     @abstractmethod
-    def update(self, pointer, value) -> bool:
+    def get_or_default(self, pointer: str, default_value: Any) -> Any:
+        """Returns value of existent key or default_value if not found."""
+
+    @abstractmethod
+    def update(self, pointer: str, value: Any) -> bool:
         """Updates value at given pointer in the content."""
 
     @abstractmethod
-    def delete(self, pointer) -> bool:
+    def delete(self, pointer: str) -> bool:
         """Removes value at given pointer from the content
         or clears entire content."""
 
+    @abstractmethod
+    def __eq__(self, other) -> bool:
+        """Equals should compare content"""
 
-class JsonContentWrapper(AbstractJsonContentWrapper):
+    @abstractmethod
+    def __contains__(self, pointer) -> bool:
+        """Pointer is in the content"""
+
+
+class JsonContentWrapper(AbstractContentWrapper):
     """Class to wrap JSON data with get/update/delete methods that use JSON Pointers"""
     __slots__ = ['__content', '__suppress_exceptions', '__context']
 
@@ -49,11 +69,27 @@ class JsonContentWrapper(AbstractJsonContentWrapper):
         self.__suppress_exceptions = False
         self.__context = None
 
+    def has(self, pointer: str) -> bool:
+        """Checks that property presents in the content.
+        Returns True if pointer refers to existing property.
+
+        Args:
+            pointer (str): JSON pointer to a property as string.
+
+        Returns:
+            bool: True if property presents, otherwise False.
+        """
+        if pointer == ROOT_POINTER:
+            return True
+
+        _, key = self.__get_property_storage(pointer, suppress_exc=True)
+        return key is not None
+
     def get(self, pointer: str) -> Any:
         """Returns property at given pointer.
 
         Args:
-            pointer (str, optional): JSON pointer to a property as string.
+            pointer (str): JSON pointer to a property as string.
 
         Raises:
             IndexError: on attempt to get element of list by out of bound index.
@@ -66,6 +102,26 @@ class JsonContentWrapper(AbstractJsonContentWrapper):
             return self.__content
 
         storage, key = self.__get_property_storage(pointer)
+        return storage[key]
+
+    def get_or_default(self, pointer: str, default_value: Any) -> Any:
+        """Returns property at given pointer or default_value
+        if property is not present.
+
+        Args:
+            pointer (str): JSON pointer to a property as string.
+            default_value (Any): value to fallback to.
+
+        Returns:
+            Any: property's value or 'default_value'
+        """
+        if pointer == ROOT_POINTER:
+            return self.__content
+
+        storage, key = self.__get_property_storage(pointer, suppress_exc=True)
+        if key is None:
+            return default_value
+
         return storage[key]
 
     def update(self, pointer: str, value: Any) -> bool:
@@ -273,3 +329,11 @@ class JsonContentWrapper(AbstractJsonContentWrapper):
             path = POINTER_PREFIX.join(self.__context[1]),
             **kwargs
         )
+
+    def __eq__(self, other: AbstractContentWrapper):
+        if not isinstance(other, AbstractContentWrapper):
+            return False
+        return self.__content == other.get('')
+
+    def __contains__(self, pointer: str):
+        return self.has(pointer)

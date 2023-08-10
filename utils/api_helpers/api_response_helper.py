@@ -5,7 +5,7 @@ from requests import Response
 
 import allure
 from jsonschema import validate
-from utils.json_content.json_content import JsonContent
+from utils.json_content.json_content import JsonContent, JsonContentBuilder
 from utils.json_content.pointer import Pointer, POINTER_PREFIX
 
 class ApiResponseHelper:
@@ -116,7 +116,7 @@ class ApiResponseHelper:
         return self
 
     @allure.step('Validate response against JSON schema')
-    def validate(self, schema: dict = None) -> Self:
+    def validate_against_schema(self, schema: dict = None) -> Self:
         """Validates response against given JSONSchema or schema from request config,
         if pre-configured request was made.
         Wrapped with Allure.Step.
@@ -140,7 +140,7 @@ class ApiResponseHelper:
         if schema is None:
             schema = self.schema
 
-        validate(self.__get_json().get('/', False), schema)
+        validate(self.__get_json().get(), schema)
 
         return self
 
@@ -154,10 +154,13 @@ class ApiResponseHelper:
         if isinstance(response_json, dict):
             if ignore:
                 # Delete values to ignore - so it won't be compared
-                response_json = JsonContent(self.response_object.json).delete(ignore) \
-                                                                      .get('/', False)
+                response_json = JsonContentBuilder() \
+                                .from_data(self.response_object.json, True) \
+                                .build() \
+                                .delete(ignore) \
+                                .get()
             if isinstance(json, JsonContent):
-                json = json.get('/', False)
+                json = json.get()
 
         assert response_json == json, "Response's JSON is not equal to given one.\n"\
                 f'Expected: {json}\n'\
@@ -175,7 +178,7 @@ class ApiResponseHelper:
         Raises:
             RuntimeError: if response wan't acquired yet.
         """
-        assert not self.__get_json().get('/', False), \
+        assert not self.__get_json().get(), \
             'Response has JSON content, but expected to be empty.'
 
         return self
@@ -190,7 +193,7 @@ class ApiResponseHelper:
         Returns:
             Self: instance of class `ApiResponseHelper`
         """
-        assert self.__get_json().get('/', False), \
+        assert self.__get_json().get(), \
             'Response has no JSON content, but expected to be not empty.'
 
         return self
@@ -674,7 +677,8 @@ class ApiResponseHelper:
             dict: deserialized JSON data.
         '''
         if self.__json_content is None:
-            self.__json_content = JsonContent(self.response_object.json())
+            self.__json_content = JsonContentBuilder().from_data(self.response_object.json())\
+                .allow_reference_resolution(False, False).build()
         return self.__json_content
 
     def __get_value(self, pointer: str|Pointer) -> Any:

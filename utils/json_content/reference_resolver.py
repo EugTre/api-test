@@ -6,10 +6,13 @@ from abc import ABC, abstractmethod
 
 from utils.data_reader import DataReader
 from utils.json_content.pointer import Pointer, REF_SEP, ROOT_POINTER
-from utils.json_content.json_content_wrapper import AbstractJsonContentWrapper
+from utils.json_content.json_content_wrapper import AbstractContentWrapper
 
 class AbstractReferenceResolver(ABC):
     """Abstract class for JSON Content reference resolution"""
+    @abstractmethod
+    def __init__(self, content_context: AbstractContentWrapper, enable_cache: bool):
+        self.content = content_context
 
     @abstractmethod
     def resolve_all(self):
@@ -25,21 +28,22 @@ class AbstractReferenceResolver(ABC):
 
 
 class ReferenceResolver(AbstractReferenceResolver):
-    """Class to resolve references  in given `AbstractJsonContentWrapper` object."""
+    """Class to resolve references  in given `AbstractContentWrapper` object."""
     __slots__ = ["content","cache_enabled",
                  "__stack_nodes", "__stack",
                  "__ref_cache", "__file_cache"]
-    def __init__(self, content: AbstractJsonContentWrapper,
+    def __init__(self, content_context: AbstractContentWrapper,
                  enable_cache: bool = False):
         """Creates instance of `ReferenceResolver` class.
 
         Args:
-            content (AbstractJsonContentWrapper): content wrapper to work with.
+            content_context (AbstractContentWrapper): content wrapper to use as context
+            for reference resolution.
             enable_cache (bool, optional): flag to enable cache. If set to True result
             of the reference resolution will be saved in re-used on next occurrence
             of this referecne. Defaults to False.
         """
-        self.content = content
+        self.content = content_context
         self.cache_enabled = enable_cache
 
         self.__stack_nodes = []

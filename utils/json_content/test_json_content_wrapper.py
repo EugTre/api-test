@@ -174,6 +174,118 @@ class TestJsonContentWrapperGet:
         """Get by index pointer from list node is successful"""
         assert wrapper.get(pointer) == expected
 
+    @pytest.mark.parametrize('pointer', [
+        "/a",
+        "/a/b1",
+        "/a/b2/0",
+        "/a/b2/-1",
+        "/c/1/enabled"
+    ])
+    def test_json_content_wrapper_has_on_existing_key(self,
+        wrapper: JsonContentWrapper, pointer: str):
+        """Has method returns True if pointer is valid"""
+        assert wrapper.has(pointer)
+
+    @pytest.mark.parametrize('pointer', [
+        "/x",
+        "/a/b2/5",
+        "/a/b2/-5",
+        "/a/b5/3",
+        "/c/5/enabled",
+        "/d/b2/0/3",
+        "/d/b2/-5/key",
+        "/a/b1/key",
+        "/a/b1/5"
+    ])
+    def test_json_content_wrapper_has_on_non_existing_key(self,
+        wrapper: JsonContentWrapper, pointer: str):
+        """Has method returns False if pointer is not exists"""
+        assert not wrapper.has(pointer)
+
+    @pytest.mark.parametrize('pointer', [
+        "/a",
+        "/a/b1",
+        "/a/b2/0",
+        "/a/b2/-1",
+        "/c/1/enabled",
+    ])
+    def test_json_content_wrapper_get_or_default_exists_returns_value(
+        self, wrapper: JsonContentWrapper, pointer: str):
+        """Get or default method for existend key return actual value"""
+        assert wrapper.get_or_default(pointer, False) == wrapper.get(pointer)
+
+    @pytest.mark.parametrize('pointer', [
+        "/x",
+        "/a/b2/5",
+        "/a/b2/-5",
+        "/a/b5/3",
+        "/c/5/enabled",
+        "/d/b2/0/3",
+        "/d/b2/-5/key"
+    ])
+    def test_json_content_wrapper_get_or_default_non_existent_returns_default(
+        self, wrapper: JsonContentWrapper, pointer: str):
+        """Get or default method for non-existend key return default value"""
+        assert wrapper.get_or_default(pointer, 333) == 333
+
+    def test_json_content_wrapper_equals(self):
+        """Wrappers with same contents equals"""
+        wrapper1 = JsonContentWrapper(copy.deepcopy(TestData.CONTENT))
+        wrapper2 = JsonContentWrapper(copy.deepcopy(TestData.CONTENT))
+
+        assert wrapper1.get('') == wrapper2.get('')
+        assert wrapper1.get('') is not wrapper2.get('')
+
+        wrapper1.update('/a/b1', 333)
+        wrapper2.update('/a/b1', 333)
+
+        assert wrapper1 is not wrapper2
+        assert wrapper1 == wrapper2
+
+    def test_json_content_wrapper_not_equals(self):
+        """Wrappers with different contents not equals"""
+        wrapper1 = JsonContentWrapper(copy.deepcopy(TestData.CONTENT))
+        wrapper2 = JsonContentWrapper(copy.deepcopy(TestData.CONTENT))
+
+        assert wrapper1.get('') == wrapper2.get('')
+        assert wrapper1.get('') is not wrapper2.get('')
+
+        # Only one content is updated
+        wrapper1.update('/a/b1', 333)
+
+        assert wrapper1 is not wrapper2
+        assert wrapper1 != wrapper2
+
+    @pytest.mark.parametrize('pointer', [
+        "/a",
+        "/a/b1",
+        "/a/b2/0",
+        "/a/b2/-1",
+        "/c/1/enabled"
+    ])
+    def test_json_content_wrapper_check_exists_by_in(self, pointer: str):
+        """Wrappers with different contents not equals"""
+        wrapper = JsonContentWrapper(copy.deepcopy(TestData.CONTENT))
+        assert pointer in wrapper
+
+    @pytest.mark.parametrize('pointer', [
+        "/x",
+        "//x",
+        "/a/b2/5",
+        "/a/b2/-5",
+        "/a/b5/3",
+        "/c/5/enabled",
+        "/c/-5/0",
+        "/d/b2/0/3",
+        "/d/b2/-5/key",
+        "/a/b1/key",
+        "/a/b1/5"
+    ])
+    def test_json_content_wrapper_check_not_exists_by_in(self, pointer: str):
+        """Wrappers with different contents not equals"""
+        wrapper = JsonContentWrapper(copy.deepcopy(TestData.CONTENT))
+        assert pointer not in wrapper
+
     # --- Negative tests
     @pytest.mark.parametrize('ptr', TestData.INVALID_POINTERS)
     def test_json_content_wrapper_get_by_invalid_pointer_fails(
@@ -448,7 +560,6 @@ class TestJsonContentWrapperArrayGet:
         """Get element by mixed key and index should be successful"""
         assert array_wrapper.get(ptr) == expected
 
-
 class TestJsonContentWrapperArrayUpdate:
     """Tests .update() method of JsonContentWrapper object based on JSON array"""
 
@@ -518,6 +629,7 @@ class TestJsonContentWrapperArrayDelete:
         """Deletion of entire content should be successful and return True"""
         assert array_wrapper.delete('')
         assert array_wrapper.get('') == []
+
 
 
 # --- Helper functions

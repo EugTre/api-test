@@ -6,10 +6,10 @@ import logging
 from configparser import ConfigParser
 
 from utils.data_reader import DataReader
-from utils.json_content.json_content import JsonContent
+from utils.json_content.json_content import JsonContentBuilder
 from utils.api_client.models import ApiConfiguration, \
     ApiClientSpecification, ApiClientsSpecificationCollection, \
-    RequestEntity, ResponseEntity, CatalogEntity
+    RequestEntity, ResponseEntity, RequestCatalogEntity
 
 
 class ApiConfigurationReader:
@@ -53,6 +53,10 @@ class ApiConfigurationReader:
             ApiSpecification: ready-to-go configuration of the API client.
         """
         logging.info('Generating API specification for API "%s".', api_name)
+        print(cfg)
+        if not cfg.get('url'):
+            raise ValueError(f'There is no "url" defined for "{api_name}" API Client '
+                             f'in configuration file "{self._config_file}".')
         api_cfg = ApiConfiguration(name=api_name, **cfg)
 
         # Timeout will be str if defined in base config, so we need to conver it
@@ -92,7 +96,7 @@ class ApiConfigurationReader:
 
     def compile_requests_catalog(self, api_config: ApiConfiguration) -> dict:
         """Compiles requests from catalog (e.g. 'requests.json') into request catalogue
-        usable by ApiClient (dict of `api_client.models.CatalogEntity` instances).
+        usable by ApiClient (dict of `api_client.models.RequestCatalogEntity` instances).
 
         Raw request catalog may contain '$defs' section in root as a collection of defines
         to be referenced from other parts of catalog file.
@@ -107,11 +111,9 @@ class ApiConfigurationReader:
         # Compile all references in catalog
         logging.info('Compiling Request catalog for "%s"', api_config.name)
 
-        json_content = JsonContent(
-            from_file=api_config.requests,
-            make_copy=False,
-            resolve_references=True
-        )
+        json_content = JsonContentBuilder().from_file(api_config.requests)\
+            .set_reference_policy(True, True).build()
+
         json_content.delete(self.REQUEST_CATALOG_DEFINES_KEY)
         compiled_catalog = json_content.get()
 
@@ -125,7 +127,7 @@ class ApiConfigurationReader:
                       api_config.name, len(compiled_catalog))
 
         for request_name, request_data in compiled_catalog.items():
-            requests_catalog[request_name] = CatalogEntity(
+            requests_catalog[request_name] = RequestCatalogEntity(
                 request_name,
                 RequestEntity(**request_data['request']),
                 ResponseEntity(**request_data['response'])

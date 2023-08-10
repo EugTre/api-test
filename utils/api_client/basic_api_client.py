@@ -2,8 +2,10 @@
 import logging
 from logging import ERROR, INFO
 from enum import Enum
+from abc import ABC, abstractmethod
 
 import requests
+from utils.api_client.models import RequestCatalogEntity
 
 DEFAULT_TIMEOUT = 240
 
@@ -15,8 +17,27 @@ class HTTPMethod(Enum):
     PATCH = 'patch'
     DELETE = 'delete'
 
+class AbstractApiClient(ABC):
+    """Abstract class for API Client"""
+    @abstractmethod
+    def __init__(self, base_url, endpoint, name, logger_name,
+                 request_defaults, request_catalog):
+        """Init required fields"""
 
-class BasicApiClient():
+    @abstractmethod
+    def request(self, method, path, override_defaults, **kwargs):
+        """Makes HTTP request, wrapping `requests.request` fucntion call"""
+
+    @abstractmethod
+    def get_api_url(self):
+        """Return fully qualified API url (url + endpoint)"""
+
+    @abstractmethod
+    def get_from_catalog(self, name: str):
+        """Get RequestCatalogEntity from api's client request catalog"""
+
+
+class BasicApiClient(AbstractApiClient):
     """Basic API Client class and base class for inheritence.
     Wraps `requests` module with little custom logic and logging of request & response.
 
@@ -80,6 +101,10 @@ class BasicApiClient():
         Args:
             method (str or `HTTPMethod` enum): method to make a request ('get', 'post', etc.)
             path (str): path relative to API base url (e.g. 'v1/check')
+            override_defaults(bool): flag to override default values of API Client. If True -
+            values passed in **params will override API Client's defaults. However for params
+            that not passed - defaults will still apply.
+            params(): additional keyword arguments for request.
 
         Returns:
             `requests.Response:`: :class:`Response <Response>` object
@@ -111,6 +136,20 @@ class BasicApiClient():
     def get_api_url(self) -> str:
         '''Returns API URL - base url + endpoint'''
         return self._compose_url('')
+
+    def get_from_catalog(self, name: str) -> RequestCatalogEntity:
+        """Selects and return 'RequestCatalogEntity' by given name.
+
+        Args:
+            name (str): name of the request entity
+
+        Returns:
+            RequestCatalogEntity: instance of `RequestCatalogEntity`
+        """
+        if name not in self.request_catalog:
+            return None
+
+        return self.request_catalog[name]
 
     def _prepare_request_params(self, method: str, path: str,
                                 override_defaults: bool, **params) -> dict:
@@ -172,7 +211,6 @@ class BasicApiClient():
             request_params['timeout'] = self.request_defaults['timeout']
 
         return request_params
-
 
     def _combine_values(self, request_value: dict, default_value: dict) -> None:
         """Safely merges 2 dictionaries (without overriding 'request_value').

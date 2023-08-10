@@ -1,7 +1,7 @@
 """Data read module"""
 import os
-import platform
 import json
+import pathlib
 import logging
 
 
@@ -17,12 +17,12 @@ class DataReader:
         Returns:
             tuple: tuple of parsed values
         """
-        logging.debug('Parsing tuple from [%s] of type %s.', value, type(value))
+        print(f'Parsing tuple from [{value}] of type {type(value)}.')
         if not value:
             return tuple()
 
         if isinstance(value, list):
-            logging.debug('Converting list to tuple')
+            print('Converting list to tuple')
             return tuple(list)
 
         # Try to parse tuple as is - e.g. quoted comma-separated values
@@ -30,12 +30,12 @@ class DataReader:
         parsed_value = [v.strip(' "\'')
                         for v in value.strip(" \n()").split(',')
                         if v.strip(' "\'')]
-        if parsed_value is not None:
-            logging.debug('Parsed tuple from line = %s', parsed_value)
+        if len(parsed_value) > 1:
+            print(f'Parsed tuple from line = {parsed_value}')
             return tuple(parsed_value)
 
         # If not parsed - consider value to be a filename and read it
-        logging.debug('Parsing tuple: read from file [%s]', value)
+        print(f'Parsing tuple: read from file [{value}]')
         return tuple(DataReader.read_json_from_file(value))
 
     @staticmethod
@@ -106,6 +106,7 @@ class DataReader:
         if not value:
             return {}
 
+        # Key-value pair should start from " or '
         value_substr = ''.join(value.strip('\n').split('\n'))
         if not (value_substr.startswith('"') or value_substr.startswith("'")):
             return None
@@ -123,7 +124,7 @@ class DataReader:
         return content
 
     @staticmethod
-    def read_json_from_file(filename: str) -> dict:
+    def read_json_from_file(filename: str|pathlib.Path) -> dict:
         """Reads json from given file.
         Args:
             filename (str): path to file.
@@ -136,7 +137,8 @@ class DataReader:
         if not filename:
             return {}
 
-        filename = DataReader.convert_path_to_platform_specific(filename)
+        if isinstance(filename, str):
+            filename = pathlib.Path(filename)
 
         if not os.path.exists(filename):
             raise FileNotFoundError(f'Failed to find "{filename}" file.')
@@ -146,23 +148,13 @@ class DataReader:
             try:
                 content = json.load(file)
             except json.decoder.JSONDecodeError as err:
-                error_line = err.doc.splitlines()[err.lineno - 1]
+                error_line = err.doc.splitlines()[err.lineno - 1] or ''
                 mark_error_line = ' ' * (err.colno-1)
                 err.add_note(f'Syntax error occured during "{filename}" file parsing.')
-                err.add_note(f'Failed on line {err.lineno}: \n{error_line}\n{mark_error_line}^')
+                err.add_note(f'Failed on line {err.lineno} (char: {err.colno-1}): '
+                            f'\n{error_line}\n{mark_error_line}^')
+                if not error_line.strip():
+                    err.add_note('No content to parse.')
                 raise err
 
             return content
-
-    @staticmethod
-    def convert_path_to_platform_specific(path: str) -> str|None:
-        """Converts separators in path to separator of current platform
-        Args:
-            path (str): path to file.
-        Returns:
-            str|None: path to file adopted to current system's style of separators.
-        """
-        if platform.system().lower() == 'windows':
-            return path.replace(r'/', os.sep)
-
-        return path.replace('\\', os.sep)

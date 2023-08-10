@@ -85,7 +85,7 @@ from utils.api_helpers.api_request_helper import ApiRequestHelper
 def test_random_image(self, api_request: ApiRequestHelper):
     api_request.by_name("GetRandomImage") \
                .perform() \
-               .validate() \
+               .validate_against_schema() \
                .latency_is_lower_than(1500) \
                .is_not_empty() \
                .value_equals('status', 'success')
@@ -112,20 +112,19 @@ client = utils.api_client.basic_api_client.BasicApiClient
 logger=api_test
 requests = config/DummyAPI/requests.json
 headers = config/DummyAPI/headers.json
-schemas = config/DummyAPI/schemas.json
 timeout = 120
 ```
 
 - The **name** of the section is considered as API name.
-- **url** and **endpoint** params - base URL and path for API to test.
-- **client** - module and classname of API client class to use.
-- **logger** - name of the logger to use for API client. See 'logging.ini'.
+- **url** - base URL for API to test. ***Required***.
+- **endpoint** - base URL and path for API to test. Default is `/`.
+- **client** - module and classname of API client class to use. Default `utils.api_client.basic_api_client.BasicApiClient`.
+- **logger** - name of the logger to use for API client. See 'logging.ini'. Default is ''.
 - **requests** - path to JSON file with pre-configured *request catalog*.
-- **schemas** - path to JSON file with JSON Schemas.
-- **timeout** - default request timeout for API client.
-- **headers** - path to JSON file with headers, OR headers as key-value pairs.
-- **cookies** - path to JSON file with cookies, OR cookies as key-value pairs.
-- **auth** - path to file with auth data, OR auth param, e.g. *("user","path")*.
+- **timeout** - default request timeout for API client. If defined - value will be applied to *every* request made by API Client. Default is 240 seconds.
+- **headers** - path to JSON file with headers, OR headers as comma-separated key-value pairs. If defined - values will be applied to *every* request made by API Client.
+- **cookies** - path to JSON file with cookies, OR cookies as comma-separated key-value pairs. If defined - values will be applied to *every* request made by API Client.
+- **auth** - path to file with auth data, OR auth param, e.g. *("user","path")*. If defined - values will be applied to *every* request made by API Client.
 
 ##### Example:
 ```ini
@@ -143,11 +142,11 @@ cookies =
 ```
 
 #### Request catalog
-It's possible to pre-configure requests and use them later with just a little touch.
+It's possible to pre-configure requests and use them later with just a little touch. Requests, and properties of each particular request defined in catalog will be used by `ApiRequestHelper` and 'ApiResponseHelper` as default values.
 
 Each entity is nested under unique key (*name* of the request) and should contain 2 section:
 - `request`: contains setup data for request - method, path, params, headers, cookies, etc.
-- `response`: contains data for response validation - status code, schema and/or schema name
+- `response`: contains data for response validation - status code, schema, expected headers, etc.
 
 #### `request` object
 Property | Value Example | Description
@@ -159,6 +158,15 @@ Property | Value Example | Description
 `headers`* | *{"Content-Type": "text/html; charset=utf-8"}* | Headers to add in request. Will be combined with base config level headers, overwritting headers with the same name.
 `cookies`* | *{"cookie1": "1"}* | Cookies to add in request. Will be combined with base config level cookies, overwritting cookies with the same name.
 `auth` | *["user","path"]* | Auth params to add in request. Overwrittes base config level auth values.
+`json` | *{"key": "value"}* | Default JSON payload for request.
+
+#### `response` object
+Property | Value Example | Description
+--- | --- | ---
+`status_code` | *200* | Expected status code number for response.
+`schema` | *{...}* | Expected JSON Schema (see https://json-schema.org/) for response.
+`json` | *{"key": "value"}* | Expected JSON payload for response.
+
 
 ****Note:*** both `headers` and `cookies` properties may be a reference to *.json* file with actual data in JSON format. Property value should be in format `"path/to/file.json"`. E.g.
 ```json
@@ -169,18 +177,49 @@ Property | Value Example | Description
 }
 ```
 
-#### `response` object
-Property | Value Example | Description
+#### Reference values and on-load compilation
+Request catalog file will be compiled on load - all references to properties or files will be resolved, and replaced with actual values.
+
+Reference type | Reference syntax | Description
 --- | --- | ---
-`status_code` | *200* | Expected status code number for response.
-`schema_name` | *"MySchema"* | Name of the JSON schema to use for validation. Schema will be looked in schema JSON file defined in base config.
-`schema` | *{...}* | One may define JSON schema directly in response object. `schema_name` property will be ignored.
+Reference | `!ref <JSONPointer>` | Value is JSON Pointer (see https://www.rfc-editor.org/rfc/rfc6901), will be replaced with value refered by pointer. JSON Pointer should be valid and should present in request catalog.
+File reference | `!file path/to/file.json` | Value is relative or absolute path to file, will be replaced with file's content. File should exists and be valid JSON file.
+
+For purpose of storing common values a special key `$defs` is allowed in request catalog root (other keys in root should be names of the objects). E.g.
+```json
+/* request catalog content */
+{
+    "$defs": {
+        "get": "GET",
+        "get_schema": "!file config/Api/schema.json"
+    },
+
+    "GetApiCall": {
+        "request": {
+            "method": "!ref /$defs/get"
+        },
+        "response": {
+            "status_code": 200,
+            "schema": "!ref /$defs/get_schema"
+        }
+    }
+}
+/* will be compiled to */
+{
+    "GetApiCall": {
+        "request": {
+            "method": "GET"
+        },
+        "response": {
+            "status_code": 200,
+            "schema": {/* schema from config/Api/schema.json */}
+        }
+    }
+}
+```
 
 #### Headers and Cookies files
 JSON file with key-values pairs to use for every request. May be overwritten by pre-configured request or directly in API client method parameters.
-
-#### Schemas file
-JSON file with JSON Schema (see https://json-schema.org/).
 
 
 ### Logging configuration (logging.ini)

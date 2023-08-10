@@ -2,8 +2,6 @@
     "$defs": "!file config/DOG.CEO/defines.json",
 
     "GetRandomImage": {
-        "comment": "Some optional description...",
-
         "request": {
             "method": "GET",
             "path": "breeds/image/random"
@@ -16,14 +14,7 @@
     "GetMultipleRandomImages": {
         "request": {
             "method": "GET",
-            "path": "breeds/image/random/{amount}",
-            "path_params": {
-                "comment": [
-                    "This is just an example of params and it's values.",
-                    "It still requires user to add params before request."
-                ],
-                "amount": 2
-            }
+            "path": "breeds/image/random/{amount}"
         },
         "response": {
             "status_code": 200,
@@ -33,10 +24,7 @@
     "GetRandomImageByBreed": {
         "request": {
             "method": "GET",
-            "path": "breed/{breed}/images/random",
-            "path_params": {
-                "breed": "pug"
-            }
+            "path": "breed/{breed}/images/random"
         },
         "response": {
             "status_code": 200,
@@ -46,11 +34,7 @@
     "GetMultipleRandomImageByBreed": {
         "request": {
             "method": "GET",
-            "path": "breed/{breed}/images/random/{amount}",
-            "path_params": {
-                "breed": "pug",
-                "amount": 2
-            }
+            "path": "breed/{breed}/images/random/{amount}"
         },
         "response": {
             "status_code": 200,

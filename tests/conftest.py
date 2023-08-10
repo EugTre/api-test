@@ -8,7 +8,7 @@ from logging.config import fileConfig
 import allure
 import pytest
 
-from utils.api_client.models import ApiClientsConfigurationCollection
+from utils.api_client.models import ApiClientsSpecificationCollection
 from utils.api_client.setup_api_client import setup_api_client
 from utils.api_client.api_configuration_reader import ApiConfigurationReader
 
@@ -60,7 +60,7 @@ def setup_loggers(request):
     fileConfig(logger_config)
 
 @pytest.fixture(scope='session')
-def api_clients_configurations(request) -> ApiClientsConfigurationCollection:
+def api_clients_configurations(request) -> ApiClientsSpecificationCollection:
     """Setups api by configuration provided by --api-config command-line argument"""
     api_config_file = request.config.getoption("--api-config")
     if not os.path.exists(api_config_file):
@@ -89,7 +89,7 @@ def logger(request, setup_loggers):
 def api_client(
     request,
     setup_loggers,
-    api_clients_configurations: ApiClientsConfigurationCollection
+    api_clients_configurations: ApiClientsSpecificationCollection
 ) -> BasicApiClient:
     '''Returns object inherited from `BasicApiClient` class.
 

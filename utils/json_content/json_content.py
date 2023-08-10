@@ -5,7 +5,7 @@ import copy
 
 from typing import Self, Any
 from utils.data_reader import DataReader
-from utils.json_content.json_content_wrapper import AbstractJsonContentWrapper, JsonContentWrapper
+from utils.json_content.json_content_wrapper import AbstractContentWrapper, JsonContentWrapper
 from utils.json_content.reference_resolver import AbstractReferenceResolver, ReferenceResolver
 from utils.json_content.pointer import ROOT_POINTER
 
@@ -17,7 +17,7 @@ class JsonContent:
     def __init__(self, content: dict|list,
                  allow_references: bool = False,
                  enable_cache: bool = False,
-                 wrapper: AbstractJsonContentWrapper = JsonContentWrapper,
+                 wrapper: AbstractContentWrapper = JsonContentWrapper,
                  resolver: AbstractReferenceResolver = ReferenceResolver
                 ):
         """Create a new instance of `JsonContent` wrapper class.
@@ -33,16 +33,33 @@ class JsonContent:
             allow_references (bool, optional): Enable reference resolution for
             reference pointers values (like '!ref /a/b' and '!file file.json').
             Defaults to False.
-            wrapper (AbstractJsonContentWrapper, optional): Content wrapper class to
+            wrapper (AbstractContentWrapper, optional): Content wrapper class to
             use for content wrapping. Defaults to JsonContentWrapper.
         """
         if content is None:
             content = {}
 
-        self.content = wrapper(content)
+        if not isinstance(content, (dict, list)):
+            raise ValueError('Content must be JSON-like of type dict or list! '
+                             f'Given value is {type(content)}.')
+
+        self.content: AbstractContentWrapper = wrapper(content)
+        self.resolver: AbstractReferenceResolver = None
         if allow_references:
             self.resolver = resolver(self.content, enable_cache)
-            self.resolver.resolve(self.get(), ROOT_POINTER)
+            self.resolver.resolve_all()
+
+    def has(self, pointer: str) -> bool:
+        """Checks that property presents in the content.
+        Returns True if pointer refers to existing property.
+
+        Args:
+            pointer (str): JSON pointer to a property as string.
+
+        Returns:
+            bool: True if property presents, otherwise False.
+        """
+        return self.content.has(pointer)
 
     def get(self, pointer: str = ROOT_POINTER, make_copy: bool = False) -> Any:
         """Returns property at given pointer.
@@ -70,6 +87,22 @@ class JsonContent:
         ```
         """
         value = self.content.get(pointer)
+        return self.__copy_value(value) if make_copy else value
+
+    def get_or_default(self, pointer: str, default_value: Any, make_copy: bool = False) -> Any:
+        """Returns property at given pointer or default_value
+        if property is not present.
+
+        Args:
+            pointer (str): JSON pointer to a property as string.
+            default_value (Any): value to fallback to.
+            make_copy (bool, optional): Flag to return a copy of the mutable property.
+            Defaults to False.
+
+        Returns:
+            Any: property's value or 'default_value'
+        """
+        value = self.content.get_or_default(pointer, default_value)
         return self.__copy_value(value) if make_copy else value
 
     def update(self, pointer: str, value: Any) -> Self:
@@ -117,17 +150,18 @@ class JsonContent:
         }
         """
 
-        value = self.resolver.resolve(value, '<update>')
+        if self.resolver is not None:
+            value = self.resolver.resolve(value, '<update>')
         self.content.update(pointer, value)
         return self
 
-    def delete(self, pointers: str|tuple|list) -> Self:
+    def delete(self, *pointers: str) -> Self:
         """Deletes node at given pointer or several nodes, if list
         of pointers was given.
         No error will be raised if desired node doesn't exists.
 
         Node deletion - Args:
-            pointers (str): JSON pointer to a property as string. Pointer may be
+            pointers (str): JSON pointers to a property as strings. Pointer may be
             root ('/') - entire JSON structure will be cleared.
 
         Bulk deletion - Args:
@@ -136,13 +170,29 @@ class JsonContent:
         Returns:
             Self: instance of `JsonContent` class
         """
-        if isinstance(pointers, str):
-            pointers = (pointers, )
-
         for ptr in pointers:
             self.content.delete(ptr)
 
         return self
+
+    def invalidate_cache(self) -> Self:
+        """Invalidate cache of underlaying ReferenceResolver.
+
+        Returns:
+            Self: instance of `JsonContent` class
+        """
+        self.resolver.invalidate_cache()
+
+    def __eq__(self, other: Self):
+        if not isinstance(other, JsonContent):
+            return False
+
+        return self.content.get('') == other.content.get('')
+
+    def __contains__(self, pointer: str):
+        if not isinstance(pointer, str):
+            return False
+        return pointer in self.content
 
     @staticmethod
     def __copy_value(value: Any):
@@ -228,10 +278,11 @@ class JsonContentBuilder:
         """
         self.allow_reference_resolution = allow
         self.enable_reference_cache = cache
+        return self
 
-    def set_wrapper(self, wrapper: AbstractJsonContentWrapper) -> Self:
+    def set_wrapper(self, wrapper: AbstractContentWrapper) -> Self:
         """Sets preferred wrapper class.
-        Wrapper is a class inherited from `AbstractJsonContentWrapper`
+        Wrapper is a class inherited from `AbstractContentWrapper`
         that's provide get, update and delete methods to access actual
         content by JSON pointer.
 
@@ -239,7 +290,7 @@ class JsonContentBuilder:
         will be used.
 
         Args:
-            wrapper (AbstractJsonContentWrapper): _description_
+            wrapper (AbstractContentWrapper): _description_
 
         Returns:
             Self: _description_
@@ -256,7 +307,7 @@ class JsonContentBuilder:
         will be used.
 
         Args:
-            wrapper (AbstractJsonContentWrapper): _description_
+            wrapper (AbstractContentWrapper): _description_
 
         Returns:
             Self: _description_

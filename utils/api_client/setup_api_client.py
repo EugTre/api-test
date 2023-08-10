@@ -2,12 +2,12 @@
 """
 import importlib
 
-from utils.api_client.models import ApiClientsConfigurationCollection
-from utils.api_client.basic_api_client import BasicApiClient
+from utils.api_client.models import ApiClientsSpecificationCollection
+from utils.api_client.basic_api_client import AbstractApiClient
 
 def setup_api_client(api_name: str,
-                     api_clients_configurations: ApiClientsConfigurationCollection
-) -> BasicApiClient:
+                     api_clients_configurations: ApiClientsSpecificationCollection
+) -> AbstractApiClient:
     """Creates and configures API Client object with config file data.
 
     Args:
@@ -19,8 +19,8 @@ def setup_api_client(api_name: str,
     """
     if api_name not in api_clients_configurations.configs:
         raise ValueError(f'There is no config for API "{api_name}" '
-                         f'in "{api_clients_configurations.source_file}" config file!'
-                         f'Available: {api_clients_configurations.configs.keys()}')
+                         f'in "{api_clients_configurations.source_file}" config file! '
+                         f'Available: {",".join(api_clients_configurations.configs.keys())}')
 
     api_spec = api_clients_configurations.configs[api_name]
 
@@ -30,7 +30,11 @@ def setup_api_client(api_name: str,
         raise ModuleNotFoundError(f'Failed to find API client module named \'{module_name}\' '
                                   f'for "{api_spec.name}" API.')
 
-    client = getattr(importlib.import_module(module_name), klass_name)
+    module = importlib.import_module(module_name)
+    if not hasattr(module, klass_name):
+        raise ModuleNotFoundError(f'Failed to find API client class "{klass_name}" in module '
+                                  f'\'{module_name}\' for "{api_spec.name}" API.')
+    client = getattr(module, klass_name)
 
     print('-' * 100)
     spec = api_spec.as_dict()
@@ -39,7 +43,7 @@ def setup_api_client(api_name: str,
         print(f'{name:>15}: {spec[name]}')
 
     print('\nRequest Defaults:')
-    for name in ('headers', 'cookies', 'auth', 'timeout', 'schemas'):
+    for name in ('headers', 'cookies', 'auth', 'timeout'):
         print(f'{name:>15}: {spec["request_defaults"][name]}')
 
     print('\nRequest Catalogue:')

@@ -15,7 +15,6 @@ class ApiConfiguration:
     auth: str|tuple = None
     headers: str|dict = None
     cookies: str|dict = None
-    schemas: str|dict = None
     name: str = ''
 
 @dataclass(slots=True)
@@ -45,8 +44,7 @@ class ApiClientSpecification:
             'timeout': api_config.timeout,
             'headers': api_config.headers,
             'cookies': api_config.cookies,
-            'auth': api_config.auth,
-            'schemas': api_config.schemas
+            'auth': api_config.auth
         }
         self.request_catalog = req_catalog
 
@@ -88,7 +86,7 @@ class ResponseEntity:
     headers: dict = None
 
 @dataclass(frozen=True, slots=True)
-class CatalogEntity:
+class RequestCatalogEntity:
     """Model for API Request catalogue dictionary value"""
     name: str
     request: RequestEntity

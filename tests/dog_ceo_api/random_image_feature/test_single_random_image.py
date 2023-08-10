@@ -21,7 +21,7 @@ class Test_RandomImage_SingleImage:
            return URI to image MIME type file'''
         (api_request.by_name("GetRandomImage")
                     .perform()
-                    .validate()
+                    .validate_against_schema()
                     .is_not_empty()
                     .value_equals('status', 'success')
                     .value_is_not_empty('message')

@@ -24,19 +24,19 @@ class ApiRequestHelper:
         self.api_client = api_client
         self.name = ''
         self.request = None
-        self.expected = {
-            "status_code": None,
-            "schema": None,
-            "headers": None,
-            "json": None
-        }
+        self.expected = None
 
     def _reset(self):
         """Resets all properties to defaults.
         """
         self.name = ''
         self.request = None
-        self.response_helper = None
+        self.expected = {
+            "status_code": None,
+            "schema": None,
+            "headers": None,
+            "json":  None
+        }
 
     # Request setup
     def by_name(self, name: str) -> Self:
@@ -54,12 +54,27 @@ class ApiRequestHelper:
         """
         self._reset()
         self.name = name
-        req_cfg = self.api_client.request_catalog.get(name)
+        req_cfg = self.api_client.get_from_catalog(name)
         if not req_cfg:
             raise ValueError(f'Unknown request name "{name}" for API '
                              f'"{self.api_client.name}"')
 
+        # Collect use by default path and query params
+        path_params = {}
+        if req_cfg.request.path_params.get('@use'):
+            for default_param_name in req_cfg.request.path_params['@use']:
+                path_params[default_param_name] = req_cfg.request.path_params[default_param_name]
+
+        query_params = {}
+        if req_cfg.request.query_params.get('@use'):
+            for default_param_name in req_cfg.request.query_params['@use']:
+                query_params[default_param_name] = req_cfg.request.query_params[default_param_name]
+
         self.request = copy.deepcopy(req_cfg.request)
+        if path_params:
+            self.request.path_params(path_params)
+        if query_params:
+            self.request.query_params(query_params)
 
         self.expected["status_code"] = req_cfg.response.status_code
         self.expected["schema"] = req_cfg.response.schema
@@ -94,7 +109,7 @@ class ApiRequestHelper:
 
     def with_path_params(self, **path_params) -> Self:
         """Adds params which should be inserted into path's placeholders.
-        Appends defaults params if defined for request.
+        Appends/overwrites defaults params if defined for request.
 
         Args:
             **path_params - param's placeholder names and values.
@@ -114,20 +129,13 @@ class ApiRequestHelper:
         """
         self.__check_request_initialized()
 
-        if self.request.path_params.get('@use'):
-            for default_param_name in self.request.path_params['@use']:
-                path_params.setdefault(
-                    default_param_name,
-                    self.request.path_params[default_param_name]
-                )
-
-        self.request.path_params = path_params
+        self.request.path_params.update(path_params)
 
         return self
 
     def with_query_params(self, **query_params) -> Self:
         """Adds params which should be added as URL query params.
-        Appends defaults params if defined for request.
+        Appends/overwrites defaults params if defined for request.
 
         Args:
             **query_params - params names and values.
@@ -142,14 +150,7 @@ class ApiRequestHelper:
         """
         self.__check_request_initialized()
 
-        if self.request.query_params.get('@use'):
-            for default_param_name in self.request.query_params['@use']:
-                query_params.setdefault(
-                    default_param_name,
-                    self.request.query_params[default_param_name]
-                )
-
-        self.request.query_params = query_params
+        self.request.query_params.update(query_params)
 
         return self
 
@@ -166,11 +167,11 @@ class ApiRequestHelper:
         Returns:
             Self: instance of class `ApiRequestHelper`
         """
-        self.request.headers = self.request.headers | headers if append else headers
+        self.request.headers = self.request.headers | headers \
+                                if append else headers
         return self
 
     def with_cookies(self, cookies: dict, append: bool = True) -> Self:
-
         """Adds cookies to request.
         Pre-configured request may have cookies defined in config, custom request may be
         modified using this method.
@@ -183,13 +184,12 @@ class ApiRequestHelper:
         Returns:
             Self: instance of class `ApiRequestHelper`
         """
-        self.request.cookies = self.request.cookies | cookies if append else cookies
+        self.request.cookies = self.request.cookies | cookies \
+                                if append else cookies
         return self
 
     def with_json_payload(self, payload: JsonContent|list|dict) -> Self:
-        """Adds JSON payload to request. Also sets given JSON as
-        expected in response (e.g. create request expected to return
-        mostly the same content).
+        """Adds JSON payload to request.
 
         Args:
             payload (JsonContent | list | dict): JSON content.
@@ -198,7 +198,6 @@ class ApiRequestHelper:
             Self: instance of `ApiRequestHelper` class
         """
         self.request.json = payload.get() if isinstance(payload, JsonContent) else payload
-        self.response_helper.set_expected(json=self.request.json)
 
     def perform(self, override_defaults: bool = False, **request_args) -> ApiResponseHelper:
         """Performs HTTP request with given request parameters (headers, cookies, auth, etc.),
@@ -228,7 +227,7 @@ class ApiRequestHelper:
             raise RuntimeError('Path is not defined for request. '
                                'Make sure to use .by_path() or .by_name() method first!')
 
-        self.__check_for_missing_path_params(self.request.path, self.request.path_params)
+        self.__check_for_missing_path_params()
 
         path = (self.request.path.format(**self.request.path_params)
                 if self.request.path_params else
@@ -240,7 +239,6 @@ class ApiRequestHelper:
         request_args['auth'] = (request_args['auth']
                                 if request_args.get('auth') else
                                 self.request.auth)
-                                #tuple(self.request.auth) if self.request.auth else ())
 
         self.__allure_save_request_params(path, request_args)
 
@@ -273,7 +271,7 @@ class ApiRequestHelper:
         raise RuntimeError('Request is not initialized. '
                           'Use .by_name() or .by_path() methods first!')
 
-    def __check_for_missing_path_params(self, path: str, params: dict) -> None:
+    def __check_for_missing_path_params(self) -> None:
         """Checks that given params fullfill all placeholders in given path.
         Missing or extra parameters will raise an exception.
 
@@ -285,6 +283,9 @@ class ApiRequestHelper:
             KeyError: Missing path parameter.
             ValueError: Extra path parameters given.
         """
+
+        path = self.request.path
+        params = self.request.path_params
 
         print(f'__check_for_missing_path_params: Invoked:\nPath={path}\nParams={params}')
         expected_path_params = set(self.PATH_PATTERN.findall(path))

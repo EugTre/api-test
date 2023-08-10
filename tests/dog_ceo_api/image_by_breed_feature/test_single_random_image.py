@@ -29,7 +29,7 @@ class Test_RandomImageByBreed_SingleImage:
         (api_request.by_name('GetRandomImageByBreed')
                     .with_path_params(breed=breed)
                     .perform()
-                    .validate()
+                    .validate_against_schema()
                     .value_equals('status', 'success')
                     .value_is_not_empty('message')
                     .verify_value('message', helper.is_image_url)
