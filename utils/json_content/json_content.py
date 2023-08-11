@@ -70,6 +70,10 @@ class JsonContent:
             make_copy (bool, optional): Flag to return a copy of the mutable property.
             Defaults to False.
 
+        Raises:
+            IndexError: on attempt to get element of list by out of bound index.
+            KeyError: when pointer uses non-existent node.
+
         Returns:
             Any: value at given pointer.
 
@@ -217,20 +221,24 @@ class JsonContentBuilder:
         - Reference resolver is `json_content.reference_resolver.ReferenceResolver`.
 
     """
+
+    __slots__ = ["__content", "__allow_reference_resolution",
+                 "__enable_reference_cache", "__wrapper_cls", "__resolver_cls"]
+
     def __init__(self):
-        self.content = {}
-        self.allow_reference_resolution = False
-        self.enable_reference_cache = False
-        self.wrapper_class = JsonContentWrapper
-        self.resolver_class = ReferenceResolver
+        self.__content = {}
+        self.__allow_reference_resolution = False
+        self.__enable_reference_cache = False
+        self.__wrapper_cls = JsonContentWrapper
+        self.__resolver_cls = ReferenceResolver
 
     def build(self) -> JsonContent:
         """Creates instance of `JsonContent` class with desired setup."""
-        return JsonContent(content=self.content,
-                            allow_references=self.allow_reference_resolution,
-                            enable_cache=self.enable_reference_cache,
-                            wrapper=self.wrapper_class,
-                            resolver=self.resolver_class)
+        return JsonContent(content=self.__content,
+                            allow_references=self.__allow_reference_resolution,
+                            enable_cache=self.__enable_reference_cache,
+                            wrapper=self.__wrapper_cls,
+                            resolver=self.__resolver_cls)
 
     def from_data(self, content: dict|list, make_copy: bool = False) -> Self:
         """Sets source of data for JsonContent object - variable or literal.
@@ -242,7 +250,7 @@ class JsonContentBuilder:
         Returns:
             Self: builder instance
         """
-        self.content = copy.deepcopy(content) if make_copy else content
+        self.__content = copy.deepcopy(content) if make_copy else content
         return self
 
     def from_file(self, filepath: str) -> Self:
@@ -254,7 +262,7 @@ class JsonContentBuilder:
         Returns:
             Self: builder instance.
         """
-        self.content = DataReader.read_json_from_file(filepath)
+        self.__content = DataReader.read_json_from_file(filepath)
         return self
 
     def set_reference_policy(self, allow: bool, cache: bool) -> Self:
@@ -276,8 +284,8 @@ class JsonContentBuilder:
         Returns:
             Self: builder instance.
         """
-        self.allow_reference_resolution = allow
-        self.enable_reference_cache = cache
+        self.__allow_reference_resolution = allow
+        self.__enable_reference_cache = cache
         return self
 
     def set_wrapper(self, wrapper: AbstractContentWrapper) -> Self:
@@ -295,7 +303,7 @@ class JsonContentBuilder:
         Returns:
             Self: _description_
         """
-        self.wrapper_class = wrapper
+        self.__wrapper_cls = wrapper
         return self
 
     def set_resolver(self, resolver: AbstractReferenceResolver) -> Self:
@@ -312,5 +320,5 @@ class JsonContentBuilder:
         Returns:
             Self: _description_
         """
-        self.resolver_class = resolver
+        self.__resolver_cls = resolver
         return self

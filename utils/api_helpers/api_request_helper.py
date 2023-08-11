@@ -154,38 +154,36 @@ class ApiRequestHelper:
 
         return self
 
-    def with_headers(self, headers: dict, append: bool = True) -> Self:
+    def with_headers(self, headers: dict, overwrite: bool = False) -> Self:
         """Adds headers to request.
         Pre-configured request may have headers defined in config, custom request may be
         modified using this method.
 
         Args:
             headers (dict): headers key-value pairs.
-            append (bool, optional): If append flag is set to True - adds given headers
-            to current request's headers.. Defaults to True.
+            overwrite (bool, optional): If flag is set to False - adds given headers
+            to current request's headers, otherwise - overwrites headers. Defaults to False.
 
         Returns:
             Self: instance of class `ApiRequestHelper`
         """
-        self.request.headers = self.request.headers | headers \
-                                if append else headers
+        self.request.headers = headers if overwrite else self.request.headers | headers
         return self
 
-    def with_cookies(self, cookies: dict, append: bool = True) -> Self:
+    def with_cookies(self, cookies: dict, overwrite: bool = False) -> Self:
         """Adds cookies to request.
         Pre-configured request may have cookies defined in config, custom request may be
         modified using this method.
 
         Args:
             cookies (dict): cookies key-value pairs.
-            append (bool, optional): If append flag is set to True - adds given headers
-            to current request's headers.. Defaults to True.
+            overwrite (bool, optional): If flag is set to False - adds given cookies
+            to current request's cookies, otherwise - overwrites cookies. Defaults to False.
 
         Returns:
             Self: instance of class `ApiRequestHelper`
         """
-        self.request.cookies = self.request.cookies | cookies \
-                                if append else cookies
+        self.request.cookies = cookies if overwrite else  self.request.cookies | cookies
         return self
 
     def with_json_payload(self, payload: JsonContent|list|dict) -> Self:
@@ -204,9 +202,23 @@ class ApiRequestHelper:
         creates and retuns `api_helpers.response_helper.ResponseHelper` with response (also
         verifies response status code).
 
-        By default parameters will be extended with API's default request parameters. To use
-        only given parameters set 'override_defaults' to True. However not specified parameters
-        will be set to client's defaults anyway!
+        Request will be made composing 4 sources of parameter values by priority:
+        1. parameters defined as kwargs of .perform() method
+        2. parameters defined by .with_X() methods
+        3. parameters defined in request catalog (e.g. requests.json)
+        4. parameters defined in API Client configuration (e.g. api_config.ini)
+
+        Composing is made on per-value basis, meaning that if some header "a" from request catalog
+        is not overwritten by .with_headers() or .perform(..., headers={...}) methods - it will be
+        passed to the actual request.
+
+        In order to overwrite:
+        - request catalog values use .with_headers/cookies(..., overwrite=True) - this will replace
+        headers/cookies on request level completely;
+        - API Client's default values use 'override_defaults=True' args of .perform(). However not
+        specified parameters will be set to client's defaults anyway (so one need to manually set
+        parameters to overwrite - e.g. .perform(..., override_defaults=True, headers={}) will ignore
+        API Client's default headers, but add auth/cookies params)!
 
         Args:
             override_defaults (bool, optional): Flag to override API Client's default parameters
@@ -255,7 +267,7 @@ class ApiRequestHelper:
             allure.dynamic.parameter(f'Request {self.count} completed', response.url)
             self.count += 1
 
-        return ApiResponseHelper(response).set_expected(**self.expected) \
+        return ApiResponseHelper(response).set_expected(**self.expected)\
                                           .status_code_equals()
 
     # Private methods

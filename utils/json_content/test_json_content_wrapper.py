@@ -355,7 +355,7 @@ class TestJsonContentWrapperGet:
         self, wrapper: JsonContentWrapper, ptr: str):
         """Get using pointer that tries to pick key/index from not a dict/list
         should fail with exception"""
-        with pytest.raises(ValueError,
+        with pytest.raises(KeyError,
                            match='Path node ".*" at pointer ".*" is not a dict or list.*'):
             wrapper.get(ptr)
 
@@ -471,7 +471,7 @@ class TestJsonContentWrapperUpdate:
         self, wrapper: JsonContentWrapper, ptr: str):
         """Update using pointer that tries to pick key/index from not a dict/list
         should fail with exception"""
-        with pytest.raises(ValueError,
+        with pytest.raises(KeyError,
                            match='Path node ".*" at pointer ".*" is not a dict or list.*'):
             wrapper.update(ptr, 333)
 

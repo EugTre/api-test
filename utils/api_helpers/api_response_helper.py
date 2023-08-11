@@ -23,6 +23,7 @@ class ApiResponseHelper:
         self.__json_content = None
         self.__headers_lowercase = None
 
+    # Public methods
     def set_expected(self, status_code: int = None,
                      schema: dict = None,
                      headers: JsonContent|dict = None,
@@ -49,7 +50,6 @@ class ApiResponseHelper:
 
         return self
 
-    # Public methods
     # General functions
     def get_json(self, as_dict: bool = False) -> dict:
         '''Returns response's JSON value
@@ -62,7 +62,6 @@ class ApiResponseHelper:
             dict: deserialized JSON data.
 
         Raises:
-            RuntimeError: if response wan't acquired yet.
         '''
         content = self.__get_json()
 
@@ -78,18 +77,18 @@ class ApiResponseHelper:
         """
         return self.response_object
 
-    def get_value(self, pointer: str|Pointer)-> Any:
-        """Returns value at given key or tuple of nested keys.
+    def get_value(self, pointer: str)-> Any:
+        """Returns value at given pointer.
 
         Args:
-            pointer (str | Pointer): JSON pointer.
+            pointer (str): JSON pointer to param.
+
+        Raises:
+            ValueError: if JSON Pointer has invalid syntax or
+            refers to non-existent node.
 
         Returns:
             Any: found value
-
-        Raises:
-            RuntimeError: if response wan't acquired yet.
-            KeyError: when keylist is invalid.
         """
 
         return self.__get_json().get(pointer)
@@ -115,7 +114,6 @@ class ApiResponseHelper:
 
         return self
 
-    @allure.step('Validate response against JSON schema')
     def validate_against_schema(self, schema: dict = None) -> Self:
         """Validates response against given JSONSchema or schema from request config,
         if pre-configured request was made.
@@ -125,28 +123,46 @@ class ApiResponseHelper:
             schema (dict, optional): JSON schema. Defaults to None and
             looks for value from request configuration.
 
-        Returns:
-            Self: instance of class `ApiResponseHelper`
-
         Raises:
             ValueError: JSONSchema is not defined nor in request config,
             nor in method! Validation is not possible.
-            RuntimeError: if response wan't acquired yet.
+            RuntimeError: if response wasn't acquired yet.
+
+        Returns:
+            Self: instance of class `ApiResponseHelper`
         """
         if schema is None and self.schema is None:
             raise ValueError('JSONSchema is not defined nor in request config, '
                              'nor in method! Validation is not possible.')
 
+        desc = "given JSON Schema"
         if schema is None:
+            desc = "JSON Schema from Request Catalog"
             schema = self.schema
 
-        validate(self.__get_json().get(), schema)
+        with allure.step(f'Validate response against {desc}'):
+            validate(self.__get_json().get(), schema)
 
         return self
 
     @allure.step('Validate response JSON content')
     def json_equals(self, json: JsonContent|dict|list = None, ignore: tuple = None):
-        """Compare JSON of response with given one"""
+        """"Compare JSON of response with given one or JSON from request config,
+        if pre-configured request was made.
+        Wrapped with Allure.Step.
+
+        Args:
+            json (JsonContent | dict | list, optional): JSON content to compare with.
+            Defaults to None.
+            ignore (tuple, optional): JSON pointers to fields that should be excluded
+            from comparison (e.g. ('/status', '/message/0')). Defaults to None.
+
+        Raises:
+            ValueError: If given JSON Pointers have invalid syntax.
+
+        Returns:
+            Self: instance of class `ApiResponseHelper`
+        """
         if json is None:
             json = self.expected_json
 
@@ -174,9 +190,6 @@ class ApiResponseHelper:
 
         Returns:
             Self: instance of class `ApiResponseHelper`
-
-        Raises:
-            RuntimeError: if response wan't acquired yet.
         """
         assert not self.__get_json().get(), \
             'Response has JSON content, but expected to be empty.'
@@ -186,9 +199,6 @@ class ApiResponseHelper:
     @allure.step('Check response is not empty')
     def is_not_empty(self) -> Self:
         """Checks that response content is not empty.
-
-        Raises:
-            RuntimeError: if response wan't acquired yet.
 
         Returns:
             Self: instance of class `ApiResponseHelper`
@@ -218,12 +228,16 @@ class ApiResponseHelper:
 
     # Headers
     @allure.step('Check all headers are present in response.')
-    def headers_present(self, *headers: str) -> Self:
+    def headers_present(self, headers: list[str]|tuple[str]) -> Self:
         """Checks that response contains all given headers.
         If headers not passed as parameter - headers from
-        response section of Request Catalog entity will be used.
+        response section of Request Catalog entity
+        or headers set via .set_expected() will be used.
 
         Assertion is case insensitive.
+
+        Args:
+            headers (list | tuple): list of header names (str) to check.
 
         Returns:
             Self: instance of class `ApiResponseHelper`
@@ -232,26 +246,30 @@ class ApiResponseHelper:
             if self.expected_headers:
                 headers = self.expected_headers.keys()
             else:
-                raise ValueError("There is no headers to compare - headers must "
-                    "be passed as argument or defined in Request Catalog.")
+                raise ValueError("There is no headers to compare - "\
+                    "headers must be passed as argument, "\
+                    "via .set_exepcted() method or defined in Request Catalog.")
 
         response_headers = self.__get_headers()
-        not_present = [header
-                       for header in headers
+        missing_headers = [header for header in headers
                        if header.lower() not in response_headers]
 
-        assert not not_present, 'Some headers are not present, but expected to be. '\
-                                f'Missing headers: {", ".join(not_present)}'
+        assert not missing_headers, 'Some headers are not present, but expected to be. '\
+                                f'Missing headers: {", ".join(missing_headers)}'
 
         return self
 
     @allure.step('Check that headers aren\'t present in response.')
-    def headers_not_present(self, *headers: str) -> Self:
+    def headers_not_present(self, headers: list[str]|tuple[str]) -> Self:
         """Checks that response doesn't contain any of given headers.
         If headers not passed as parameter - headers from
-        response section of Request Catalog entity will be used.
+        response section of Request Catalog entity
+        or headers set via .set_expected() will be used.
 
         Assertion is case insensitive.
+
+        Args:
+            headers (list | tuple): list of header names (str) to check.
 
         Returns:
             Self: instance of class `ApiResponseHelper`
@@ -260,8 +278,9 @@ class ApiResponseHelper:
             if self.expected_headers:
                 headers = self.expected_headers.keys()
             else:
-                raise ValueError("There is no headers to compare - headers must "
-                    "be passed as argument or defined in Request Catalog.")
+                raise ValueError("There is no headers to compare - "\
+                    "headers must be passed as argument, "\
+                    "via .set_exepcted() method or defined in Request Catalog.")
 
         response_headers = self.__get_headers()
         present = [header
@@ -304,21 +323,21 @@ class ApiResponseHelper:
 
     @allure.step('Check that header "{header}" equals to "{value}"')
     def header_equals(self, header: str, value: str,
-                      case_insensetive: bool = True) -> Self:
+                      case_sensetive: bool = False) -> Self:
         """Checks that given header is present and it's value equals
         to given 'value'.
 
         Args:
             header (str): name of the header.
             value (str): value to compare.
-            case_insensetive (optiona, bool): flag to make assertion case
-            insensetive. Defaults to True.
+            case_sensetive (optiona, bool): flag to make assertion case
+            sensetive. Defaults to False.
 
         Returns:
             Self: instance of class `ApiResponseHelper`
         """
-        response_headers = self.__get_headers(case_insensetive)
-        if case_insensetive:
+        response_headers = self.__get_headers(case_sensetive)
+        if not case_sensetive:
             header = header.lower()
             value = value.lower()
 
@@ -332,33 +351,35 @@ class ApiResponseHelper:
         return self
 
     @allure.step('Check that headers are like given')
-    def headers_like(self, expected_headers: dict = None,
-                     case_insensetive: bool = True) -> Self:
+    def headers_like(self, expected_headers: dict[str, str] = None,
+                     case_sensetive: bool = False) -> Self:
         """Check of response headers to be like given.
         If 'expected_headers' not passed as parameter - headers
         from response section of Request Catalog entity will be used.
 
         Args:
-            expected_headers (dict, optional): dictionary of headers and it's values.
-            Defaults to None (Request Catalog will be used).
-            case_insensetive (optiona, bool): flag to make assertion case
-            insensetive. Defaults to True.
+            expected_headers (dict[str,str], optional): dictionary of headers and
+            it's values. Defaults to None (Request Catalog will be used or value
+            set by .set_expected()).
+            case_sensetive (optiona, bool): flag to make assertion case
+            sensetive. Defaults to False.
 
         Returns:
-            Self: _description_
+            Self: instance of class `ApiResponseHelper`
         """
         if expected_headers is None:
             if self.expected_headers:
                 expected_headers = self.expected_headers
             else:
-                raise ValueError("There is no headers to compare - headers must "
-                    "be passed as argument or defined in Request Catalog.")
+                raise ValueError("There is no headers to compare - "\
+                    "headers must be passed as argument, "\
+                    "via .set_exepcted() method or defined in Request Catalog.")
 
-        response_headers = self.__get_headers(case_insensetive)
+        response_headers = self.__get_headers(case_sensetive)
 
         failed = []
         for header, value in expected_headers.items():
-            if case_insensetive:
+            if not case_sensetive:
                 header = header.lower()
                 value = value.lower()
 
@@ -379,8 +400,9 @@ class ApiResponseHelper:
         section of Request Catalog entity will be used.
 
         Args:
-            expected_headers (dict, optional): dictionary of headers and it's values.
-            Defaults to None (Request Catalog will be used).
+            expected_headers (dict[str,str], optional): dictionary of headers and
+            it's values. Defaults to None (Request Catalog will be used or value
+            set by .set_expected()).
             case_insensetive (optiona, bool): flag to make assertion case
             insensetive. Defaults to True.
 
@@ -391,8 +413,9 @@ class ApiResponseHelper:
             if self.expected_headers:
                 expected_headers = self.expected_headers
             else:
-                raise ValueError("There is no headers to compare - headers must "
-                    "be passed as argument or defined in Request Catalog.")
+                raise ValueError("There is no headers to compare - "\
+                    "headers must be passed as argument, "\
+                    "via .set_exepcted() method or defined in Request Catalog.")
 
         response_headers = self.__get_headers(case_insensetive)
 
@@ -414,71 +437,61 @@ class ApiResponseHelper:
     # Response's param verification
     # Single param
     @allure.step('Check response has param "{pointer}"')
-    def param_presents(self, pointer: str|Pointer) -> Self:
-        """Checks that param is present in response'
+    def param_presents(self, pointer: str) -> Self:
+        """Checks that param is present in response
 
         Args:
-            pointer (str | Pointer):  key or tuple of successively nested keys.
+            pointer (str): JSON pointer to param.
+
+        Raises:
+            AssertionError: when param is not present.
+            ValueError: if JSON Pointer has invalid syntax.
 
         Returns:
             Self: instance of class `ApiResponseHelper`
-
-        Raises:
-            RuntimeError: if response wan't acquired yet.
         """
 
-        is_present = True
-
-        try:
-            self.__get_value(pointer)
-        except KeyError:
-            is_present = False
-
+        is_present = self.__has_param(pointer)
         assert is_present, f'Param "{pointer}" is not present, ' \
             'but expected to be.'
 
         return self
 
     @allure.step('Check response has no param "{pointer}"')
-    def param_not_presents(self, pointer: str|Pointer) -> Self:
+    def param_not_presents(self, pointer: str) -> Self:
         """Checks that param is not present in response.
 
         Args:
-            pointer (str | Pointer):  key or tuple of successively nested keys.
+            pointer (str): JSON pointer to param.
+
+        Raises:
+            AssertionError: when params is present.
+            ValueError: if JSON Pointer has invalid syntax.
 
         Returns:
             Self: instance of class `ApiResponseHelper`
-
-        Raises:
-            RuntimeError: if response wan't acquired yet.
         """
 
-        is_present = True
-
-        try:
-            self.__get_value(pointer)
-        except KeyError:
-            is_present = False
-
+        is_present = self.__has_param(pointer)
         assert not is_present, f'Param "{pointer}" is present, '\
             'but not expected to be.'
 
         return self
 
     @allure.step('Check response has non-empty param "{pointer}"')
-    def value_is_not_empty(self, pointer: str|Pointer) -> Self:
+    def value_is_not_empty(self, pointer: str) -> Self:
         """Checks that value at given keylist is not empty.
 
         Args:
-            pointer (str | Pointer):  key or tuple of successively nested keys.
+            pointer (str): JSON pointer to param.
+
+        Raises:
+            ValueError: if JSON Pointer has invalid syntax or
+            refers to non-existent node.
 
         Returns:
             Self: instance of class `ApiResponseHelper`
-
-        Raises:
-            RuntimeError: if response wan't acquired yet.
         """
-
         actual_value = self.__get_value(pointer)
         assert actual_value, \
                f'Value of param "{pointer}" is empty, '\
@@ -487,19 +500,21 @@ class ApiResponseHelper:
         return self
 
     @allure.step('Check response has empty param "{pointer}"')
-    def value_is_empty(self, pointer: str|Pointer) -> Self:
+    def value_is_empty(self, pointer: str) -> Self:
         """Checks that value at given keylist is empty.
 
         Args:
-            pointer (str | Pointer):  key or tuple of successively nested keys.
+            pointer (str): JSON pointer to param.
+
+        Raises:
+            AssertionError: when value is not empty.
+            ValueError: if JSON Pointer has invalid syntax.
+            KeyError/IndexError: if pointer refers to non-existsend
+            key/out of range index.
 
         Returns:
             Self: instance of class `ApiResponseHelper`
-
-        Raises:
-            RuntimeError: if response wan't acquired yet.
         """
-
         actual_value = self.__get_value(pointer)
         assert not actual_value, \
                f'Value of param "{pointer}" is not empty '\
@@ -508,47 +523,78 @@ class ApiResponseHelper:
         return self
 
     @allure.step('Check response has param "{pointer}" = {value}')
-    def value_equals(self, pointer: str|Pointer, value: Any) -> Self:
-        """Checks that given key contains given value.
+    def value_equals(self, pointer: str, value: Any) -> Self:
+        """Checks that given key has value equal to given.
 
         Args:
-            pointer (str | Pointer): key or tuple of successively nested keys.
+            pointer (str): JSON pointer to param.
             value (Any): value to compare with.
+
+        Raises:
+            AssertionError: when value is not equals to given.
+            ValueError: if JSON Pointer has invalid syntax.
+            KeyError/IndexError: if pointer refers to non-existsend key/out of range index.
 
         Returns:
             Self: instance of class `ApiResponseHelper`
-
-        Raises:
-            RuntimeError: if response wan't acquired yet.
         """
-        try:
-            actual_value = self.__get_value(pointer)
-        except KeyError as exc:
-            raise KeyError(f'Failed to find "{pointer}" '  \
-                           'key in response body.') from exc
 
+        actual_value = self.__get_value(pointer)
         assert value == actual_value, \
                f'Value of param "{pointer}" is equal to [{actual_value}], '\
                f'but expected to be [{value}]'
 
         return self
 
-    def verify_value(self, pointer: str|Pointer, verification_func: Callable,
+    @allure.step('Check response has param "{pointer}" like {value}')
+    def value_contains(self, pointer: str, value: str) -> Self:
+        """Checks that given key has value that contains given value substring.
+
+        Args:
+            pointer (str): JSON pointer to param.
+            value (str): substring to be expected.
+
+        Raises:
+            AssertionError: when value doesn't include given substring.
+            ValueError: if JSON Pointer has invalid syntax.
+            KeyError/IndexError: if pointer refers to non-existsend
+            key/out of range index.
+
+        Returns:
+            Self: instance of class `ApiResponseHelper`
+        """
+
+        actual_value = self.__get_value(pointer)
+        assert value in actual_value, \
+               f'Value [{actual_value}] of param "{pointer}" doesn\'t '\
+               f'contain [{value}].'
+
+        return self
+
+    def verify_value(self, pointer: str, verification_func: Callable,
                      value_to_compare: Any = None) -> Self:
         """Execute given callable on response's param.
 
         Args:
-            verification_func (Callable): callable that asserts some specific condition.
-            pointer (str | Pointer): key or tuple of successively nested keys that selects
-            value which will be passed to verification_func.
+            verification_func (Callable): callable that asserts some
+            specific condition.
+            pointer (str): JSON pointer to param to pick value from
+            and pass to to verification_func.
+
+        Raises:
+            AssertionError: produced by 'verification_func'.
+            ValueError: if JSON Pointer has invalid syntax.
+            KeyError/IndexError: if pointer refers to non-existsend
+            key/out of range index.
 
         Returns:
             Self: instance of class `ApiResponseHelper`
-
-        Raises:
-            RuntimeError: if response wan't acquired yet.
         """
         target_value = self.__get_value(pointer)
+        # There are 2 verification_function to be expected:
+        # - one that checks something without explicit comparison
+        # - one that compares to user given value (comparators)
+        # Depending on 'value_to_compare' - proper call is selected
         if value_to_compare is None:
             with allure.step(f'Verify value of param "{pointer}" '
                             f'by {verification_func.__name__}'):
@@ -562,35 +608,92 @@ class ApiResponseHelper:
 
     # Params of objects in array
     @allure.step('Check values of each object in array at "{list_at}"')
-    def each_object_values_are(self, list_at: str|Pointer, **params) -> Self:
+    def each_object_values_are(self, list_at: str, params: dict) -> Self:
         """Checks that:
-        - given keylist contains an array
+        - given pointer contains an array
         - each element of array is an object
-        - each element has given key and value
+        - each element has given key (pointer) and value
 
         Args:
-            list_at (str | Pointer): key or tuple of successively nested keys that leads to array.
-            **params: key-value pairs to check against each array element.
+            list_at (str): key or tuple of successively nested keys that leads to array.
+            params (dict): key-value pairs to check against each array element in format
+            {'/pointer': value}.
+
+        Raises:
+            AssertionError: if there is missing key or value doesn't equals
+            AssertionError: if pointer doesn't refer to a list.
+            ValueError: if JSON Pointer has invalid syntax.
+            KeyError/IndexError: if pointer refers to non-existsend key/out of range index.
 
         Returns:
             Self: instance of class `ApiResponseHelper`
-
-        Raises:
-            RuntimeError: if response wan't acquired yet.
         """
         list_content = self.__get_array(list_at)
 
         with allure.step(f'Check {len(list_content)} object(s) has {params}'):
             for idx, _ in enumerate(list_content):
                 for param_name, param_value in params.items():
-                    pointer = f'{list_at}/{idx}/{param_name}'
+                    assert Pointer.is_pointer(param_name), \
+                        f'Given object\'s pointer "{param_name}" is not valid JSON Pointer.'\
+                        f'Should start with "{POINTER_PREFIX}".'
+
+                    pointer = f'{list_at}/{idx}{param_name}'
+
+                    assert self.__has_param(pointer), \
+                            f'Item {idx}: key "{pointer}" is missing!'
+
                     assert param_value == self.__get_value(pointer), \
                            f'Item {idx}: key "{pointer}" value doesn\'t match.'
 
         return self
 
+    @allure.step('Check values of each object in array at "{list_at}"')
+    def each_object_values_like(self, list_at: str, params: dict) -> Self:
+        """Checks that:
+        - given pointer contains an array
+        - each element of array is an object
+        - each element has given key (pointer) and it's value contains given substring.
+
+        Args:
+            list_at (str): key or tuple of successively nested keys that leads to array.
+            params (dict): key-value pairs to check against each array element in format
+            {'/pointer': str}.
+
+        Raises:
+            AssertionError: if there is missing key or value doesn't equals
+            AssertionError: if pointer doesn't refer to a list.
+            ValueError: if JSON Pointer has invalid syntax.
+            KeyError/IndexError: if pointer refers to non-existsend key/out of range index.
+
+        Returns:
+            Self: instance of class `ApiResponseHelper`
+        """
+        list_content = self.__get_array(list_at)
+
+        with allure.step(f'Check {len(list_content)} object(s) has params like {params}'):
+            for idx, _ in enumerate(list_content):
+                for param_name, param_value in params.items():
+                    assert Pointer.is_pointer(param_name), \
+                        f'Given object\'s pointer "{param_name}" is not valid JSON Pointer.'\
+                        f'Should start with "{POINTER_PREFIX}".'
+
+                    pointer = f'{list_at}/{idx}{param_name}'
+
+                    assert self.__has_param(pointer), \
+                            f'Item {idx}: key "{pointer}" is missing!'
+
+                    actual_value = self.__get_value(pointer)
+                    assert isinstance(actual_value, str), \
+                        f'Item {idx}: "{pointer}" value "{actual_value}" is not a string!'
+
+                    assert param_value in actual_value, \
+                           f'Item {idx}: "{pointer}" value "{actual_value}" doesn\'t '\
+                               'contain {param_value}!'
+
+        return self
+
     @allure.step('Verify each object in array at "{list_at}" by custom function')
-    def verify_each_object(self, verification_func: Callable, list_at: str|Pointer,
+    def verify_each_object(self, verification_func: Callable, list_at: str,
                            pointer: str) -> Self:
         """Execute given callable on response's param. Considerations:
         - `list_at` points on an array
@@ -599,39 +702,48 @@ class ApiResponseHelper:
 
         Args:
             verification_func (Callable): callable that asserts some specific condition.
-            list_at (str | Pointer): pointer that leads to array.
+            list_at (str): pointer that leads to an array.
             pointer (str): pointer that selects value inside each object which
-            will be passed to verification_func.
+            will be passed to verification_func (e.g. '/id').
+
+        Raises:
+            AssertionError: if pointer doesn't refer to a list.
+            ValueError: if JSON Pointer has invalid syntax.
 
         Returns:
             Self: instance of class `ApiResponseHelper`
-
-        Raises:
-            RuntimeError: if response wan't acquired yet.
         """
         list_content = self.__get_array(list_at)
-        pointer = (pointer
-                   if pointer.startswith(POINTER_PREFIX) else
-                   f'{POINTER_PREFIX}{pointer}')
+
+        assert Pointer.is_pointer(pointer), \
+            f'Given object\'s pointer "{pointer}" is not valid JSON Pointer.'\
+            f'Should start with "{POINTER_PREFIX}".'
 
         with allure.step(f'Check {len(list_content)} element(s) against custom function'):
             for idx, _ in enumerate(list_content):
-                object_pointer = f'{list_at}/{idx}/{pointer}'
-                verification_func(self.__get_value(object_pointer))
+                fq_pointer = f'{list_at}/{idx}{pointer}'
+
+                assert self.__has_param(fq_pointer), \
+                    f'Item {idx}: key "{fq_pointer}" is missing!'
+
+                verification_func(self.__get_value(fq_pointer))
 
         return self
 
     # Elements of array
     @allure.step('Verify amount of array elements at "{list_at}"')
-    def elements_count_is(self, list_at: str|Pointer, value: int) -> Self:
+    def elements_count_is(self, list_at: str, value: int) -> Self:
         """Counts elements at given list_at and compare to given value.
 
         Args:
-            list_at (str | Pointer): pointer that leads to array.
+            list_at (str): pointer that leads to a list.
             value (int): value to compare with.
 
         Raises:
-            RuntimeError: if response wan't acquired yet.
+            AssertionError: if number of element not equals to expected.
+            AssertionError: if pointer doesn't refer to a list.
+            ValueError: if JSON Pointer has invalid syntax.
+            KeyError/IndexError: if pointer refers to non-existsend key/out of range index.
 
         Returns:
             Self: instance of class `ApiResponseHelper`
@@ -645,21 +757,21 @@ class ApiResponseHelper:
         return self
 
     @allure.step('Verify each array element at "{list_at}" by custom function')
-    def verify_each(self, list_at: str|Pointer, verification_func: Callable) -> Self:
+    def verify_each(self, list_at: str, verification_func: Callable) -> Self:
         """Execute given verification_func on each element of array in list_at response param.
 
         Args:
             verification_func (Callable): callable that asserts some specific condition.
-            list_at (str | Pointer): pointer that leads to array.
+            list_at (str): pointer that leads to array.
+
+        Raises:
+            AssertionError: if pointer doesn't refer to a list.
+            ValueError: if JSON Pointer has invalid syntax.
+            KeyError/IndexError: if pointer refers to non-existsend key/out of range index.
 
         Returns:
             Self: instance of class `ApiResponseHelper`
-
-        Raises:
-            RuntimeError: if response wan't acquired yet.
         """
-
-
         list_content = self.__get_array(list_at)
 
         with allure.step(f'Check {len(list_content)} element(s) against custom function'):
@@ -671,55 +783,84 @@ class ApiResponseHelper:
 
     # Protected/private functions
     def __get_json(self) -> JsonContent:
-        '''Caches and return cached deserialized JSON data from response.
+        """Caches and return cached deserialized JSON data from response.
 
         Return:
-            dict: deserialized JSON data.
-        '''
+            dict: deserialized JSON data as an `JsonContent` object.
+        """
         if self.__json_content is None:
             self.__json_content = JsonContentBuilder().from_data(self.response_object.json())\
-                .allow_reference_resolution(False, False).build()
+                                                        .set_reference_policy(False, False)\
+                                                        .build()
         return self.__json_content
 
-    def __get_value(self, pointer: str|Pointer) -> Any:
-        return self.__get_json().get(pointer)
-
-    def __get_array(self, pointer: str|Pointer) -> list|None:
-        """Returns list at given key or tuple of nested keys.
+    def __has_param(self, pointer: str) -> bool:
+        """Returns True if given pointer refers to existing param of
+        response's JSON.
 
         Args:
-            keylist (str | tuple): key or tuple of successively nested keys.
-            target (dict, optional): dictionary to search in. Defaults to response.json().
+            pointer (str): JSON pointer to param.
+
+        Returns:
+            bool: True if param exists, False otherwise.
+        """
+        return self.__get_json().has(pointer)
+
+    def __get_value(self, pointer: str) -> Any:
+        """Returns value from response's JSON by given pointer.
+
+        Args:
+            pointer (str): JSON pointer to param.
+
+        Raises:
+            IndexError: on attempt to get element of list by out of bound index.
+            KeyError: when pointer uses non-existent node.
 
         Returns:
             Any: found value
+        """
+        return self.__get_json().get(pointer)
+
+    def __get_array(self, pointer: str) -> list|None:
+        """Returns list at given key or tuple of nested keys.
+
+        Args:
+            pointer (str): JSON pointer to param.
+            target (dict, optional): dictionary to search in. Defaults to response.json().
 
         Raises:
-            KeyError: when keylist is invalid.
-        """
-        list_content = self.__get_value(pointer)
+            AssertionError: if value at given pointer is not a list
+            ValueError: if JSON Pointer has invalid syntax
+            KeyError/IndexError: if pointer refers to non-existsend key/out of range index.
 
+        Returns:
+            Any: found array
+        """
+        assert self.__has_param(pointer), \
+            f'Param "{pointer}" is missing in the response.'
+
+        list_content = self.__get_value(pointer)
         assert isinstance(list_content, list), \
-               f'Response\'s property at "{pointer}" is not an array.'
+               f'Response\'s param at "{pointer}" is not an JSON array (list).'
         return list_content
 
-    def __get_headers(self, case_insensitive: bool = True) -> dict:
-        """Returns response's headers. If flag 'case_insensitive' is set to True -
+    def __get_headers(self, case_sensitive: bool = False) -> dict:
+        """Returns response's headers. If flag 'case_sensitive' is set to False -
         returns all lowercase version of the headers (both keys and values).
 
         Args:
-            case_insensitive (bool, optional): flag to return headers as
-            all lowercase variant (True) or as is (False). Defaults to True.
+            case_sensitive (bool, optional): flag to return headers as
+            all lowercase variant (False) or as is (True). Defaults to False.
 
         Returns:
-            dict: _description_
+            dict: headers
         """
-        if not case_insensitive:
+        if case_sensitive:
             return self.response_object.headers
 
         if not self.__headers_lowercase:
             self.__headers_lowercase = {}
-            for k, v in self.response_object.headers.items():
-                self.__headers_lowercase[k.lower()] = v.lower()
+            for key, value in self.response_object.headers.items():
+                self.__headers_lowercase[key.lower()] = value.lower()
 
         return self.__headers_lowercase

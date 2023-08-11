@@ -11,12 +11,6 @@ import pytest
 from utils.json_content.json_content_wrapper import JsonContentWrapper
 from utils.json_content.reference_resolver import ReferenceResolver
 
-@pytest.fixture(name='tmp_folder', scope='session')
-def handle_tmp_path(tmp_path_factory):
-    """Creates temporary directory and deletes on session end"""
-    tmpdir = tmp_path_factory.mktemp('ref_files', numbered=False)
-    yield tmpdir
-    shutil.rmtree(tmpdir)
 
 
 class TestReferenceResolver:
@@ -252,42 +246,37 @@ class TestReferenceResolverFileRef:
     @pytest.mark.parametrize("cache_enabled", [False, True])
     def test_reference_resolver_file_no_refs(self,
                                             cache_enabled: bool,
-                                            tmp_folder: pathlib.Path):
+                                            json_file: pathlib.Path):
         """Resolving file reference with ref-less content should be successful"""
         file_content = [1, 2, 3]
-
-        filename = tmp_folder / "file.json"
-        filename.write_text(json.dumps(file_content))
+        json_file.write_text(json.dumps(file_content))
 
         content = JsonContentWrapper({
-            "a": f"!file {filename.resolve()}",
-            "b": f"!file {filename.resolve()}"
+            "a": f"!file {json_file}",
+            "b": f"!file {json_file}"
         })
         ReferenceResolver(content, cache_enabled).resolve_all()
 
         raw_content = content.get('')
-
         assert raw_content['a'] == file_content
         assert raw_content['b'] == file_content
 
     @pytest.mark.parametrize("cache_enabled", [False, True])
     def test_reference_resolver_file_with_refs(self,
                                                 cache_enabled: bool,
-                                                tmp_folder: pathlib.Path):
+                                                json_file: pathlib.Path):
         """Resolving file reference with content with references should be successful"""
-        filename = tmp_folder / "file.json"
         file_content = {"id": 2, "posts": "!ref /0/posts" }
-        filename.write_text(json.dumps(file_content))
+        json_file.write_text(json.dumps(file_content))
 
         content = JsonContentWrapper([
             {"id": 1, "posts": [12, 23, 75]},
-            f"!file {filename}",
-            f"!file {filename}",
+            f"!file {json_file}",
+            f"!file {json_file}",
         ])
         ReferenceResolver(content, cache_enabled).resolve_all()
 
         raw_content = content.get('')
-
         # Validate references parsed
         assert raw_content[1]['id'] == file_content['id']
         assert raw_content[1]['posts'] == raw_content[0]['posts']
@@ -303,7 +292,7 @@ class TestReferenceResolverFileRef:
         assert raw_content[2]['posts'] is not raw_content[0]['posts']
         assert raw_content[1]['posts'] is not raw_content[2]['posts']
 
-    def test_reference_resolver_file_cache_may_be_invalidated(self, tmp_folder: pathlib.Path):
+    def test_reference_resolver_file_cache_may_be_invalidated(self, json_file: pathlib.Path):
         """Cache may be invalidated and new file references will be
         correctly resolved"""
         original_posts = [12, 23, 75]
@@ -312,23 +301,22 @@ class TestReferenceResolverFileRef:
         new_value = 10
 
         # Initializ content and resolve ref for the first time to cache data
-        filename = tmp_folder / "file.json"
         file_content = {"id": original_value, "posts": "!ref /0/posts" }
-        filename.write_text(json.dumps(file_content))
+        json_file.write_text(json.dumps(file_content))
         content = JsonContentWrapper([
             {"id": 1, "posts": original_posts},
-            f"!file {filename}"
+            f"!file {json_file}"
         ])
         resolver = ReferenceResolver(content, True)
         resolver.resolve_all()
 
         # Update referenced content and file's content
         file_content['id'] = new_value
-        filename.write_text(json.dumps(file_content))
+        json_file.write_text(json.dumps(file_content))
         content.update('/0/posts', new_posts)
 
         # Add new file reference to content, drop cache and resolve again
-        content.update('/-', f"!file {filename}")
+        content.update('/-', f"!file {json_file}")
         resolver.invalidate_cache()
         resolver.resolve_all()
 
@@ -349,14 +337,13 @@ class TestReferenceResolverFileRef:
         {"posts": "!ref /0/enabled"},
     ])
     def test_reference_resolver_file_invalid_pointer_in_file_ref_fails(self,
-            tmp_folder: pathlib.Path, file_content: dict):
+            json_file: pathlib.Path, file_content: dict):
         """Exception raised on parsing in-file reference if ref pointer is invalid"""
-        filename = tmp_folder / "file_invalid_refs.json"
-        filename.write_text(json.dumps(file_content))
+        json_file.write_text(json.dumps(file_content))
 
         content = JsonContentWrapper([
             {"id": 1, "posts": [12, 23, 75]},
-            f"!file {filename}"
+            f"!file {json_file}"
         ])
 
         with pytest.raises(ValueError):
@@ -371,13 +358,12 @@ class TestReferenceResolverFileRef:
         with pytest.raises(ValueError):
             ReferenceResolver(content).resolve_all()
 
-    def test_reference_resolver_file_json_malformed_fails(self, tmp_folder: pathlib.Path):
+    def test_reference_resolver_file_json_malformed_fails(self, json_file: pathlib.Path):
         """Exception raised on parsing file reference to file with malformed
         JSON content."""
-        filename = tmp_folder / "malformed.json"
-        filename.write_text("{a: 100, b: 200}")
+        json_file.write_text("{a: 100, b: 200}")
         content = JsonContentWrapper([
-            {"id": 1, "posts": f"!file {filename}"}
+            {"id": 1, "posts": f"!file {json_file}"}
         ])
 
         with pytest.raises(ValueError):

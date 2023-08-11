@@ -98,6 +98,11 @@ class BasicApiClient(AbstractApiClient):
         """Performs request with given method and paramerters to given path of API.
         Send request and response data to logger.
 
+        Each request will be extended with defaults parameters (headers, cookies, auth, timeout)
+        from config file (e.g. api_config.ini). If 'override_defaults' flag set to True - only
+        missing parameters will be set to defaults (e.g. if 'override_defaults' is True,
+        default headers is set and request invoked with headers - only passed headers will be used)
+
         Args:
             method (str or `HTTPMethod` enum): method to make a request ('get', 'post', etc.)
             path (str): path relative to API base url (e.g. 'v1/check')

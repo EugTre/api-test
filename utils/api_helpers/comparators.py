@@ -14,8 +14,7 @@ class Data:
         """Verifies that values are the same type."""
         assert isinstance(val1, type(val2)), \
             f'Value [{val1}] of type "{type(val1)}" is not the same '\
-            f'as given type "{type(val2)}".'
-
+            f'as given value [{val2}] type "{type(val2)}".'
 
 class Number(Data):
     """Numbers comparator"""

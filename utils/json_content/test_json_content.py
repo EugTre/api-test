@@ -3,12 +3,12 @@
 pytest -s -vv ./utils/json_content/test_json_content.py
 """
 import copy
-import shutil
 import json
 from typing import Any
 
 import pytest
-from utils.json_content.json_content import JsonContentBuilder, AbstractContentWrapper, AbstractReferenceResolver
+from utils.json_content.json_content import JsonContentBuilder,\
+    AbstractContentWrapper, AbstractReferenceResolver
 
 
 CONTENT = {
@@ -31,13 +31,6 @@ CONTENT_WITH_REFS = {
     },
     'e': '!ref /defs/values/-1'
 }
-
-@pytest.fixture(name='tmp_folder', scope='session')
-def handle_tmp_path(tmp_path_factory):
-    """Creates temporary directory and deletes on session end"""
-    tmpdir = tmp_path_factory.mktemp('ref_files', numbered=False)
-    yield tmpdir
-    shutil.rmtree(tmpdir)
 
 class MockWrapper(AbstractContentWrapper):
     """Mocked ContentWrapper"""
@@ -126,12 +119,11 @@ class TestJsonContent:
         assert not cnt.get('')
         assert isinstance(cnt.get(''), expected_type)
 
-    def test_json_content_build_from_file(self, tmp_folder):
+    def test_json_content_build_from_file(self, json_file):
         """JsonContent object may be build from JSON file content."""
-        filename = tmp_folder / "content.json"
-        filename.write_text(json.dumps(CONTENT))
+        json_file.write_text(json.dumps(CONTENT))
 
-        cnt = JsonContentBuilder().from_file(filename).build()
+        cnt = JsonContentBuilder().from_file(str(json_file)).build()
         assert cnt.get('') == CONTENT
 
     def test_json_content_no_ref_resolultion_on_creation(self):
@@ -370,10 +362,9 @@ class TestJsonContent:
         with pytest.raises(FileNotFoundError):
             JsonContentBuilder().from_file("non-exists.json").build()
 
-    def test_json_content_build_from_malformed_json_file_fails(self, tmp_folder):
+    def test_json_content_build_from_malformed_json_file_fails(self, json_file):
         """Build JsonContent object from malformed JSON should fail"""
-        filename = tmp_folder / "malformed.json"
-        filename.write_text("{a: 100, b: 200}")
+        json_file.write_text("{a: 100, b: 200}")
 
         with pytest.raises(json.decoder.JSONDecodeError):
-            JsonContentBuilder().from_file(str(filename)).build()
+            JsonContentBuilder().from_file(str(json_file)).build()

@@ -36,7 +36,9 @@ class AbstractContentWrapper(ABC):
     @abstractmethod
     def get(self, pointer: str) -> Any:
         """Returns value at given pointer from the content
-        or return entire content."""
+        or return entire content.
+        May raise IndexError or KeyError.
+        """
 
     @abstractmethod
     def get_or_default(self, pointer: str, default_value: Any) -> Any:
@@ -246,8 +248,8 @@ class JsonContentWrapper(AbstractContentWrapper):
             that key is in range or key is append sign ("-")
 
         Raises:
-            ValueError: when storage is not a list or dict.
-            KeyError: when non-existent key or index was given.
+            KeyError: when storage is not a list or dict or when non-existent key was given
+            IndexError: when out of range index was given.
 
         Returns:
             str|int: resolved key as integer index or string. If exceptions
@@ -263,7 +265,7 @@ class JsonContentWrapper(AbstractContentWrapper):
                 if self.__suppress_exceptions:
                     return None
 
-                raise ValueError(self.__format_exc(EXC_MSG__INVALID_STORAGE))
+                raise KeyError(self.__format_exc(EXC_MSG__INVALID_STORAGE))
 
         return key
 

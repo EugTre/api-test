@@ -12,21 +12,20 @@ from utils.helper import Helper
 @allure.epic('DOG CEO API')
 @allure.feature('Random image')
 @allure.story('Getting single random image of random breed.')
-class Test_RandomImage_SingleImage:
+class TestRandomImageSingleImage:
     """Group of tests related to DOG_API - Random image story"""
 
     @allure.title('Get single random image')
     def test_random_image(self, api_request: ApiRequestHelper, helper: Helper):
         '''Verifies random image API call is successful and
            return URI to image MIME type file'''
-        (api_request.by_name("GetRandomImage")
-                    .perform()
-                    .validate_against_schema()
-                    .is_not_empty()
-                    .value_equals('status', 'success')
-                    .value_is_not_empty('message')
-                    .verify_value('message', helper.is_image_url)
-        )
+        api_request.by_name("GetRandomImage") \
+                    .perform() \
+                    .validate_against_schema() \
+                    .is_not_empty() \
+                    .value_equals('/status', 'success') \
+                    .value_is_not_empty('/message') \
+                    .verify_value('/message', helper.is_image_url)
 
 
 

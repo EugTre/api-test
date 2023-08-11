@@ -18,8 +18,6 @@ from utils.log_database_handler import DatabaseHandler
 from utils.api_client.basic_api_client import BasicApiClient
 from utils.api_helpers.api_request_helper import ApiRequestHelper
 
-# from tests.tests_l3.rest_api_2.open_brewery_db_api import OpenBreweryDBAPI
-
 def pytest_addoption(parser):
     """Add custom CLI arguments"""
     parser.addoption(
@@ -49,8 +47,8 @@ def helper() -> Helper:
     """Returns `Helper` class object to use inside tests/fixtures"""
     return Helper()
 
-@pytest.fixture(scope='session')
-def setup_loggers(request):
+@pytest.fixture(scope='session', name='setup_loggers')
+def perform_logger_setup(request):
     """Setups loggers by configuration provided by --logging-config command-line argument"""
     logger_config = request.config.getoption("--logging-config")
     if not os.path.exists(logger_config):
@@ -59,9 +57,10 @@ def setup_loggers(request):
     logging.handlers.DatabaseHandler = DatabaseHandler
     fileConfig(logger_config)
 
-@pytest.fixture(scope='session')
-def api_clients_configurations(request) -> ApiClientsSpecificationCollection:
+@pytest.fixture(scope='session', name='api_clients_configurations')
+def configure_api_clients(request, setup_loggers) -> ApiClientsSpecificationCollection:
     """Setups api by configuration provided by --api-config command-line argument"""
+    # pylint: disable=unused-argument
     api_config_file = request.config.getoption("--api-config")
     if not os.path.exists(api_config_file):
         raise FileNotFoundError(
@@ -70,8 +69,8 @@ def api_clients_configurations(request) -> ApiClientsSpecificationCollection:
 
     return ApiConfigurationReader(api_config_file).read_configurations()
 
-@pytest.fixture()
-def logger(request, setup_loggers):
+@pytest.fixture(name='logger')
+def get_logger(request):
     """Returns logger defined by name defined by tests mark @pytest.mark.logger()"""
     logger_name = 'root'
     logger_name_params = request.node.get_closest_marker('logger')
@@ -85,10 +84,9 @@ def logger(request, setup_loggers):
 
     return logger
 
-@pytest.fixture(scope='class')
-def api_client(
+@pytest.fixture(scope='class', name="api_client")
+def get_api_client(
     request,
-    setup_loggers,
     api_clients_configurations: ApiClientsSpecificationCollection
 ) -> BasicApiClient:
     '''Returns object inherited from `BasicApiClient` class.
@@ -101,8 +99,8 @@ def api_client(
     return setup_api_client(api_name, api_clients_configurations)
 
 
-@pytest.fixture(scope='function')
-def api_request(api_client: BasicApiClient) -> ApiRequestHelper:
+@pytest.fixture(scope='function', name='api_request')
+def get_api_request_instance(api_client: BasicApiClient) -> ApiRequestHelper:
     '''Returns instance of `ApiRequestHelper` class.'''
     allure.dynamic.parameter('API', api_client.get_api_url())
     return ApiRequestHelper(api_client=api_client)
