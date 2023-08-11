@@ -166,17 +166,17 @@ class ApiResponseHelper:
         if json is None:
             json = self.expected_json
 
-        response_json = self.__get_json()
-        if isinstance(response_json, dict):
-            if ignore:
-                # Delete values to ignore - so it won't be compared
-                response_json = JsonContentBuilder() \
-                                .from_data(self.response_object.json, True) \
-                                .build() \
-                                .delete(ignore) \
-                                .get()
-            if isinstance(json, JsonContent):
-                json = json.get()
+        if not isinstance(json, JsonContent):
+            json = JsonContentBuilder().from_data(json, True).build()
+
+        response_json = self.response_object.json()
+        if ignore:
+            # Delete values to ignore - so it won't be compared
+            response_json = JsonContentBuilder() \
+                           .from_data(response_json, True) \
+                           .build() \
+                           .delete(*ignore)
+            json.delete(*ignore)
 
         assert response_json == json, "Response's JSON is not equal to given one.\n"\
                 f'Expected: {json}\n'\
@@ -191,7 +191,8 @@ class ApiResponseHelper:
         Returns:
             Self: instance of class `ApiResponseHelper`
         """
-        assert not self.__get_json().get(), \
+        # assert not self.__get_json().get(), \
+        assert not self.response_object.text, \
             'Response has JSON content, but expected to be empty.'
 
         return self
@@ -203,7 +204,7 @@ class ApiResponseHelper:
         Returns:
             Self: instance of class `ApiResponseHelper`
         """
-        assert self.__get_json().get(), \
+        assert self.response_object.text, \
             'Response has no JSON content, but expected to be not empty.'
 
         return self
@@ -228,7 +229,7 @@ class ApiResponseHelper:
 
     # Headers
     @allure.step('Check all headers are present in response.')
-    def headers_present(self, headers: list[str]|tuple[str]) -> Self:
+    def headers_present(self, *headers: str) -> Self:
         """Checks that response contains all given headers.
         If headers not passed as parameter - headers from
         response section of Request Catalog entity
@@ -237,7 +238,7 @@ class ApiResponseHelper:
         Assertion is case insensitive.
 
         Args:
-            headers (list | tuple): list of header names (str) to check.
+            *headers (str): one or more header names to check.
 
         Returns:
             Self: instance of class `ApiResponseHelper`
@@ -250,9 +251,8 @@ class ApiResponseHelper:
                     "headers must be passed as argument, "\
                     "via .set_exepcted() method or defined in Request Catalog.")
 
-        response_headers = self.__get_headers()
         missing_headers = [header for header in headers
-                       if header.lower() not in response_headers]
+                            if header not in self.response_object.headers]
 
         assert not missing_headers, 'Some headers are not present, but expected to be. '\
                                 f'Missing headers: {", ".join(missing_headers)}'
@@ -260,32 +260,18 @@ class ApiResponseHelper:
         return self
 
     @allure.step('Check that headers aren\'t present in response.')
-    def headers_not_present(self, headers: list[str]|tuple[str]) -> Self:
+    def headers_not_present(self, *headers: str) -> Self:
         """Checks that response doesn't contain any of given headers.
-        If headers not passed as parameter - headers from
-        response section of Request Catalog entity
-        or headers set via .set_expected() will be used.
-
         Assertion is case insensitive.
 
         Args:
-            headers (list | tuple): list of header names (str) to check.
+            *headers (list | tuple): list of header names (str) to check.
 
         Returns:
             Self: instance of class `ApiResponseHelper`
         """
-        if headers is None:
-            if self.expected_headers:
-                headers = self.expected_headers.keys()
-            else:
-                raise ValueError("There is no headers to compare - "\
-                    "headers must be passed as argument, "\
-                    "via .set_exepcted() method or defined in Request Catalog.")
-
-        response_headers = self.__get_headers()
-        present = [header
-                   for header in headers
-                   if header.lower() in response_headers]
+        present = [header for header in headers
+                    if header in self.response_object.headers]
 
         assert not present, 'Some headers are present, but expected not to be. '\
                                 f'Headers: {", ".join(present)}'
@@ -294,22 +280,22 @@ class ApiResponseHelper:
 
     @allure.step('Check that header "{header}" contains substring "{value}"')
     def header_contains(self, header: str, value: str,
-                        case_insensetive: bool = True) -> Self:
+                        case_sensetive: bool = False) -> Self:
         """Checks that given header is present and it's value contains given
         substring 'value'.
 
         Args:
             header (str): name of the header.
             value (str): substring to find in header's value.
-            case_insensetive (optiona, bool): flag to make assertion case
-            insensetive. Defaults to True.
+            case_sensetive (optiona, bool): flag to make assertion case
+            sensetive. Defaults to False.
 
         Returns:
             Self: instance of class `ApiResponseHelper`
         """
-        response_headers = self.__get_headers(case_insensetive)
-        if case_insensetive:
-            header = header.lower()
+        response_headers = self.__get_headers(case_sensetive)
+        header = header.lower()
+        if not case_sensetive:
             value = value.lower()
 
         assert header in response_headers, \
@@ -337,8 +323,8 @@ class ApiResponseHelper:
             Self: instance of class `ApiResponseHelper`
         """
         response_headers = self.__get_headers(case_sensetive)
+        header = header.lower()
         if not case_sensetive:
-            header = header.lower()
             value = value.lower()
 
         assert header in response_headers, \
@@ -353,7 +339,7 @@ class ApiResponseHelper:
     @allure.step('Check that headers are like given')
     def headers_like(self, expected_headers: dict[str, str] = None,
                      case_sensetive: bool = False) -> Self:
-        """Check of response headers to be like given.
+        """Check that response headers are like given.
         If 'expected_headers' not passed as parameter - headers
         from response section of Request Catalog entity will be used.
 
@@ -379,21 +365,21 @@ class ApiResponseHelper:
 
         failed = []
         for header, value in expected_headers.items():
+            header = header.lower()
             if not case_sensetive:
-                header = header.lower()
                 value = value.lower()
 
-            if header in response_headers and value not in response_headers[header]:
-                failed.append(f'header "{header}" doesn\'t contain value "{value}"')
-            else:
+            if header not in response_headers:
                 failed.append(f'header "{header}" not found')
+            elif value not in response_headers[header]:
+                failed.append(f'header "{header}" doesn\'t contain value "{value}"')
 
         assert not failed, f'Headers are not like given: {", ".join(failed)}'
 
         return self
 
     @allure.step('Check that headers are match to given')
-    def headers_match(self, expected_headers: dict = None,
+    def headers_match(self, expected_headers: dict[str, str] = None,
                      case_insensetive: bool = True) -> Self:
         """Check of response headers to be equal to given.
         If 'expected_headers' not passed as parameter - headers from response

@@ -1,34 +1,17 @@
-import logging.handlers
-import logging.config
+import requests
 
-import utils.log_database_handler
+r = requests.models.Response()
+r.url = 'http://someurl.com'
+r.headers.update({"header1": "value1", "header2": "value2"})
+r.cookies.update({"cookie1": "value1"})
+r.status_code = 200
+r.encoding = 'utf-8'
+r._content = b'{"foo":"bar"}'
+r.elapsed = 1500330343
 
-
-logging.config.fileConfig("config/logging.ini")
-logging.debug("KEK")
-
-from utils.json_content.json_content import JsonContent
-
-cfg = {
-    'a': 1,
-    'b': {
-        'c': [1,2,3]
-    }
-}
-
-cnt = JsonContent(cfg)
-#cnt.delete()
-cnt.update('/b/d', 100)
-print(cnt.get())
-
-
-'''
-from utils.api_client.api_configuration_reader import ApiConfigurationReader
-
-api = ApiConfigurationReader('config/api_clients.ini')
-api_collection = api.read_configurations()
-
-print(api_collection)
-print('-' * 200)
-print(api_collection.configs['DOG.CEO'].request_catalog['GetRandomImage'].response)
-'''
+print(r)
+print(r.text)
+print(r.status_code)
+print(r.headers)
+print(r.cookies)
+print(r.json())

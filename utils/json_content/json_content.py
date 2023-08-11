@@ -187,11 +187,17 @@ class JsonContent:
         """
         self.resolver.invalidate_cache()
 
-    def __eq__(self, other: Self):
-        if not isinstance(other, JsonContent):
-            return False
+    def __str__(self):
+        return str(self.content.get(ROOT_POINTER))
 
-        return self.content.get('') == other.content.get('')
+    def __eq__(self, other):
+        if isinstance(other, JsonContent):
+            return self.content.get(ROOT_POINTER) == other.content.get(ROOT_POINTER)
+
+        if isinstance(other, dict|list):
+            return self.content.get(ROOT_POINTER) == other
+
+        return False
 
     def __contains__(self, pointer: str):
         if not isinstance(pointer, str):
