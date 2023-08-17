@@ -1,17 +1,22 @@
 """Pointer to JSON element"""
 from dataclasses import dataclass
+from abc import ABC, abstractmethod
 from typing import Self
 
 POINTER_PREFIX = "/"
 REF_PREFIX = "!ref "
 FILE_PREFIX = "!file "
-REF_SEP = "/"
+POINTER_SEP = "/"
 ROOT_POINTER = ''
 APPEND_CHAR = '-'
 
 POINTER_SYNTAX_HING_MSG = \
     'JSON Pointer must start with "/" symbol ' \
     '(e.g. "/a/b/c") or be empty string "" to reference entire document.'
+
+POINTER_CHILD_SYNTAX_HINT_MSG = \
+    'Child sub-path must be non empty string symbol, integer, '\
+    'or list/tuple of nodes names.'
 
 REFERENCE_POINTER_SYNTAX_HING_MSG = \
         'JSON Reference Pointer must start with "!ref" prefix (e.g. "!ref /a/b/c")' \
@@ -20,15 +25,57 @@ REFERENCE_POINTER_SYNTAX_HING_MSG = \
 FILE_POINTER_SYNTAX_HING_MSG = \
         'File Pointer must start with "!file" prefix (e.g. "!file path/to/file").'
 
+@dataclass(frozen=True, slots=True)
+class AbstractPointer(ABC):
+    """Basic class for pointers"""
+    path: tuple|None
+    raw: str
+
+    @staticmethod
+    @abstractmethod
+    def match(pointer_str: str) -> bool:
+        """Checks that given string matches basic expected pointer syntax."""
+
+    @staticmethod
+    @abstractmethod
+    def from_string(pointer_str: str) -> 'AbstractPointer':
+        """Parses given string pointer and return instance of Pointer class."""
+
+    @staticmethod
+    def decode_escaped_chars(value: str) -> str:
+        """Decodes escaped characts:
+        ~0 - to ~
+        ~1 - to /
+
+        Args:
+            value (str): string to decode.
+
+        Returns:
+            str: decoded string
+        """
+        return value.replace('~1', '/').replace('~0', '~')
+
+    @staticmethod
+    def encode_escaped_chars(value: str) -> str:
+        """Decodes escaped characts:
+        ~0 - to ~
+        ~1 - to /
+
+        Args:
+            value (str): string to decode.
+
+        Returns:
+            str: decoded string
+        """
+        return value.replace('~', '~0').replace('/', '~1')
+
 
 @dataclass(frozen=True, slots=True)
-class Pointer:
+class Pointer(AbstractPointer):
     """Class to wrap JSON Pointer (RFC6901).
     Provides parsing and validation of pointers.
     """
-    path: tuple|None
     rfc_pointer: str
-    raw: str
 
     def parent(self) -> "Pointer":
         """Returns immediate parent pointer of current pointer.
@@ -41,6 +88,35 @@ class Pointer:
         if self.path is None:
             return self
         return Pointer.from_path(self.path[:-1])
+
+    def child(self, path: str|int|tuple|list) -> "Pointer":
+        """Creates child pointer by appending given 'path' to current pointer.
+
+        Args:
+            path (str | int | tuple | list): sub-path as string or as
+            collection of nodes names.
+
+        Returns:
+            Pointer: instance of `Pointer` class
+        """
+        # Check for data types / None
+        if any((
+            path is None,
+            not isinstance(path, (int, str, tuple, list)),
+            isinstance(path, (tuple, list)) and (not path or None in path)
+        )):
+            raise ValueError(POINTER_CHILD_SYNTAX_HINT_MSG)
+
+        # Parse string to list
+        if isinstance(path, str):
+            path = path.lstrip(POINTER_PREFIX).split(POINTER_SEP)
+        elif isinstance(path, int):
+            path = (str(path), )
+
+        if self.path is not None:
+            path = (*self.path, *path)
+
+        return Pointer.from_path(path)
 
     def is_child_of(self, pointer: 'Pointer') -> bool:
         """Returns True if current pointer is a child of
@@ -66,7 +142,7 @@ class Pointer:
         return pointer.path == self.path[:len(pointer.path)]
 
     def __eq__(self, other):
-        return isinstance(other, Pointer) and self.path == other.path
+        return isinstance(other, (Pointer, ReferencePointer)) and self.path == other.path
 
     def __str__(self):
         return self.rfc_pointer
@@ -111,7 +187,7 @@ class Pointer:
         return Pointer(
             path = tuple(
                 Pointer.decode_escaped_chars(v)
-                for v in pointer_str[1:].split(REF_SEP)
+                for v in pointer_str[1:].split(POINTER_SEP)
             ),
             rfc_pointer = pointer_str,
             raw = pointer_str
@@ -131,52 +207,19 @@ class Pointer:
             return Pointer(None, ROOT_POINTER, ROOT_POINTER)
 
         pointer_path = tuple(str(p) for p in pointer_path)
-        escaped_path = REF_SEP.join((Pointer.encode_escaped_chars(p) for p in pointer_path))
+        escaped_path = POINTER_SEP.join((Pointer.encode_escaped_chars(p) for p in pointer_path))
 
-        rfc_pointer = f'{REF_SEP}{escaped_path}'
+        rfc_pointer = f'{POINTER_SEP}{escaped_path}'
         return Pointer(pointer_path, rfc_pointer, rfc_pointer)
-
-    @staticmethod
-    def decode_escaped_chars(value: str) -> str:
-        """Decodes escaped characts:
-        ~0 - to ~
-        ~1 - to /
-
-        Args:
-            value (str): string to decode.
-
-        Returns:
-            str: decoded string
-        """
-        return value.replace('~1', '/').replace('~0', '~')
-
-    @staticmethod
-    def encode_escaped_chars(value: str) -> str:
-        """Decodes escaped characts:
-        ~0 - to ~
-        ~1 - to /
-
-        Args:
-            value (str): string to decode.
-
-        Returns:
-            str: decoded string
-        """
-        return value.replace('~', '~0').replace('/', '~1')
 
 
 @dataclass(frozen=True, slots=True)
-class ReferencePointer(Pointer):
+class ReferencePointer(AbstractPointer):
     """Extends JSON Pointer syntax with '!ref ' token,
     marking pointer a reference pointer to some node
     of the document.
     """
-
-    def parent(self):
-        return self
-
-    def is_child_of(self, pointer: Pointer) -> bool:
-        return False
+    rfc_pointer: str
 
     @staticmethod
     def match(pointer_str: str) -> bool:
@@ -219,23 +262,17 @@ class ReferencePointer(Pointer):
         return ReferencePointer(
             path=tuple(
                 Pointer.decode_escaped_chars(v)
-                for v in rfc_pointer[1:].split(REF_SEP)
+                for v in rfc_pointer[1:].split(POINTER_SEP)
             ),
             raw=pointer_str,
             rfc_pointer=rfc_pointer)
 
 
 @dataclass(frozen=True, slots=True)
-class FilePointer(Pointer):
-    """Extends JSON Pointer syntax with '!file ' token,
+class FilePointer(AbstractPointer):
+    """Extends AbstractPointer syntax with '!file ' token,
     marking pointer to a file.
     """
-
-    def parent(self):
-        return self
-
-    def is_child_of(self, pointer: Pointer) -> bool:
-        return False
 
     def __eq___(self, other):
         return isinstance(other, FilePointer) and self.path == other.path
@@ -274,4 +311,4 @@ class FilePointer(Pointer):
         if not pointer_path:
             raise ValueError('Empty File Pointer is not allowed!')
 
-        return FilePointer(path=pointer_path, raw=pointer_str, rfc_pointer=None)
+        return FilePointer(path=pointer_path, raw=pointer_str)

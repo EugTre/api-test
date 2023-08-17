@@ -98,6 +98,48 @@ class TestPointer:
         assert ptr1_parent == ptr1
         assert ptr1_parent.path == ptr1.path
 
+    @pytest.mark.parametrize("child_ptr, expected_ptr", [
+        ("/b", "/root/b"),
+        ("/b/c", "/root/b/c"),
+        ("b", "/root/b"),
+        ("b/c", "/root/b/c"),
+        (0, "/root/0"),
+        (-1, "/root/-1"),
+        (("b", ), "/root/b"),
+        (("b", "c"), "/root/b/c"),
+        ((0, ), "/root/0"),
+        ((0, 1), "/root/0/1"),
+        (("",""), "/root//")
+    ])
+    def test_get_child(self, child_ptr, expected_ptr):
+        ptr = Pointer.from_string('/root').child(child_ptr)
+        ptr_expected = Pointer.from_string(expected_ptr)
+        assert ptr == ptr_expected
+
+    @pytest.mark.parametrize('child_ptr, expected_ptr', [
+        ("", '/'),
+        ('b', '/b'),
+        ('/b', '/b'),
+        (0, '/0'),
+        (('a',), '/a'),
+        ((0, 1), '/0/1')
+    ])
+    def test_get_child_from_root(self, child_ptr, expected_ptr):
+        ptr = Pointer.from_string('').child(child_ptr)
+        ptr_expected = Pointer.from_string(expected_ptr)
+        assert ptr == ptr_expected
+
+    @pytest.mark.parametrize("child_ptr", [
+        None,
+        (None,),
+        4.55,
+        [],
+        tuple()
+    ])
+    def test_get_child_with_invalid_subpointer_fails(self, child_ptr):
+        with pytest.raises(ValueError, match='Child sub-path must be non empty.*'):
+            Pointer.from_string('/root').child(child_ptr)
+
     def test_equals(self):
         raw_ptr = "/a/b/c"
         ptr1 = Pointer.from_string(raw_ptr)

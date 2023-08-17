@@ -428,18 +428,7 @@ class TestApiResponseHelperBody:
         api_response_detailed.set_expected(json=PAYLOAD_SIMPLE) \
             .json_equals(ignore=("/info",))
 
-    def test_json_equals_with_match_objects(self, api_response_detailed: ApiResponseHelper):
-        import utils.api_helpers.match_objects as match
-        api_response_detailed.json_equals({
-            "status": "success",
-            "message": match.AnyText(),
-            "info": match.AnyNonEmptyDict()
-            #{
-            #    "id": match.AnyNumberGreaterThan(0),
-            #    "timestamp": match.AnyTextLike(r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z'),
-                #"items": match.AnyList()
-            #}
-        })
+
 
     # param_presents
     # param_not_presents

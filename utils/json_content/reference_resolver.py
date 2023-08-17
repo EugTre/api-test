@@ -5,7 +5,7 @@ from typing import Any
 from abc import ABC, abstractmethod
 
 from utils.data_reader import DataReader
-from utils.json_content.pointer import ReferencePointer, FilePointer, REF_SEP, ROOT_POINTER
+from utils.json_content.pointer import ReferencePointer, FilePointer, POINTER_SEP, ROOT_POINTER
 from utils.json_content.json_wrapper import AbstractContentWrapper
 
 class AbstractReferenceResolver(ABC):
@@ -214,11 +214,11 @@ class ReferenceResolver(AbstractReferenceResolver):
         if stack_size < len(self.__stack_nodes) - 1:
             merge_diff = len(self.__stack_nodes) - stack_size
             nodes = [
-                REF_SEP.join(self.__stack_nodes[:merge_diff]),
+                POINTER_SEP.join(self.__stack_nodes[:merge_diff]),
                 *self.__stack_nodes[merge_diff:-1]
             ]
         else:
-            nodes = REF_SEP.join(self.__stack_nodes)
+            nodes = POINTER_SEP.join(self.__stack_nodes)
 
         full_stack = '\n'.join(
             [f'     Node "{node}" -> "{stack}"'
@@ -234,7 +234,7 @@ class ReferenceResolver(AbstractReferenceResolver):
 
     def __get_nodepath_msg(self) -> str:
         """Formats reference path for error messaging."""
-        return f'Problem occured on parsing key "{REF_SEP.join(self.__stack_nodes)}".'
+        return f'Problem occured on parsing key "{POINTER_SEP.join(self.__stack_nodes)}".'
 
     @staticmethod
     def __copy_value(value: Any):

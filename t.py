@@ -1,15 +1,45 @@
 
 import logging
+from dataclasses import dataclass
+from abc import ABC, abstractmethod
 
-from utils.generators import generators_manager
+@dataclass(slots=True, frozen=True)
+class AbstractPointer(ABC):
+    path: tuple|None
+    raw: str
 
-print(generators_manager.generate('FirstName'))
-print(generators_manager.generate('FirstName', ('female', )))
-print(generators_manager.generate('FirstName', ('female', ), correlation_id='abc'))
-print(generators_manager.generate('FirstName', ('female', ), correlation_id='abc'))
-print(generators_manager.generate('FirstName', ('female', ), correlation_id='abc'))
-print(generators_manager.generate('FirstName', ('female', ), correlation_id='abc'))
-print(generators_manager.cache)
+    @staticmethod
+    @abstractmethod
+    def from_string():
+        pass
+
+    @staticmethod
+    @abstractmethod
+    def match():
+        pass
+
+    @staticmethod
+    def kek():
+        print('KEK')
+
+@dataclass(slots=True, frozen=True)
+class Pointer(AbstractPointer):
+
+    @staticmethod
+    def from_string():
+        return Pointer(1,2)
+
+    @staticmethod
+    def match():
+        print(2)
+        Pointer.kek()
+
+
+p = Pointer.from_string()
+p.match()
+p.kek()
+
+
 """
 class Manager:
     def __init__(self):

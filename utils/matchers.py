@@ -284,8 +284,8 @@ class MatchersManager:
         return matcher
 
 
-manager = MatchersManager()
-manager.bulk_register((
+matchers_manager = MatchersManager()
+matchers_manager.bulk_register((
     Any,
     AnyText,
     AnyTextLike,

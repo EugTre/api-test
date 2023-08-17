@@ -15,7 +15,7 @@
 4. Use Compile on ApiConfigurationRead
 5. ~~Optimize update of IterableJsonWrapper~~
 6. ~~Remove negative index support for JsonWrapper~~
-
+7. Make JsonWrapper and FlatJsonWrapper use similar error classes?
 
 
 

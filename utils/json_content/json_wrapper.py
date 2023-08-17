@@ -370,7 +370,7 @@ class JsonWrapper(AbstractContentWrapper):
         yield from self.__iter(self._content)
 
 
-class FastJsonWrapper(JsonWrapper):
+class FlatJsonWrapper(JsonWrapper):
     """Class to wrap JSON data with get/update/delete methods that use JSON Pointers.
 
     Extends `JsonWrapper` class with fast get mechanism (using pre-calculated flattened reference
@@ -434,24 +434,26 @@ class FastJsonWrapper(JsonWrapper):
         return default_value
 
     def delete(self, pointer: str) -> bool:
-        pointer = self.__convert_to_pointer_obj(pointer)
-        if pointer.path is None:
+        if pointer == ROOT_POINTER:
             self._content.clear()
+            self._node_map.clear()
             return True
 
+        pointer = self.__convert_to_pointer_obj(pointer)
         if not self.__has(pointer):
             return False
 
         storage, key = self.__unsafe_get_storage(pointer)
         del storage[key]
+        del self._node_map[pointer]
 
         # One may delete container with nested values/container
         # so recalculate storage's substructure to reflect changes
-        self.__recalculate_for_storage(storage, pointer)
+        self.__delete_stale_nodes(pointer)
         return True
 
     def update(self, pointer: str, value: Any) -> bool:
-        pointer = self.__convert_to_pointer_obj(pointer)
+        pointer: Pointer = self.__convert_to_pointer_obj(pointer)
         if pointer.path is None:
             raise ValueError(EXC_MSG__UPDATE_ROOT_ERROR)
 
@@ -471,28 +473,32 @@ class FastJsonWrapper(JsonWrapper):
                     ))
 
                 storage.append(value)
+
+                new_index = len(storage) - 1
+                pointer = parent_pointer.child(new_index)
+                self._node_map[pointer] = (storage, new_index)
             elif isinstance(storage, dict):
                 storage[new_key] = value
+                self._node_map[pointer] = (storage, new_key)
             else:
                 raise KeyError(EXC_MSG__INVALID_STORAGE_FAST.format(
                     path=parent_pointer,
                     pointer=pointer
                 ))
 
-            # Add new node to map and scan for added node
-            self._node_map[pointer] = (storage, new_key)
             if isinstance(value, list|dict):
-                self.__recalculate_for_storage(value, pointer)
+                self.__add_new_nodes(pointer)
 
             return True
 
         # Update case
-        storage, key = self.__unsafe_get_storage(pointer) #self._node_map[pointer]
+        storage, key = self.__unsafe_get_storage(pointer)
         storage[key] = value
 
         if isinstance(value, (dict|list)):
             # If container added - update node map with pointer nodes
-            self.__recalculate_for_storage(storage, pointer)
+            self.__delete_stale_nodes(pointer)
+            self.__add_new_nodes(pointer)
 
         return True
 
@@ -556,17 +562,16 @@ class FastJsonWrapper(JsonWrapper):
                            'to restore integrity)') from exc
         return node_info
 
-    def __recalculate_for_storage(self, storage: list|dict,
-                                  storage_pointer: Pointer) -> dict:
+    def __add_new_nodes(self,  storage_pointer: Pointer):
+        """Scans for new child nodes of given pointer"""
+        new_nodes = self.__scan_storage(self.__unsafe_get(storage_pointer), storage_pointer.path)
+        self._node_map.update(new_nodes)
 
-        # Delete existing child nodes of storage
+    def __delete_stale_nodes(self, storage_pointer: Pointer):
+        """Delete existing child nodes of given pointer"""
         stale_nodes = [node for node in self._node_map if node.is_child_of(storage_pointer)]
         for node in stale_nodes:
             del self._node_map[node]
-
-        # Add new nodes
-        new_nodes = self.__scan_storage(storage, storage_pointer.path)
-        self._node_map.update(new_nodes)
 
     def __iter__(self):
         for ptr in self._node_map.keys():

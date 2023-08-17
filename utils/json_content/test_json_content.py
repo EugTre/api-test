@@ -9,7 +9,7 @@ from typing import Any
 import pytest
 from utils.json_content.json_content import JsonContentBuilder,\
     AbstractContentWrapper, AbstractReferenceResolver
-from utils.json_content.json_wrapper import JsonWrapper, FastJsonWrapper
+from utils.json_content.json_wrapper import JsonWrapper, FlatJsonWrapper
 
 CONTENT = {
     'a': 1,
@@ -88,7 +88,7 @@ class MockResolver(AbstractReferenceResolver):
 
 @pytest.mark.parametrize('wrapper_cls', [
     JsonWrapper,
-    FastJsonWrapper
+    FlatJsonWrapper
 ])
 class TestJsonContent:
     """Tests for JsonContent object based on JSON object"""

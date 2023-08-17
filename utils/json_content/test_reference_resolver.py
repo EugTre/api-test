@@ -7,13 +7,13 @@ import pathlib
 import json
 import pytest
 
-from utils.json_content.json_wrapper import JsonWrapper, FastJsonWrapper
+from utils.json_content.json_wrapper import JsonWrapper, FlatJsonWrapper
 from utils.json_content.reference_resolver import ReferenceResolver
 
 
 @pytest.mark.parametrize("wrapper_cls", [
     JsonWrapper,
-    FastJsonWrapper
+    FlatJsonWrapper
 ])
 class TestReferenceResolver:
     """Tests ReferenceResolver class"""
@@ -243,7 +243,7 @@ class TestReferenceResolver:
 
 @pytest.mark.parametrize("wrapper_cls", [
     JsonWrapper,
-    FastJsonWrapper
+    FlatJsonWrapper
 ])
 class TestReferenceResolverFileRef:
     """Tests how Reference Resolver resolves file references."""

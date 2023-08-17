@@ -7,7 +7,7 @@ from requests import Response, exceptions as requests_exceptions
 import allure
 from jsonschema import validate
 from utils.json_content.json_content import JsonContent, JsonContentBuilder
-from utils.json_content.json_wrapper import FastJsonWrapper
+from utils.json_content.json_wrapper import FlatJsonWrapper
 from utils.json_content.pointer import Pointer, POINTER_PREFIX, ROOT_POINTER
 
 class ApiResponseHelper:
@@ -35,7 +35,7 @@ class ApiResponseHelper:
         if json_of_response is not None:
             self.__json_content = JsonContentBuilder() \
                                 .from_data(json_of_response) \
-                                .set_wrapper(FastJsonWrapper) \
+                                .set_wrapper(FlatJsonWrapper) \
                                 .build()
 
     # Public methods
@@ -497,7 +497,7 @@ class ApiResponseHelper:
                     "via .set_exepcted() method or defined in Request Catalog.")
             json = self.expected_json
 
-        expected_json = FastJsonWrapper(json)
+        expected_json = FlatJsonWrapper(json)
         actual_json = self.__json_content
 
         for ptr, expected_value in expected_json:

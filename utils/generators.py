@@ -1,18 +1,8 @@
 
 import typing
 import random
-from abc import ABC, abstractmethod
 
-class AbstractGenerator(ABC):
-    """Test data generator"""
-
-    @staticmethod
-    @abstractmethod
-    def generate():
-        """Generates test data"""
-
-
-class FirstNameGenerator(AbstractGenerator):
+class NamesGenerator:
     MALE_NAMES = (
         "James",
         "John",
@@ -33,11 +23,30 @@ class FirstNameGenerator(AbstractGenerator):
         "Aki",
         "Noelle"
     )
+    LAST_NAMES = (
+        'Harris',
+        'Robinson',
+        'Walker',
+        'Reaves',
+        'Smith',
+        'Levi',
+        'Yamamoto',
+        'Brodski',
+        'Danielopoulos',
+        'McNuggets',
+        'Lopez',
+        'Hernandez'
+    )
+
     @staticmethod
-    def generate(gender: str = 'male'):
-        return random.choice(FirstNameGenerator.MALE_NAMES
+    def generate_first_name(gender: str = 'male'):
+        return random.choice(NamesGenerator.MALE_NAMES
                              if gender.lower().strip() == 'male' else
-                             FirstNameGenerator.FEMALE_NAMES)
+                             NamesGenerator.FEMALE_NAMES)
+
+    @staticmethod
+    def generate_last_name():
+        return random.choice(NamesGenerator.LAST_NAMES)
 
 
 class GeneratorsManager():
@@ -48,12 +57,12 @@ class GeneratorsManager():
         self.collection = {}
         self.cache = {}
 
-    def register(self, generator: AbstractGenerator, name: str = None) -> None:
+    def register(self, generator: callable, name: str = None) -> None:
         """Registers given generator under given name.
 
         Args:
-            generator (Any): generator class.
-            name (str, optional): registration name. Defaults to class.__name__.
+            generator (callable): generator function.
+            name (str, optional): registration name. Defaults to callable.__name__.
 
         Raises:
             ValueError: when name already occupied.
@@ -71,7 +80,7 @@ class GeneratorsManager():
 
         Args:
             generators (list | tuple): collection of generators where each element is
-            'class<cls>' or ('class<cls>', 'name<str>').
+            'callable' or ('callable', 'name<str>').
         """
         for generator_data in generators:
             if isinstance(generator_data, (tuple, list)):
@@ -114,8 +123,8 @@ class GeneratorsManager():
         # Generate new data
         if kwargs is None:
             kwargs = {}
-        generator_cls = self.collection[name]
-        value = generator_cls.generate(*args, **kwargs)
+        generator_func = self.collection[name]
+        value = generator_func(*args, **kwargs)
 
         # Cache data if needed
         if correlation_id:
@@ -125,5 +134,6 @@ class GeneratorsManager():
 
 generators_manager = GeneratorsManager()
 generators_manager.bulk_register((
-    [FirstNameGenerator, 'FirstName'],
+    [NamesGenerator.generate_first_name, 'FirstName'],
+    [NamesGenerator.generate_last_name, 'LastName']
 ))
