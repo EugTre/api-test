@@ -1,8 +1,20 @@
 
-
-4. Add headers check to ApiResponseHelper
-5.
-
+1. ~~Add Generators and Generator Manager. Manager allows:~~
+    ~~- register generator~~
+    ~~- generate data using given args and kwargs~~
+    ~~- support caching and cache retrieving (e.g. return same value) if ID argument is passed~~
+2. ~~Add Matcher Manager:~~
+    ~~- register matchers~~
+    ~~- create matcher object by given name and using given args~~
+    ~~- cache matcher objects and return cached object if args match~~
+3. Add Compiler class:
+    - plugs in JsonContent and uses wrapper to compile values of the structure
+    - parses linse of "!any" and "!gen " values retriving: name of generator/matcher, args, kwargs and id (for generator)
+    - using GeneratorManager or MatcherManager - create actual value/matcher
+    - set generated value to Json
+4. Use Compile on ApiConfigurationRead
+5. ~~Optimize update of IterableJsonWrapper~~
+6. ~~Remove negative index support for JsonWrapper~~
 
 
 

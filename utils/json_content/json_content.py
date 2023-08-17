@@ -5,7 +5,7 @@ import copy
 
 from typing import Self, Any
 from utils.data_reader import DataReader
-from utils.json_content.json_content_wrapper import AbstractContentWrapper, JsonContentWrapper
+from utils.json_content.json_wrapper import AbstractContentWrapper, JsonWrapper
 from utils.json_content.reference_resolver import AbstractReferenceResolver, ReferenceResolver
 from utils.json_content.pointer import ROOT_POINTER
 
@@ -17,7 +17,7 @@ class JsonContent:
     def __init__(self, content: dict|list,
                  allow_references: bool = False,
                  enable_cache: bool = False,
-                 wrapper: AbstractContentWrapper = JsonContentWrapper,
+                 wrapper: AbstractContentWrapper = JsonWrapper,
                  resolver: AbstractReferenceResolver = ReferenceResolver
                 ):
         """Create a new instance of `JsonContent` wrapper class.
@@ -204,6 +204,9 @@ class JsonContent:
             return False
         return pointer in self.content
 
+    def __iter__(self):
+        return self.content.__iter__()
+
     @staticmethod
     def __copy_value(value: Any):
         """Makes deepcopy of mutable JSON value (dict or list)
@@ -235,7 +238,7 @@ class JsonContentBuilder:
         self.__content = {}
         self.__allow_reference_resolution = False
         self.__enable_reference_cache = False
-        self.__wrapper_cls = JsonContentWrapper
+        self.__wrapper_cls = JsonWrapper
         self.__resolver_cls = ReferenceResolver
 
     def build(self) -> JsonContent:

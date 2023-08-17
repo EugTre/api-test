@@ -3,16 +3,18 @@
 pytest -s -vv ./utils/json_content/test_reference_resolver.py
 """
 import copy
-import shutil
 import pathlib
 import json
 import pytest
 
-from utils.json_content.json_content_wrapper import JsonContentWrapper
+from utils.json_content.json_wrapper import JsonWrapper, FastJsonWrapper
 from utils.json_content.reference_resolver import ReferenceResolver
 
 
-
+@pytest.mark.parametrize("wrapper_cls", [
+    JsonWrapper,
+    FastJsonWrapper
+])
 class TestReferenceResolver:
     """Tests ReferenceResolver class"""
     # --- Positive tests
@@ -25,18 +27,18 @@ class TestReferenceResolver:
         {"a":1, "b":[1,2,3]},
         [{"id":1}, {"id":2}]
     ])
-    def test_reference_resolver_no_refs_to_resolve(self, raw_content: list|dict,
-                                                   cache_enabled: bool):
+    def test_no_refs_to_resolve(self, raw_content: list|dict,
+                                   cache_enabled: bool, wrapper_cls):
         """No error on resolve_all() for content without references."""
-        content = JsonContentWrapper(copy.deepcopy(raw_content))
+        content = wrapper_cls(copy.deepcopy(raw_content))
         ReferenceResolver(content, cache_enabled).resolve_all()
         # Check that content after resolution is the very same as original
         assert content.get('') == raw_content
 
     @pytest.mark.parametrize("cache_enabled", [False, True])
-    def test_reference_resolver_resolve_reference_flat_dict(self, cache_enabled):
+    def test_resolve_reference_flat_dict(self, cache_enabled, wrapper_cls):
         """Reference resolution is successful for flat references"""
-        content = JsonContentWrapper({
+        content = wrapper_cls({
             "a": 100,
             "b": "!ref /a",
             "c": "!ref /a"
@@ -48,9 +50,9 @@ class TestReferenceResolver:
         assert raw_content['c'] == raw_content['a']
 
     @pytest.mark.parametrize("cache_enabled", [False, True])
-    def test_reference_resolver_resolve_reference_nested_dict(self, cache_enabled):
+    def test_resolve_reference_nested_dict(self, cache_enabled, wrapper_cls):
         """Reference resolution is successful in nested references in dict"""
-        content = JsonContentWrapper({
+        content = wrapper_cls({
             "a": 100,
             "b": {
                 "c": 200
@@ -69,9 +71,9 @@ class TestReferenceResolver:
         assert raw_content['e']['e-from-bc'] == raw_content['b']['c']
 
     @pytest.mark.parametrize("cache_enabled", [False, True])
-    def test_reference_resolver_resolve_reference_value_is_mutable(self, cache_enabled):
+    def test_resolve_reference_value_is_mutable(self, cache_enabled, wrapper_cls):
         """Reference resolution create copy of mutable values."""
-        content = JsonContentWrapper({
+        content = wrapper_cls({
             "a": [1,2,3],
             "b": {
                 "enabled": True
@@ -100,14 +102,14 @@ class TestReferenceResolver:
         assert raw_content['e-from-e'] is not raw_content['b']
 
     @pytest.mark.parametrize("cache_enabled", [False, True])
-    def test_reference_resolver_resolve_reference_in_array(self, cache_enabled):
+    def test_resolve_reference_in_array(self, cache_enabled, wrapper_cls):
         """References in and to array elements resolves successfully,
         including root content array."""
-        content = JsonContentWrapper([
+        content = wrapper_cls([
             {"id": 1, "posts": [1,2,44,55]},
             {"id": 2, "posts": []},
             {"id": 30, "posts": "!ref /0/posts"},
-            {"id": 31, "posts": ["!ref /0/posts/0", "!ref /0/posts/-1"]},
+            {"id": 31, "posts": ["!ref /0/posts/0", "!ref /0/posts/1"]},
             {"id": 32, "posts": ["!ref /0/posts/0", "!ref /0/posts/2"]},
             "!ref /1"
         ])
@@ -118,7 +120,7 @@ class TestReferenceResolver:
         assert raw_content[2]['posts'] is not raw_content[0]['posts']
 
         assert raw_content[3]['posts'][0] == raw_content[0]['posts'][0]
-        assert raw_content[3]['posts'][1] == raw_content[0]['posts'][-1]
+        assert raw_content[3]['posts'][1] == raw_content[0]['posts'][1]
 
         assert raw_content[4]['posts'][0] == raw_content[0]['posts'][0]
         assert raw_content[4]['posts'][1] == raw_content[0]['posts'][2]
@@ -127,9 +129,9 @@ class TestReferenceResolver:
         assert raw_content[-1] is not raw_content[1]
 
     @pytest.mark.parametrize("cache_enabled", [False, True])
-    def test_reference_resolver_resolve_ref_to_none(self, cache_enabled):
+    def test_resolve_ref_to_none(self, cache_enabled, wrapper_cls):
         """It's possible to resolve reference to None type"""
-        content = JsonContentWrapper({
+        content = wrapper_cls({
             "a": None,
             "b": "!ref /a",
             "c": "!ref /a"
@@ -139,13 +141,13 @@ class TestReferenceResolver:
         assert raw_content['b'] == raw_content['a']
         assert raw_content['c'] == raw_content['a']
 
-    def test_reference_resolver_cache_may_be_invalidated(self):
+    def test_cache_may_be_invalidated(self, wrapper_cls):
         """Cache may be invalidated and new references will be
         correctly resolved"""
         original_value = 10
         new_value = 300
 
-        content = JsonContentWrapper({
+        content = wrapper_cls({
             "a": original_value,
             "b": "!ref /a"
         })
@@ -192,22 +194,22 @@ class TestReferenceResolver:
             "b": "!ref /a/nested"
         }
     ])
-    def test_reference_resolver_recursive_ref_fails(self, raw_content: dict|list):
+    def test_recursive_ref_fails(self, raw_content: dict|list, wrapper_cls):
         """Recursive references couldn't be resolved and exception should be raised"""
-        content = JsonContentWrapper(raw_content)
+        content = wrapper_cls(raw_content)
         with pytest.raises(RecursionError, match='Recursion detected!.*'):
             ReferenceResolver(content).resolve_all()
 
     @pytest.mark.parametrize("pointer, exc_msg", [
-        (r'!ref b/c',  r'Pointer ".*" should start from root "/" element.'),
-        ('!ref -3', r'Pointer ".*" should start from root "/" element.'),
-        ('!ref ', r'Reference to the whole document is prohibited.')
+        (r'!ref b/c',  r'Invalid JSON Reference Pointer syntax.*'),
+        ('!ref -3', r'Invalid JSON Reference Pointer syntax.*'),
+        ('!ref ', r'.*Refering to entire document is not allowed.')
     ])
-    def test_reference_resolver_recursive_ref_by_invalid_pointer_fails(self, pointer: str,
-                                                                       exc_msg: str):
+    def test_recursive_ref_by_invalid_pointer_fails(self, pointer: str,
+                                                    exc_msg: str, wrapper_cls):
         """References that use invalid pointer couldn't be resolved and exception
         should be raised"""
-        content = JsonContentWrapper({
+        content = wrapper_cls({
             "a": 10,
             "e": pointer
         })
@@ -222,11 +224,11 @@ class TestReferenceResolver:
         r'!ref /d/5',
         r'!ref /d/zzz/3',
     ])
-    def test_reference_resolver_recursive_ref_by_incorrect_pointer_fails(self,
-                                                                       pointer: str):
+    def test_recursive_ref_by_incorrect_pointer_fails(self, pointer: str,
+                                                      wrapper_cls):
         """References that use of incorrect pointer (target key or node is missing)
         couldn't be resolved and exception should be raised"""
-        content = JsonContentWrapper({
+        content = wrapper_cls({
             "a": 10,
             "b": {
                 "c": 20
@@ -239,19 +241,22 @@ class TestReferenceResolver:
             ReferenceResolver(content).resolve_all()
 
 
+@pytest.mark.parametrize("wrapper_cls", [
+    JsonWrapper,
+    FastJsonWrapper
+])
 class TestReferenceResolverFileRef:
     """Tests how Reference Resolver resolves file references."""
 
     # --- Positive tests
     @pytest.mark.parametrize("cache_enabled", [False, True])
-    def test_reference_resolver_file_no_refs(self,
-                                            cache_enabled: bool,
-                                            json_file: pathlib.Path):
+    def test_file_no_refs(self, cache_enabled: bool, json_file: pathlib.Path,
+                          wrapper_cls):
         """Resolving file reference with ref-less content should be successful"""
         file_content = [1, 2, 3]
         json_file.write_text(json.dumps(file_content))
 
-        content = JsonContentWrapper({
+        content = wrapper_cls({
             "a": f"!file {json_file}",
             "b": f"!file {json_file}"
         })
@@ -262,14 +267,13 @@ class TestReferenceResolverFileRef:
         assert raw_content['b'] == file_content
 
     @pytest.mark.parametrize("cache_enabled", [False, True])
-    def test_reference_resolver_file_with_refs(self,
-                                                cache_enabled: bool,
-                                                json_file: pathlib.Path):
+    def test_file_with_refs(self, cache_enabled: bool, json_file: pathlib.Path,
+                            wrapper_cls):
         """Resolving file reference with content with references should be successful"""
         file_content = {"id": 2, "posts": "!ref /0/posts" }
         json_file.write_text(json.dumps(file_content))
 
-        content = JsonContentWrapper([
+        content = wrapper_cls([
             {"id": 1, "posts": [12, 23, 75]},
             f"!file {json_file}",
             f"!file {json_file}",
@@ -292,7 +296,7 @@ class TestReferenceResolverFileRef:
         assert raw_content[2]['posts'] is not raw_content[0]['posts']
         assert raw_content[1]['posts'] is not raw_content[2]['posts']
 
-    def test_reference_resolver_file_cache_may_be_invalidated(self, json_file: pathlib.Path):
+    def test_file_cache_may_be_invalidated(self, json_file: pathlib.Path, wrapper_cls):
         """Cache may be invalidated and new file references will be
         correctly resolved"""
         original_posts = [12, 23, 75]
@@ -303,7 +307,7 @@ class TestReferenceResolverFileRef:
         # Initializ content and resolve ref for the first time to cache data
         file_content = {"id": original_value, "posts": "!ref /0/posts" }
         json_file.write_text(json.dumps(file_content))
-        content = JsonContentWrapper([
+        content = wrapper_cls([
             {"id": 1, "posts": original_posts},
             f"!file {json_file}"
         ])
@@ -336,12 +340,12 @@ class TestReferenceResolverFileRef:
         {"posts": "!ref /-5"},
         {"posts": "!ref /0/enabled"},
     ])
-    def test_reference_resolver_file_invalid_pointer_in_file_ref_fails(self,
-            json_file: pathlib.Path, file_content: dict):
+    def test_file_invalid_pointer_in_file_ref_fails(self,
+            json_file: pathlib.Path, file_content: dict, wrapper_cls):
         """Exception raised on parsing in-file reference if ref pointer is invalid"""
         json_file.write_text(json.dumps(file_content))
 
-        content = JsonContentWrapper([
+        content = wrapper_cls([
             {"id": 1, "posts": [12, 23, 75]},
             f"!file {json_file}"
         ])
@@ -349,20 +353,20 @@ class TestReferenceResolverFileRef:
         with pytest.raises(ValueError):
             ReferenceResolver(content).resolve_all()
 
-    def test_reference_resolver_file_ref_file_not_found_fails(self):
+    def test_file_ref_file_not_found_fails(self, wrapper_cls):
         """Exception raised on parsing file reference to non existing file."""
-        content = JsonContentWrapper([
+        content = wrapper_cls([
             {"id": 1, "posts": "!file non_existing_file.json"}
         ])
 
         with pytest.raises(ValueError):
             ReferenceResolver(content).resolve_all()
 
-    def test_reference_resolver_file_json_malformed_fails(self, json_file: pathlib.Path):
+    def test_file_json_malformed_fails(self, json_file: pathlib.Path, wrapper_cls):
         """Exception raised on parsing file reference to file with malformed
         JSON content."""
         json_file.write_text("{a: 100, b: 200}")
-        content = JsonContentWrapper([
+        content = wrapper_cls([
             {"id": 1, "posts": f"!file {json_file}"}
         ])
 

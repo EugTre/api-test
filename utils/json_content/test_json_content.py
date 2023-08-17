@@ -9,7 +9,7 @@ from typing import Any
 import pytest
 from utils.json_content.json_content import JsonContentBuilder,\
     AbstractContentWrapper, AbstractReferenceResolver
-
+from utils.json_content.json_wrapper import JsonWrapper, FastJsonWrapper
 
 CONTENT = {
     'a': 1,
@@ -29,7 +29,7 @@ CONTENT_WITH_REFS = {
         'c': '!ref /defs/int',
         'd': '!ref /defs/values',
     },
-    'e': '!ref /defs/values/-1'
+    'e': '!ref /defs/values/1'
 }
 
 class MockWrapper(AbstractContentWrapper):
@@ -63,6 +63,9 @@ class MockWrapper(AbstractContentWrapper):
     def __contains__(self, pointer) -> bool:
         return True
 
+    def __iter__(self):
+        return self.__content
+
 class MockResolver(AbstractReferenceResolver):
     """Mocked ReferenceResolver"""
     def __init__(self, content_context: AbstractContentWrapper,
@@ -83,13 +86,17 @@ class MockResolver(AbstractReferenceResolver):
         return
 
 
+@pytest.mark.parametrize('wrapper_cls', [
+    JsonWrapper,
+    FastJsonWrapper
+])
 class TestJsonContent:
     """Tests for JsonContent object based on JSON object"""
 
     # --- Init
-    def test_json_content_build_from_data_copy(self):
+    def test_build_from_data_copy(self, wrapper_cls):
         """Build with data copy is successful"""
-        cnt = JsonContentBuilder().from_data(CONTENT, make_copy=True).build()
+        cnt = JsonContentBuilder().from_data(CONTENT, make_copy=True).set_wrapper(wrapper_cls).build()
         raw_content = cnt.get('')
 
         assert raw_content == CONTENT
@@ -97,10 +104,10 @@ class TestJsonContent:
         assert raw_content['b'] is not CONTENT['b']
         assert raw_content['b']['d'] is not CONTENT['b']['d']
 
-    def test_json_content_build_from_data_nocopy(self):
+    def test_build_from_data_nocopy(self, wrapper_cls):
         """Build without data copy is successful"""
         content = copy.deepcopy(CONTENT)
-        cnt = JsonContentBuilder().from_data(content).build()
+        cnt = JsonContentBuilder().from_data(content).set_wrapper(wrapper_cls).build()
         raw_content = cnt.get('')
 
         assert raw_content == content
@@ -113,43 +120,43 @@ class TestJsonContent:
         ([], list),
         (None, dict)
     ])
-    def test_json_content_build_from_empty(self, content, expected_type):
+    def test_build_from_empty(self, content, expected_type, wrapper_cls):
         """Build JsonContent object from empty list or dict is successful"""
-        cnt = JsonContentBuilder().from_data(content).build()
+        cnt = JsonContentBuilder().from_data(content).set_wrapper(wrapper_cls).build()
         assert not cnt.get('')
         assert isinstance(cnt.get(''), expected_type)
 
-    def test_json_content_build_from_file(self, json_file):
+    def test_build_from_file(self, json_file, wrapper_cls):
         """JsonContent object may be build from JSON file content."""
         json_file.write_text(json.dumps(CONTENT))
 
-        cnt = JsonContentBuilder().from_file(str(json_file)).build()
+        cnt = JsonContentBuilder().from_file(str(json_file)).set_wrapper(wrapper_cls).build()
         assert cnt.get('') == CONTENT
 
-    def test_json_content_no_ref_resolultion_on_creation(self):
+    def test_no_ref_resolultion_on_creation(self, wrapper_cls):
         """Referecnces not resolved on creation of JsonContent when
         reference resolution is disabled"""
         cnt = JsonContentBuilder().from_data(CONTENT_WITH_REFS, True)\
-            .set_reference_policy(False, False).build()
+            .set_reference_policy(False, False).set_wrapper(wrapper_cls).build()
 
         raw_content = cnt.get('')
         assert raw_content == CONTENT_WITH_REFS
 
-    def test_json_content_ref_resolultion_on_creation(self):
+    def test_ref_resolultion_on_creation(self, wrapper_cls):
         """Referecnces resolved on creation of JsonContent when
         reference resolution is enabled"""
         cnt = JsonContentBuilder().from_data(CONTENT_WITH_REFS, True)\
-            .set_reference_policy(True, True).build()
+            .set_reference_policy(True, True).set_wrapper(wrapper_cls).build()
 
         raw_content = cnt.get('')
         assert raw_content['a'] == CONTENT_WITH_REFS['defs']['int']
         assert raw_content['b']['c'] == CONTENT_WITH_REFS['defs']['int']
         assert raw_content['b']['d'] == CONTENT_WITH_REFS['defs']['values']
-        assert raw_content['e'] == CONTENT_WITH_REFS['defs']['values'][-1]
+        assert raw_content['e'] == CONTENT_WITH_REFS['defs']['values'][1]
 
         assert raw_content['b']['d'] is not CONTENT_WITH_REFS['defs']['values']
 
-    def test_json_content_build_fully_specified(self):
+    def test_build_fully_specified(self, wrapper_cls):
         """Build with fully specified params"""
         cnt = JsonContentBuilder().from_data(CONTENT_WITH_REFS, True)\
             .set_wrapper(MockWrapper) \
@@ -161,7 +168,7 @@ class TestJsonContent:
         assert cnt.resolver is not None
         assert isinstance(cnt.resolver, MockResolver)
 
-    def test_json_content_get_return_copy(self):
+    def test_get_return_copy(self, wrapper_cls):
         """Get returns a copy of mutable if flag is set to True"""
         cnt = JsonContentBuilder().from_data(CONTENT).build()
 
@@ -170,7 +177,7 @@ class TestJsonContent:
         assert cnt.get('/b/d') is CONTENT['b']['d']
         assert cnt.get('/b/d', True) is not CONTENT['b']['d']
 
-    def test_json_content_update_without_ref_resolution(self):
+    def test_update_without_ref_resolution(self, wrapper_cls):
         """Update with ref-value when reference resolution is disabled
         will resolve reference and updates successful"""
         cnt = JsonContentBuilder().from_data(CONTENT, True).build()
@@ -181,7 +188,7 @@ class TestJsonContent:
         assert raw_content['e'] == '!ref /b/c'
         assert raw_content['a'] == '!ref /b/d/-1'
 
-    def test_json_content_update_with_ref_resolution(self):
+    def test_update_with_ref_resolution(self, wrapper_cls):
         """Update with ref-value when reference resolution is eabled
         will resolve reference and updates successful"""
         content = copy.deepcopy(CONTENT)
@@ -195,7 +202,7 @@ class TestJsonContent:
 
         assert cnt.get('') == content
 
-    def test_json_content_update_ref_resolultion_cache_usage(self):
+    def test_update_ref_resolultion_cache_usage(self, wrapper_cls):
         """Update resolves refs using cache when reference resolution and
         cache are enabled"""
         cnt = JsonContentBuilder().from_data(CONTENT_WITH_REFS, True)\
@@ -212,7 +219,7 @@ class TestJsonContent:
         assert raw_content['a'] == CONTENT_WITH_REFS['defs']['int']
         assert raw_content['f'] == CONTENT_WITH_REFS['defs']['int']
 
-    def test_json_content_update_ref_resolultion_cache_invalidated(self):
+    def test_update_ref_resolultion_cache_invalidated(self, wrapper_cls):
         """Update resolves refs using empty cache when reference resolution and
         cache are enabled, and cache was invalidated"""
         cnt = JsonContentBuilder().from_data(CONTENT_WITH_REFS, True)\
@@ -227,7 +234,7 @@ class TestJsonContent:
         assert raw_content['defs']['int'] == 50
         assert raw_content['f'] == raw_content['defs']['int']
 
-    def test_json_content_update_ref_resolultion_cache_disabled(self):
+    def test_update_ref_resolultion_cache_disabled(self, wrapper_cls):
         """Update resolves refs without using of cache when reference
         resolution is enabled, but cache is not cache are enabled"""
         cnt = JsonContentBuilder().from_data(CONTENT_WITH_REFS, True)\
@@ -241,38 +248,42 @@ class TestJsonContent:
         assert raw_content['defs']['int'] == 50
         assert raw_content['f'] == raw_content['defs']['int']
 
-    def test_json_content_delete(self):
+    def test_delete(self, wrapper_cls):
         """Delete single valid key is successful"""
-        cnt = JsonContentBuilder().from_data(CONTENT, True).build()
+        cnt = JsonContentBuilder().from_data(CONTENT, True)\
+            .set_wrapper(wrapper_cls).build()
         cnt.delete('/a')
 
         raw_content = cnt.get('')
         assert raw_content != CONTENT
         assert raw_content.get('a') is None
 
-    def test_json_content_bulk_delete(self):
+    def test_bulk_delete(self, wrapper_cls):
         """Delete several keys including is successful"""
-        cnt = JsonContentBuilder().from_data(CONTENT, True).build()
-        cnt.delete('/b/d/-1', '/a')
+        cnt = JsonContentBuilder().from_data(CONTENT, True)\
+            .set_wrapper(wrapper_cls).build()
+        cnt.delete('/b/d/1', '/a')
 
         raw_content = cnt.get('')
         assert raw_content != CONTENT
         assert raw_content.get('a') is None
         assert len(raw_content['b']['d']) == (len(CONTENT['b']['d']) - 1)
 
-    def test_json_content_bulk_delete_with_missing_key(self):
+    def test_bulk_delete_with_missing_key(self, wrapper_cls):
         """Delete several keys including missing is successful"""
-        cnt = JsonContentBuilder().from_data(CONTENT, True).build()
-        cnt.delete('/b/d/-1', '/b/x', '/x', '/a')
+        cnt = JsonContentBuilder().from_data(CONTENT, True)\
+            .set_wrapper(wrapper_cls).build()
+        cnt.delete('/b/d/1', '/b/x', '/x', '/a')
 
         raw_content = cnt.get('')
         assert raw_content != CONTENT
         assert raw_content.get('a') is None
         assert len(raw_content['b']['d']) == (len(CONTENT['b']['d']) - 1)
 
-    def test_json_content_has_key(self):
+    def test_has_key(self, wrapper_cls):
         """Has method returns True on existend node or false on non-existent"""
-        cnt = JsonContentBuilder().from_data(CONTENT).build()
+        cnt = JsonContentBuilder().from_data(CONTENT)\
+            .set_wrapper(wrapper_cls).build()
 
         assert cnt.has('/a')
         assert not cnt.has('/xxx')
@@ -281,15 +292,17 @@ class TestJsonContent:
         ('/a', 333, CONTENT['a']),
         ('/xxx', 333, 333),
     ])
-    def test_json_content_get_or_default(self, pointer, default_value, expected_value):
+    def test_get_or_default(self, pointer, default_value, expected_value, wrapper_cls):
         """Get or default returns property's data or default"""
-        cnt = JsonContentBuilder().from_data(CONTENT).build()
+        cnt = JsonContentBuilder().from_data(CONTENT)\
+            .set_wrapper(wrapper_cls).build()
 
         assert cnt.get_or_default(pointer, default_value) == expected_value
 
-    def test_json_content_get_or_default_makes_copy(self):
+    def test_get_or_default_makes_copy(self, wrapper_cls):
         """Get or default can retur copy of property's data"""
-        cnt = JsonContentBuilder().from_data(CONTENT).build()
+        cnt = JsonContentBuilder().from_data(CONTENT)\
+            .set_wrapper(wrapper_cls).build()
 
         default_value = [99, 100]
         value = cnt.get_or_default('/b/d', default_value, make_copy=True)
@@ -300,10 +313,12 @@ class TestJsonContent:
         assert non_existent_prop_value == default_value
         assert non_existent_prop_value is not default_value
 
-    def test_json_content_equals(self):
+    def test_equals(self, wrapper_cls):
         """JsonContent with same contents equals"""
-        cnt1 = JsonContentBuilder().from_data(CONTENT, True).build()
-        cnt2 = JsonContentBuilder().from_data(CONTENT, True).build()
+        cnt1 = JsonContentBuilder().from_data(CONTENT, True)\
+            .set_wrapper(wrapper_cls).build()
+        cnt2 = JsonContentBuilder().from_data(CONTENT, True)\
+            .set_wrapper(wrapper_cls).build()
 
         cnt1.update('/b/c', 333)
         cnt2.update('/b/c', 333)
@@ -311,10 +326,12 @@ class TestJsonContent:
         assert cnt1 is not cnt2
         assert cnt1 == cnt2
 
-    def test_json_content_not_equals(self):
+    def test_not_equals(self, wrapper_cls):
         """JsonContent with different contents not equals"""
-        cnt1 = JsonContentBuilder().from_data(CONTENT, True).build()
-        cnt2 = JsonContentBuilder().from_data(CONTENT, True).build()
+        cnt1 = JsonContentBuilder().from_data(CONTENT, True)\
+            .set_wrapper(wrapper_cls).build()
+        cnt2 = JsonContentBuilder().from_data(CONTENT, True)\
+            .set_wrapper(wrapper_cls).build()
 
         # Only one content is updated
         cnt1.update('/b/c', 333)
@@ -326,11 +343,12 @@ class TestJsonContent:
         '/a',
         '/b/c',
         '/b/d/0',
-        '/b/d/-1'
+        '/b/d/1'
     ])
-    def test_json_content_check_key_exists_by_in(self, pointer):
+    def test_check_key_exists_by_in(self, pointer, wrapper_cls):
         """Check for pointer presenets by in operator"""
-        cnt = JsonContentBuilder().from_data(CONTENT).build()
+        cnt = JsonContentBuilder().from_data(CONTENT)\
+            .set_wrapper(wrapper_cls).build()
         assert pointer in cnt
 
     @pytest.mark.parametrize("pointer", [
@@ -340,9 +358,10 @@ class TestJsonContent:
         '/b/d/-5',
         '/b/d/5'
     ])
-    def test_json_content_check_key_not_exists_by_in(self, pointer):
+    def test_check_key_not_exists_by_in(self, pointer, wrapper_cls):
         """Check for pointer not presenets by in operator"""
-        cnt = JsonContentBuilder().from_data(CONTENT).build()
+        cnt = JsonContentBuilder().from_data(CONTENT)\
+            .set_wrapper(wrapper_cls).build()
         assert pointer not in cnt
 
     # --- Negative
@@ -352,19 +371,22 @@ class TestJsonContent:
         ('foo', 'bar'),
         False
     ])
-    def test_json_content_build_from_not_supported_content_fails(self, content):
+    def test_build_from_not_supported_content_fails(self, content, wrapper_cls):
         """Build JsonContent object from non list/dict should fail"""
         with pytest.raises(ValueError, match='Content must be JSON-like of type dict or list!.*'):
-            JsonContentBuilder().from_data(content).build()
+            JsonContentBuilder().from_data(content)\
+                .set_wrapper(wrapper_cls).build()
 
-    def test_json_content_build_from_non_exists_file_fails(self):
+    def test_build_from_non_exists_file_fails(self, wrapper_cls):
         """Build JsonContent object from non existisng file should fail"""
         with pytest.raises(FileNotFoundError):
-            JsonContentBuilder().from_file("non-exists.json").build()
+            JsonContentBuilder().from_file("non-exists.json")\
+                .set_wrapper(wrapper_cls).build()
 
-    def test_json_content_build_from_malformed_json_file_fails(self, json_file):
+    def test_build_from_malformed_json_file_fails(self, json_file, wrapper_cls):
         """Build JsonContent object from malformed JSON should fail"""
         json_file.write_text("{a: 100, b: 200}")
 
         with pytest.raises(json.decoder.JSONDecodeError):
-            JsonContentBuilder().from_file(str(json_file)).build()
+            JsonContentBuilder().from_file(str(json_file))\
+                .set_wrapper(wrapper_cls).build()

@@ -10,7 +10,7 @@ import jsonschema.exceptions
 
 from requests.models import Response
 from utils.api_helpers.api_response_helper import ApiResponseHelper
-from utils.json_content.json_content import JsonContent
+from utils.json_content.json_content import JsonContent, JsonContentBuilder
 
 # --- Constants
 PAYLOAD_SIMPLE = payload = {
@@ -81,12 +81,12 @@ JSONSCHEMA_DETAILED = {
 
 HEADERS_SIMPLE = {
     "Accept": "text/plain, text/html, text/x-dvi",
-    "Accept-Charset": "iso-8859-5, Unicode-1-1; q = 0,8"
+    "Accept-Charset": "iso-8859-5, Unicode-1-1"
 }
 
 HEADERS_DETAILED = {
     "Accept": "text/plain, text/html, text/x-dvi",
-    "Accept-Charset": "iso-8859-5, Unicode-1-1; q = 0,8",
+    "Accept-Charset": "iso-8859-5, Unicode-1-1",
     "Accept-Encoding": "gzip",
     "Cookie": "name1=value1; name2=value2; name3=value3",
     "From": "webmaster@example.com",
@@ -202,6 +202,15 @@ class TestApiResponseHelperGeneral:
         with pytest.raises(jsonschema.exceptions.ValidationError):
             api_response_simple.validate_against_schema(JSONSCHEMA_DETAILED)
 
+    # latency_is_lower_than
+    def test_latency_is_lower_than(self):
+        mock_response(200, latency=250).latency_is_lower_than(500)
+
+    def test_latency_is_lower_than_asserts(self):
+        with pytest.raises(AssertionError,
+                           match='Response latency of .* is higher than.*'):
+            mock_response(200, latency=500).latency_is_lower_than(250)
+
     # is_empty
     def test_is_empty(self):
         mock_response(200).is_empty()
@@ -219,35 +228,6 @@ class TestApiResponseHelperGeneral:
         with pytest.raises(AssertionError,
                            match='Response has no JSON content, but expected to be not empty.'):
             mock_response(200).is_not_empty()
-
-    # json_equals(json)
-    def test_json_equals(self, api_response_simple: ApiResponseHelper):
-        api_response_simple.json_equals(PAYLOAD_SIMPLE)
-
-    def test_set_expected_and_json_equals(self, api_response_simple: ApiResponseHelper):
-        api_response_simple.set_expected(json=PAYLOAD_SIMPLE).json_equals()
-
-    def test_json_equals_asserts(self, api_response_simple: ApiResponseHelper):
-        with pytest.raises(AssertionError,
-                           match='Response\'s JSON is not equal to given one.*'):
-            api_response_simple.json_equals({"status": "success"})
-
-    # json_equals(json, ignoring)
-    def test_json_equals_ignoring(self, api_response_detailed: ApiResponseHelper):
-        api_response_detailed.json_equals(PAYLOAD_SIMPLE, ignore=("/info/id", "/info"))
-
-    def test_set_expected_and_json_equals_ignoring(self, api_response_detailed: ApiResponseHelper):
-        api_response_detailed.set_expected(json=PAYLOAD_SIMPLE) \
-            .json_equals(ignore=("/info",))
-
-    # latency_is_lower_than
-    def test_latency_is_lower_than(self):
-        mock_response(200, latency=250).latency_is_lower_than(500)
-
-    def test_latency_is_lower_than_asserts(self):
-        with pytest.raises(AssertionError,
-                           match='Response latency of .* is higher than.*'):
-            mock_response(200, latency=500).latency_is_lower_than(250)
 
 
 class TestApiResponseHelperHeaders:
@@ -316,56 +296,151 @@ class TestApiResponseHelperHeaders:
     # headers_like
     @pytest.mark.parametrize("headers_like, case_sensitive", [
         ({
-            "accept": "TEXT/HTML",
-            "accept-charset": "unicode"
+            "accept": ".*TEXT/HTML.*",
+            "accept-charset": ".*unicode.*"
         }, False),
         ({
-            "Accept": "text/html",
-            "Accept-Charset": "Unicode"
+            "accept": r"(Text/[a-z-]*),*\s*",
+            "accept-charset": ".*unicode.*"
+        }, False),
+        ({
+            "Accept": ".*text/html.*",
+            "Accept-Charset": ".*Unicode.*"
         }, True)
     ])
-    def test_headers_like(self, api_response_simple: ApiResponseHelper, headers_like, case_sensitive):
-        api_response_simple.headers_like(headers_like, case_sensitive)
+    def test_headers_to_be_like(self, api_response_simple: ApiResponseHelper, headers_like, case_sensitive):
+        api_response_simple.headers_to_be_like(headers_like, case_sensitive)
 
-    def test_set_expected_and_headers_like(self, api_response_detailed: ApiResponseHelper):
-        api_response_detailed.set_expected(headers=HEADERS_SIMPLE).headers_like()
+    def test_set_expected_and_headers_to_be_like(self, api_response_detailed: ApiResponseHelper):
+        api_response_detailed.set_expected(headers=HEADERS_SIMPLE).headers_to_be_like()
 
     @pytest.mark.parametrize("headers_like, case_sensitive, exc_msg", [
-        ({
-            "origin": "something",
-            "redirects": "allowedd"
-        }, False, 'Headers are not like given:.*header ".*" not found.*'),
-        ({
-            "accept": "image/png",
-            "accept-charset": "xcode"
-        }, False, 'Headers are not like given:.*header ".*" doesn\'t contain value.*'),
-        ({
-            "accept": "image/png",
-            "origin": "somewhere"
-        }, False, 'Headers are not like given:.*header ".*" doesn\'t contain value.*header ".*" not found.*'),
-        ({
-            "Accept": "Text/HTML",
-            "Accept-Charset": "UNICODE"
-        }, True, 'Headers are not like given:.*header ".*" doesn\'t contain value.*')
+        (
+            {
+                "origin": ".*something.*",
+                "redirects": ".*allowedd.*"
+            },
+            False,
+            r'Response headers are not like given:.*header ".*" not found.*'
+        ),
+        (
+            {
+                "accept": ".*image/png.*",
+                "accept-charset": ".*xcode.*"
+            },
+            False,
+            r'Response headers are not like given:.*header\'s value .* doesn\'t match to expected .*'
+        ),
+        (
+            {
+                "accept": ".*image/png.*",
+                "origin": ".*somewhere.*"
+            },
+            False,
+            r'Response headers are not like given:.*header\'s value .* doesn\'t match to expected .*'
+            r'header ".*" not found.*'
+        ),
+        (
+            {
+                "Accept": ".*Text/HTML.*",
+                "Accept-Charset": ".*UNICODE.*"
+            },
+            True,
+            r'Response headers are not like given:.*header\'s value .* doesn\'t match to expected .*'
+        )
     ])
-    def test_headers_like_asserts(self, api_response_simple: ApiResponseHelper, headers_like, case_sensitive, exc_msg):
+    def test_headers_to_be_like_asserts(self, api_response_simple: ApiResponseHelper,
+                                        headers_like, case_sensitive, exc_msg):
         with pytest.raises(AssertionError, match=exc_msg):
-            api_response_simple.headers_like(headers_like, case_sensitive)
+            api_response_simple.headers_to_be_like(headers_like, case_sensitive)
 
-    # headers_match
+    # headers_equals
+    def test_headers_equals(self, api_response_detailed: ApiResponseHelper):
+        api_response_detailed.headers_equals(HEADERS_DETAILED, True)
 
-    # set_expected:
-    # + headers_present
-    # + headers_not_present
-    # + header_contains
-    # + header_equals
-    # + headers_like
-    # + headers_match
+    def test_headers_equals_ignore(self, api_response_simple: ApiResponseHelper):
+        api_response_simple.headers_equals(HEADERS_DETAILED,
+                                           True,
+                                           ignore=("Accept-Encoding", "Cookie", "From", "Referer"))
+
+    def test_headers_equals_ignore_case_insensitive(self, api_response_simple: ApiResponseHelper):
+        api_response_simple.headers_equals(HEADERS_DETAILED,
+                                           False,
+                                           ignore=("accept-Encoding", "cookie", "From", "referer"))
+
+    def test_headers_equals_case_insensitive(self, api_response_simple: ApiResponseHelper):
+        api_response_simple.headers_equals(
+            headers={
+                "accept": "Text/plain, Text/html, Text/x-dvi",
+                "accept-charset": "ISO-8859-5, Unicode-1-1"
+            },
+            case_sensitive=False
+        )
+
+    def test_set_expected_and_headers_equals(self, api_response_detailed: ApiResponseHelper):
+        api_response_detailed.set_expected(headers=HEADERS_DETAILED).headers_equals()
+
+    def test_headers_equals_values_differ_asserts(self, api_response_simple: ApiResponseHelper):
+        with pytest.raises(AssertionError,
+                           match='Headers are not equal to expected.'):
+            api_response_simple.headers_equals({
+                "accept": "text/plain, text/html",
+                "Accept-Charset": "iso-8859-5, Unicode-1-1, windows-1253"
+            })
+
+    def test_headers_equals_missing_headers_asserts(self, api_response_simple: ApiResponseHelper):
+        expected = JsonContentBuilder().from_data(HEADERS_SIMPLE, True).build() \
+                .update('/Extra-Header', "some value").get()
+        with pytest.raises(AssertionError,
+                           match='Headers are not equal to expected.'):
+
+
+            api_response_simple.headers_equals(headers=expected)
+
+    def test_headers_equals_extra_headers_asserts(self, api_response_simple: ApiResponseHelper):
+        expected = JsonContentBuilder().from_data(HEADERS_SIMPLE, True).build() \
+                .delete('/Accept').get()
+        with pytest.raises(AssertionError,
+                           match='Headers are not equal to expected.'):
+            api_response_simple.headers_equals(headers=expected)
 
 
 
 class TestApiResponseHelperBody:
     """Response body validation methods tests"""
+     # json_equals(json)
+    def test_json_equals(self, api_response_simple: ApiResponseHelper):
+        api_response_simple.json_equals(PAYLOAD_SIMPLE)
+
+    def test_set_expected_and_json_equals(self, api_response_simple: ApiResponseHelper):
+        api_response_simple.set_expected(json=PAYLOAD_SIMPLE).json_equals()
+
+    def test_json_equals_asserts(self, api_response_simple: ApiResponseHelper):
+        with pytest.raises(AssertionError,
+                           match='Response\'s JSON is not equal to given one.*'):
+            api_response_simple.json_equals({"status": "success"})
+
+    # json_equals(json, ignoring)
+    def test_json_equals_ignoring(self, api_response_detailed: ApiResponseHelper):
+        api_response_detailed.json_equals(PAYLOAD_SIMPLE, ignore=("/info/id", "/info"))
+
+    def test_set_expected_and_json_equals_ignoring(self, api_response_detailed: ApiResponseHelper):
+        api_response_detailed.set_expected(json=PAYLOAD_SIMPLE) \
+            .json_equals(ignore=("/info",))
+
+    def test_json_equals_with_match_objects(self, api_response_detailed: ApiResponseHelper):
+        import utils.api_helpers.match_objects as match
+        api_response_detailed.json_equals({
+            "status": "success",
+            "message": match.AnyText(),
+            "info": match.AnyNonEmptyDict()
+            #{
+            #    "id": match.AnyNumberGreaterThan(0),
+            #    "timestamp": match.AnyTextLike(r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z'),
+                #"items": match.AnyList()
+            #}
+        })
+
     # param_presents
     # param_not_presents
     # value_is_empty

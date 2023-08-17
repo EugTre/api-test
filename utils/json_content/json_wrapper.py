@@ -22,9 +22,15 @@ EXC_MSG_HINT__RANGE = 'Index must be signed integer in list\'s range.'
 EXC_MSG_HINT__FORMAT = 'Index must be signed integer (to update specific '\
                        'index in list bounds) or "-" (to append new element).'
 
+EXC_MSG__LIST_INDEX_ERROR_FAST = 'Update failed due to invalid list index "{key}" at node "/{path}" '\
+                                'of pointer "{pointer}". {hint}'
+EXC_MSG__INVALID_STORAGE_FAST = 'Not possible to add new key/element to path node "/{path}" '\
+                                'at pointer "{pointer}", target node is not a dict or list.'
+EXC_MSG_HINT__FORMAT_FAST = 'Index must be an integer in list\'s range (to update specific '\
+                             'index) or "-" (to append new element).'
 
 class AbstractContentWrapper(ABC):
-    """Abstract cl1ass for json content wrappers"""
+    """Abstract cl1ass for content wrappers"""
     @abstractmethod
     def __init__(self, content: dict|list):
         """Instance should be created using "content" variable"""
@@ -61,13 +67,24 @@ class AbstractContentWrapper(ABC):
     def __contains__(self, pointer) -> bool:
         """Pointer is in the content"""
 
+    @abstractmethod
+    def __iter__(self):
+        """Iterable of content"""
 
-class JsonContentWrapper(AbstractContentWrapper):
-    """Class to wrap JSON data with get/update/delete methods that use JSON Pointers"""
-    __slots__ = ['__content', '__suppress_exceptions', '__context']
 
-    def __init__(self, content: dict):
-        self.__content = content
+class JsonWrapper(AbstractContentWrapper):
+    """Class to wrap JSON data with get/update/delete methods that use JSON Pointers.
+    Allows iteration through underlaying dict in way like it is flat dict/list.
+
+    Implements next features:
+    - elements search without caching, which allows editing of the underlaying dict
+    from other points in exchange to slower access speed.
+    - allow to access list items using pythonic negative indicies.
+    """
+    __slots__ = ['_content', '__suppress_exceptions', '__context']
+
+    def __init__(self, content: dict|list):
+        self._content = content
         self.__suppress_exceptions = False
         self.__context = None
 
@@ -101,7 +118,7 @@ class JsonContentWrapper(AbstractContentWrapper):
             Any: value at given pointer.
         """
         if pointer == ROOT_POINTER:
-            return self.__content
+            return self._content
 
         storage, key = self.__get_property_storage(pointer)
         return storage[key]
@@ -118,7 +135,7 @@ class JsonContentWrapper(AbstractContentWrapper):
             Any: property's value or 'default_value'
         """
         if pointer == ROOT_POINTER:
-            return self.__content
+            return self._content
 
         storage, key = self.__get_property_storage(pointer, suppress_exc=True)
         if key is None:
@@ -163,7 +180,7 @@ class JsonContentWrapper(AbstractContentWrapper):
 
     def delete(self, pointer: str) -> bool:
         """Deletes node at given pointer.
-        No error will be raised if desired node doesn't exists.
+        No error will be raised if desired node doesn't exist.
 
         Args:
             pointer (str): JSON pointer as string. Pointer may be
@@ -176,7 +193,7 @@ class JsonContentWrapper(AbstractContentWrapper):
 
         # Clear entire content if method called for Root pointer
         if pointer == ROOT_POINTER:
-            self.__content.clear()
+            self._content.clear()
             return True
 
         # Suppress exceptions, to avoid unwanted errors on deletion of
@@ -201,15 +218,12 @@ class JsonContentWrapper(AbstractContentWrapper):
             raise ValueError(EXC_MSG__INVALID_POINTER_TYPE.format(
                 pointer_str=pointer)) from err
 
-        if not ptr.is_pointer:
-            raise ValueError(EXC_MSG__INVALID_POINTER_TYPE.format(pointer_str=pointer))
-
         # Exctract final key from path
-        path = ptr.pointer[:-1]
+        path = ptr.path[:-1]
 
         # Initialize search from root
         self.__suppress_exceptions = suppress_exc
-        storage = self.__content
+        storage = self._content
 
         for idx, key in enumerate(path):
             self.__context = (ptr.raw, path[:idx])
@@ -222,8 +236,8 @@ class JsonContentWrapper(AbstractContentWrapper):
 
             storage = storage[key]
 
-        self.__context = (ptr.raw, ptr.pointer)
-        keyname = self.__resolve_key(storage, ptr.pointer[-1], check_key_exists)
+        self.__context = (ptr.raw, ptr.path)
+        keyname = self.__resolve_key(storage, ptr.path[-1], check_key_exists)
 
         # Reset state
         self.__suppress_exceptions = False
@@ -332,10 +346,238 @@ class JsonContentWrapper(AbstractContentWrapper):
             **kwargs
         )
 
+    def __iter(self, value: Any, ptr_path: tuple = tuple()):
+        if isinstance(value, list):
+            for idx, item in enumerate(value):
+                sub_path = (*ptr_path, str(idx))
+                yield from self.__iter(item, sub_path)
+        elif isinstance(value, dict):
+            for key, item in value.items():
+                sub_path = (*ptr_path, key)
+                yield from self.__iter(item, sub_path)
+        else:
+            yield (Pointer.from_path(ptr_path), value)
+
     def __eq__(self, other: AbstractContentWrapper):
         if not isinstance(other, AbstractContentWrapper):
             return False
-        return self.__content == other.get('')
+        return self._content == other.get('')
 
     def __contains__(self, pointer: str):
         return self.has(pointer)
+
+    def __iter__(self):
+        yield from self.__iter(self._content)
+
+
+class FastJsonWrapper(JsonWrapper):
+    """Class to wrap JSON data with get/update/delete methods that use JSON Pointers.
+
+    Extends `JsonWrapper` class with fast get mechanism (using pre-calculated flattened reference
+    structure of content).
+
+    Please note, that this implementation has some restrictions:
+    - negative indicies are not allowed for lists;
+    - due to nature of get mechanism direct editing of underlaying content may cause issues on
+    accessing edited keys/indicies. One should use .recalculate() method to update
+    internal reference structure after external changes!
+    """
+    __slots__ = ["_node_map"]
+
+    def __init__(self, content: dict|list):
+        super().__init__(content)
+        self.recalculate()
+
+    def recalculate(self):
+        """Recalculates flattened structure of the content. Should be used after
+        changes was made to underlaying content to refresh it's internal
+        representation.
+        """
+        self._node_map = dict(self.__scan_storage(self._content))
+
+    def __scan_storage(self, storage: list|dict,
+                       pointer_path: tuple = tuple()) -> tuple[str, tuple]:
+        """Deeply scans a storage and yield JSON pointer-like key and storage/key pairs
+        to represent flat document structure.
+
+        Args:
+            storage (list|dict): storage to scan.
+            pointer_path (tuple): current pointer of upper level.
+
+        Yields:
+            tuple[str, tuple]: JSON Pointer like key and tuple of storage and key pointer
+            is refer to
+        """
+        is_list_storage = isinstance(storage, list)
+
+        iter_source = enumerate(storage) if is_list_storage else storage.items()
+        for key, value in iter_source:
+            # Generate JSON pointer for each member of the storage
+            sub_path = (*pointer_path, str(key))
+            yield Pointer.from_path(sub_path), (storage, key)
+
+            # Continue deep scan
+            if isinstance(value, (dict, list)):
+                yield from self.__scan_storage(value, sub_path)
+
+    def has(self, pointer: str) -> bool:
+        return self.__has(pointer)
+
+    def get(self, pointer: str) -> Any:
+        return self.__unsafe_get(pointer)
+
+    def get_or_default(self, pointer: str, default_value: Any) -> Any:
+        pointer = self.__convert_to_pointer_obj(pointer)
+        if self.__has(pointer):
+            return self.__unsafe_get(pointer)
+
+        return default_value
+
+    def delete(self, pointer: str) -> bool:
+        pointer = self.__convert_to_pointer_obj(pointer)
+        if pointer.path is None:
+            self._content.clear()
+            return True
+
+        if not self.__has(pointer):
+            return False
+
+        storage, key = self.__unsafe_get_storage(pointer)
+        del storage[key]
+
+        # One may delete container with nested values/container
+        # so recalculate storage's substructure to reflect changes
+        self.__recalculate_for_storage(storage, pointer)
+        return True
+
+    def update(self, pointer: str, value: Any) -> bool:
+        pointer = self.__convert_to_pointer_obj(pointer)
+        if pointer.path is None:
+            raise ValueError(EXC_MSG__UPDATE_ROOT_ERROR)
+
+        # Add case: new key for dict or '-' to append to list
+        if pointer not in self._node_map:
+            parent_pointer = pointer.parent()
+            new_key = pointer.path[-1]
+            storage = self.__unsafe_get(parent_pointer)
+
+            if isinstance(storage, list):
+                if new_key != APPEND_CHAR:
+                    raise IndexError(EXC_MSG__LIST_INDEX_ERROR_FAST.format(
+                        key=new_key,
+                        path=parent_pointer,
+                        pointer=pointer,
+                        hint=EXC_MSG_HINT__FORMAT_FAST
+                    ))
+
+                storage.append(value)
+            elif isinstance(storage, dict):
+                storage[new_key] = value
+            else:
+                raise KeyError(EXC_MSG__INVALID_STORAGE_FAST.format(
+                    path=parent_pointer,
+                    pointer=pointer
+                ))
+
+            # Add new node to map and scan for added node
+            self._node_map[pointer] = (storage, new_key)
+            if isinstance(value, list|dict):
+                self.__recalculate_for_storage(value, pointer)
+
+            return True
+
+        # Update case
+        storage, key = self.__unsafe_get_storage(pointer) #self._node_map[pointer]
+        storage[key] = value
+
+        if isinstance(value, (dict|list)):
+            # If container added - update node map with pointer nodes
+            self.__recalculate_for_storage(storage, pointer)
+
+        return True
+
+    def __has(self, pointer: str|Pointer) -> bool:
+        if not isinstance(pointer, Pointer):
+            pointer = Pointer.from_string(pointer)
+        return pointer in self._node_map
+
+    def __unsafe_get(self, pointer: str|Pointer) -> Any:
+        """Returns value by given pointer using pre-calculcated document
+        structure map.
+
+        Unsafe operation - do not check for key existense and raise KeyError
+        if operation fails.
+
+        Args:
+            pointer (str): JSON Pointer.
+
+        Raises:
+            KeyError: when key is missing from pre-calculated document structure
+            map.
+
+        Returns:
+            Any: found value.
+        """
+        storage, key = self.__unsafe_get_storage(pointer)
+
+        # In case pointer is root pointer - return whole content
+        if key is None:
+            return storage
+
+        return storage[key]
+
+    def __unsafe_get_storage(self, pointer: str|Pointer) -> tuple[list|dict, str]:
+        """Returns storage and key selected by given pointer
+
+        Args:
+            pointer (str|Pointer): pointer to find.
+
+        Raises:
+            KeyError: when given pointer is missing in the content.
+
+        Returns:
+            tuple(list|dict, str): storage and key name/index by pointer.
+        """
+        if (isinstance(pointer, str) and pointer == ROOT_POINTER) or \
+           (isinstance(pointer, Pointer) and pointer.path is None):
+            return self._content, None
+
+        pointer = self.__convert_to_pointer_obj(pointer)
+
+        try:
+            node_info = self._node_map[pointer]
+        except KeyError as exc:
+            # Original key error doesn't give any interesting info,
+            # so overwritting exception completely
+            # pylint: disable-next=raise-missing-from
+            raise KeyError(f'Failed to find value by "{pointer}" JSON Pointer in the document. '
+                           'Pointer refers to non-existing node or document content '
+                           'was modified directly (consider calling .recalculate() '
+                           'to restore integrity)') from exc
+        return node_info
+
+    def __recalculate_for_storage(self, storage: list|dict,
+                                  storage_pointer: Pointer) -> dict:
+
+        # Delete existing child nodes of storage
+        stale_nodes = [node for node in self._node_map if node.is_child_of(storage_pointer)]
+        for node in stale_nodes:
+            del self._node_map[node]
+
+        # Add new nodes
+        new_nodes = self.__scan_storage(storage, storage_pointer.path)
+        self._node_map.update(new_nodes)
+
+    def __iter__(self):
+        for ptr in self._node_map.keys():
+            val = self.__unsafe_get(ptr)
+            if isinstance(val, (list, dict)):
+                continue
+            yield ptr, val
+
+    @staticmethod
+    def __convert_to_pointer_obj(pointer):
+        if isinstance(pointer, Pointer):
+            return pointer
+
+        return Pointer.from_string(pointer)

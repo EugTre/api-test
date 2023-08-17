@@ -1,12 +1,14 @@
 """Response helper and test wrapper"""
 
+import re
 from typing import Self, Any, Callable
-from requests import Response
+from requests import Response, exceptions as requests_exceptions
 
 import allure
 from jsonschema import validate
 from utils.json_content.json_content import JsonContent, JsonContentBuilder
-from utils.json_content.pointer import Pointer, POINTER_PREFIX
+from utils.json_content.json_wrapper import FastJsonWrapper
+from utils.json_content.pointer import Pointer, POINTER_PREFIX, ROOT_POINTER
 
 class ApiResponseHelper:
     """Class that wraps isntance of `requests.Response` class
@@ -20,8 +22,21 @@ class ApiResponseHelper:
         self.expected_headers = None
         self.schema = None
 
+        self.__headers_lowercase = {}
+        for key, value in self.response_object.headers.items():
+            self.__headers_lowercase[key.lower()] = value.lower()
+
+        try:
+            json_of_response = self.response_object.json()
+        except requests_exceptions.JSONDecodeError:
+            json_of_response = None
+
         self.__json_content = None
-        self.__headers_lowercase = None
+        if json_of_response is not None:
+            self.__json_content = JsonContentBuilder() \
+                                .from_data(json_of_response) \
+                                .set_wrapper(FastJsonWrapper) \
+                                .build()
 
     # Public methods
     def set_expected(self, status_code: int = None,
@@ -63,9 +78,10 @@ class ApiResponseHelper:
 
         Raises:
         '''
-        content = self.__get_json()
+        if self.__json_content is None:
+            return None
 
-        return content.get() if as_dict else content
+        return self.__json_content.get() if as_dict else self.__json_content
 
     def get_response(self) -> Response|None:
         """Returns instance of `requests.Response` class
@@ -91,7 +107,7 @@ class ApiResponseHelper:
             Any: found value
         """
 
-        return self.__get_json().get(pointer)
+        return self.__get_value(pointer)
 
     # Response overall verification
     def status_code_equals(self, status_code: int = None) -> Self:
@@ -131,56 +147,18 @@ class ApiResponseHelper:
         Returns:
             Self: instance of class `ApiResponseHelper`
         """
-        if schema is None and self.schema is None:
-            raise ValueError('JSONSchema is not defined nor in request config, '
+        desc = "given JSON Schema"
+
+        if schema is None:
+            if self.schema is None:
+                raise ValueError('JSONSchema is not defined nor in request config, '
                              'nor in method! Validation is not possible.')
 
-        desc = "given JSON Schema"
-        if schema is None:
-            desc = "JSON Schema from Request Catalog"
+            desc = "expected JSON Schema"
             schema = self.schema
 
         with allure.step(f'Validate response against {desc}'):
-            validate(self.__get_json().get(), schema)
-
-        return self
-
-    @allure.step('Validate response JSON content')
-    def json_equals(self, json: JsonContent|dict|list = None, ignore: tuple = None):
-        """"Compare JSON of response with given one or JSON from request config,
-        if pre-configured request was made.
-        Wrapped with Allure.Step.
-
-        Args:
-            json (JsonContent | dict | list, optional): JSON content to compare with.
-            Defaults to None.
-            ignore (tuple, optional): JSON pointers to fields that should be excluded
-            from comparison (e.g. ('/status', '/message/0')). Defaults to None.
-
-        Raises:
-            ValueError: If given JSON Pointers have invalid syntax.
-
-        Returns:
-            Self: instance of class `ApiResponseHelper`
-        """
-        if json is None:
-            json = self.expected_json
-
-        if not isinstance(json, JsonContent):
-            json = JsonContentBuilder().from_data(json, True).build()
-
-        response_json = self.response_object.json()
-        if ignore:
-            # Delete values to ignore - so it won't be compared
-            response_json = JsonContentBuilder() \
-                           .from_data(response_json, True) \
-                           .build() \
-                           .delete(*ignore)
-            json.delete(*ignore)
-
-        assert response_json == json, "Response's JSON is not equal to given one.\n"\
-                f'Expected: {json}\n'\
-                f'Actual:   {response_json}'
+            validate(self.__get_value(ROOT_POINTER), schema)
 
         return self
 
@@ -191,7 +169,6 @@ class ApiResponseHelper:
         Returns:
             Self: instance of class `ApiResponseHelper`
         """
-        # assert not self.__get_json().get(), \
         assert not self.response_object.text, \
             'Response has JSON content, but expected to be empty.'
 
@@ -228,7 +205,7 @@ class ApiResponseHelper:
         return self
 
     # Headers
-    @allure.step('Check all headers are present in response.')
+    @allure.step('Check headers are present in response.')
     def headers_present(self, *headers: str) -> Self:
         """Checks that response contains all given headers.
         If headers not passed as parameter - headers from
@@ -244,12 +221,12 @@ class ApiResponseHelper:
             Self: instance of class `ApiResponseHelper`
         """
         if headers is None:
-            if self.expected_headers:
-                headers = self.expected_headers.keys()
-            else:
+            if not self.expected_headers:
                 raise ValueError("There is no headers to compare - "\
                     "headers must be passed as argument, "\
                     "via .set_exepcted() method or defined in Request Catalog.")
+
+            headers = self.expected_headers.keys()
 
         missing_headers = [header for header in headers
                             if header not in self.response_object.headers]
@@ -280,22 +257,22 @@ class ApiResponseHelper:
 
     @allure.step('Check that header "{header}" contains substring "{value}"')
     def header_contains(self, header: str, value: str,
-                        case_sensetive: bool = False) -> Self:
+                        case_sensitive: bool = False) -> Self:
         """Checks that given header is present and it's value contains given
         substring 'value'.
 
         Args:
             header (str): name of the header.
             value (str): substring to find in header's value.
-            case_sensetive (optiona, bool): flag to make assertion case
+            case_sensitive (optiona, bool): flag to make assertion case
             sensetive. Defaults to False.
 
         Returns:
             Self: instance of class `ApiResponseHelper`
         """
-        response_headers = self.__get_headers(case_sensetive)
+        response_headers = self.__get_headers(case_sensitive)
         header = header.lower()
-        if not case_sensetive:
+        if not case_sensitive:
             value = value.lower()
 
         assert header in response_headers, \
@@ -309,22 +286,22 @@ class ApiResponseHelper:
 
     @allure.step('Check that header "{header}" equals to "{value}"')
     def header_equals(self, header: str, value: str,
-                      case_sensetive: bool = False) -> Self:
+                      case_sensitive: bool = False) -> Self:
         """Checks that given header is present and it's value equals
         to given 'value'.
 
         Args:
             header (str): name of the header.
             value (str): value to compare.
-            case_sensetive (optiona, bool): flag to make assertion case
+            case_sensitive (optiona, bool): flag to make assertion case
             sensetive. Defaults to False.
 
         Returns:
             Self: instance of class `ApiResponseHelper`
         """
-        response_headers = self.__get_headers(case_sensetive)
+        response_headers = self.__get_headers(case_sensitive)
         header = header.lower()
-        if not case_sensetive:
+        if not case_sensitive:
             value = value.lower()
 
         assert header in response_headers, \
@@ -337,90 +314,211 @@ class ApiResponseHelper:
         return self
 
     @allure.step('Check that headers are like given')
-    def headers_like(self, expected_headers: dict[str, str] = None,
-                     case_sensetive: bool = False) -> Self:
+    def headers_to_be_like(self, headers: dict[str, str] = None,
+                     case_sensitive: bool = False) -> Self:
         """Check that response headers are like given.
         If 'expected_headers' not passed as parameter - headers
         from response section of Request Catalog entity will be used.
+
+        Asserts that:
+        - all passed headers are present
+        - values of headers match to expected regex
 
         Args:
             expected_headers (dict[str,str], optional): dictionary of headers and
             it's values. Defaults to None (Request Catalog will be used or value
             set by .set_expected()).
-            case_sensetive (optiona, bool): flag to make assertion case
+            case_sensitive (optiona, bool): flag to make assertion case
             sensetive. Defaults to False.
 
         Returns:
             Self: instance of class `ApiResponseHelper`
         """
-        if expected_headers is None:
-            if self.expected_headers:
-                expected_headers = self.expected_headers
-            else:
+        if headers is None:
+            if not self.expected_headers:
                 raise ValueError("There is no headers to compare - "\
                     "headers must be passed as argument, "\
                     "via .set_exepcted() method or defined in Request Catalog.")
 
-        response_headers = self.__get_headers(case_sensetive)
+            headers = self.expected_headers
+
+        response_headers = self.__get_headers(case_sensitive)
 
         failed = []
-        for header, value in expected_headers.items():
+        for header, value in headers.items():
             header = header.lower()
-            if not case_sensetive:
+            if not case_sensitive:
                 value = value.lower()
 
             if header not in response_headers:
                 failed.append(f'header "{header}" not found')
-            elif value not in response_headers[header]:
-                failed.append(f'header "{header}" doesn\'t contain value "{value}"')
+            elif not re.match(value, response_headers[header]):
+                failed.append(f'header\'s value "{header}" = "{response_headers[header]}" '
+                              f'doesn\'t match to expected value "{value}"')
 
-        assert not failed, f'Headers are not like given: {", ".join(failed)}'
+        assert not failed, f'Response headers are not like given: {", ".join(failed)}'
 
         return self
 
     @allure.step('Check that headers are match to given')
-    def headers_match(self, expected_headers: dict[str, str] = None,
-                     case_insensetive: bool = True) -> Self:
+    def headers_equals(self, headers: dict[str, str] = None,
+                     case_sensitive: bool = False, ignore: tuple = None) -> Self:
         """Check of response headers to be equal to given.
         If 'expected_headers' not passed as parameter - headers from response
         section of Request Catalog entity will be used.
+
+        Asserts that:
+        - all headers present in response, except headers listed in 'ignore'
+        - there is no extra headers in response, except headers listed in 'ignore'
+        - values are exactly the same for checked headers
 
         Args:
             expected_headers (dict[str,str], optional): dictionary of headers and
             it's values. Defaults to None (Request Catalog will be used or value
             set by .set_expected()).
-            case_insensetive (optiona, bool): flag to make assertion case
-            insensetive. Defaults to True.
+            case_sensitive (optiona, bool): flag to make assertion case
+            sensetive. Defaults to False.
+            ignore (optional, tuple): names of the headers that should be excluded
+            from comparison (e.g. ('Accept', 'From')). Defaults to None.
 
         Returns:
-            Self: _description_
+            Self: instance of class `ApiResponseHelper`
         """
-        if expected_headers is None:
-            if self.expected_headers:
-                expected_headers = self.expected_headers
-            else:
+        if headers is None:
+            if not self.expected_headers:
                 raise ValueError("There is no headers to compare - "\
                     "headers must be passed as argument, "\
                     "via .set_exepcted() method or defined in Request Catalog.")
 
-        response_headers = self.__get_headers(case_insensetive)
+            headers = self.expected_headers
 
-        failed = []
-        for header, value in expected_headers.items():
-            if case_insensetive:
-                header = header.lower()
-                value = value.lower()
+        response_headers = None
+        expected_headers = None
+        if case_sensitive:
+            expected_headers = dict( (k.lower(), v) for k,v in headers.items() )
+            response_headers = dict(
+                (k.lower(), v)
+                for k,v in self.__get_headers(case_sensitive=True).items()
+            )
+        else:
+            expected_headers = dict( ((k.lower(), v.lower())
+                                      for k, v in headers.items()) )
+            response_headers = self.__get_headers()
 
-            if header in response_headers and value != response_headers[header]:
-                failed.append(f'header "{header}" doesn\'t equals to "{value}"')
-            else:
-                failed.append(f'header "{header}" not found')
+        if ignore:
+            ignore = tuple(
+                (f'{POINTER_PREFIX}{k.lower()}'
+                for k in ignore)
+            )
+            print(f'Ignoring: {ignore}')
 
-        assert not failed, f'Headers doesn\'t match to given: {", ".join(failed)}'
+            response_headers = JsonContentBuilder().from_data(
+                response_headers, True).build().delete(*ignore).get()
+            expected_headers = JsonContentBuilder().from_data(
+                expected_headers, True).build().delete(*ignore).get()
+
+
+        assert response_headers == expected_headers, \
+            f'Headers are not equal to expected.\n' \
+            f'Expected: {expected_headers}\n'\
+            f'Actual:   {response_headers}'
 
         return self
 
-    # Response's param verification
+    # Response's JSON body param verification
+    @allure.step('Validate response JSON content')
+    def json_equals(self, json: JsonContent|dict|list = None, ignore: tuple = None):
+        """"Compare JSON of response with given one or JSON from request config,
+        if pre-configured request was made.
+        Wrapped with Allure.Step.
+
+        Asserts that:
+        - all keys from passed 'json' are present in response, except params listed in 'ignore'
+        - there is no extra keys in response, except params listed in 'ignore'
+        - values are excatly the same for all checked params
+
+        Args:
+            json (JsonContent | dict | list, optional): JSON content to compare with.
+            Defaults to None.
+            ignore (tuple, optional): JSON pointers to fields that should be excluded
+            from comparison (e.g. ('/status', '/message/0')). Defaults to None.
+
+        Raises:
+            ValueError: If given JSON Pointers have invalid syntax.
+
+        Returns:
+            Self: instance of class `ApiResponseHelper`
+        """
+        if json is None:
+            if self.expected_json is  None:
+                raise ValueError("There is no JSON to compare - "\
+                    "expected JSON must be passed as argument, "\
+                    "via .set_exepcted() method or defined in Request Catalog.")
+            json = self.expected_json
+
+        if not isinstance(json, JsonContent):
+            json = JsonContentBuilder().from_data(json, True).build()
+
+        response_json = self.response_object.json()
+        if ignore:
+            # Delete values to ignore - so it won't be compared
+            response_json = JsonContentBuilder() \
+                           .from_data(response_json, True) \
+                           .build() \
+                           .delete(*ignore)
+            json.delete(*ignore)
+
+        assert response_json == json, "Response's JSON is not equal to given one.\n"\
+                f'Expected: {json}\n'\
+                f'Actual:   {response_json}'
+
+        return self
+
+    def json_to_be_like(self, json: dict|list = None, case_sensitive: bool = False):
+        """Weak comparison of given JSON with response's JSON.
+
+        Asserts that:
+        - all keys from passed 'json' are present in response
+        - values are same type
+        - string values match to given regexp
+        - non-string values are equal
+
+        Limitations:
+        - values of list/dict type will be ignored!
+
+        Args:
+            json (dict | list, optional): _description_. Defaults to None.
+            case_sensitive (bool, optional): _description_. Defaults to False.
+        """
+        if json is None:
+            if self.expected_json is  None:
+                raise ValueError("There is no JSON to compare - "\
+                    "expected JSON must be passed as argument, "\
+                    "via .set_exepcted() method or defined in Request Catalog.")
+            json = self.expected_json
+
+        expected_json = FastJsonWrapper(json)
+        actual_json = self.__json_content
+
+        for ptr, expected_value in expected_json:
+            assert actual_json.has(ptr), f'Param "{ptr}" is missing in response JSON'
+
+            actual_value = actual_json.get(ptr)
+            assert type(actual_value) is type(expected_value), \
+                f'Actual value type "{type(actual_value)} is not the same as '\
+                f'expected "{expected_value}" (of type: {type(expected_value)})'
+
+
+            if isinstance(expected_value, str):
+                # Consider expected string as regex
+                assert re.match(expected_value, actual_value,
+                                re.NOFLAG if case_sensitive else re.IGNORECASE)
+
+            elif not isinstance(expected_value, (dict|list)):
+                # Other expected values compare as is (excluding dicts and lists),
+                # which may contain nestsed objects
+                assert actual_value == expected_value
+
     # Single param
     @allure.step('Check response has param "{pointer}"')
     def param_presents(self, pointer: str) -> Self:
@@ -619,7 +717,7 @@ class ApiResponseHelper:
         with allure.step(f'Check {len(list_content)} object(s) has {params}'):
             for idx, _ in enumerate(list_content):
                 for param_name, param_value in params.items():
-                    assert Pointer.is_pointer(param_name), \
+                    assert Pointer.match(param_name), \
                         f'Given object\'s pointer "{param_name}" is not valid JSON Pointer.'\
                         f'Should start with "{POINTER_PREFIX}".'
 
@@ -659,7 +757,7 @@ class ApiResponseHelper:
         with allure.step(f'Check {len(list_content)} object(s) has params like {params}'):
             for idx, _ in enumerate(list_content):
                 for param_name, param_value in params.items():
-                    assert Pointer.is_pointer(param_name), \
+                    assert Pointer.match(param_name), \
                         f'Given object\'s pointer "{param_name}" is not valid JSON Pointer.'\
                         f'Should start with "{POINTER_PREFIX}".'
 
@@ -701,7 +799,7 @@ class ApiResponseHelper:
         """
         list_content = self.__get_array(list_at)
 
-        assert Pointer.is_pointer(pointer), \
+        assert Pointer.match(pointer), \
             f'Given object\'s pointer "{pointer}" is not valid JSON Pointer.'\
             f'Should start with "{POINTER_PREFIX}".'
 
@@ -769,15 +867,10 @@ class ApiResponseHelper:
 
     # Protected/private functions
     def __get_json(self) -> JsonContent:
-        """Caches and return cached deserialized JSON data from response.
-
-        Return:
-            dict: deserialized JSON data as an `JsonContent` object.
-        """
+        """Returns iterable JSON Content object or raises ValueError
+        if response body is missing any JSON data."""
         if self.__json_content is None:
-            self.__json_content = JsonContentBuilder().from_data(self.response_object.json())\
-                                                        .set_reference_policy(False, False)\
-                                                        .build()
+            raise ValueError("There is no JSON found in Response body!")
         return self.__json_content
 
     def __has_param(self, pointer: str) -> bool:
@@ -790,7 +883,7 @@ class ApiResponseHelper:
         Returns:
             bool: True if param exists, False otherwise.
         """
-        return self.__get_json().has(pointer)
+        return pointer in self.__json_content
 
     def __get_value(self, pointer: str) -> Any:
         """Returns value from response's JSON by given pointer.
@@ -805,7 +898,7 @@ class ApiResponseHelper:
         Returns:
             Any: found value
         """
-        return self.__get_json().get(pointer)
+        return self.__json_content.get(pointer)
 
     def __get_array(self, pointer: str) -> list|None:
         """Returns list at given key or tuple of nested keys.
@@ -822,10 +915,10 @@ class ApiResponseHelper:
         Returns:
             Any: found array
         """
-        assert self.__has_param(pointer), \
+        assert pointer in self.__json_content, \
             f'Param "{pointer}" is missing in the response.'
 
-        list_content = self.__get_value(pointer)
+        list_content = self.__json_content.get(pointer)
         assert isinstance(list_content, list), \
                f'Response\'s param at "{pointer}" is not an JSON array (list).'
         return list_content
@@ -843,10 +936,5 @@ class ApiResponseHelper:
         """
         if case_sensitive:
             return self.response_object.headers
-
-        if not self.__headers_lowercase:
-            self.__headers_lowercase = {}
-            for key, value in self.response_object.headers.items():
-                self.__headers_lowercase[key.lower()] = value.lower()
 
         return self.__headers_lowercase

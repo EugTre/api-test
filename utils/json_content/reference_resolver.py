@@ -5,8 +5,8 @@ from typing import Any
 from abc import ABC, abstractmethod
 
 from utils.data_reader import DataReader
-from utils.json_content.pointer import Pointer, REF_SEP, ROOT_POINTER
-from utils.json_content.json_content_wrapper import AbstractContentWrapper
+from utils.json_content.pointer import ReferencePointer, FilePointer, REF_SEP, ROOT_POINTER
+from utils.json_content.json_wrapper import AbstractContentWrapper
 
 class AbstractReferenceResolver(ABC):
     """Abstract class for JSON Content reference resolution"""
@@ -83,9 +83,9 @@ class ReferenceResolver(AbstractReferenceResolver):
                     value[i] = self.resolve(element, str(i))
 
             case builtins.str:
-                if Pointer.match_ref_pointer(value):
+                if ReferencePointer.match(value):
                     value = self._resolve_reference(value)
-                elif Pointer.match_file_ref_pointer(value):
+                elif FilePointer.match(value):
                     value = self._resolve_file_reference(value)
 
         self.__stack_nodes.pop()
@@ -115,7 +115,7 @@ class ReferenceResolver(AbstractReferenceResolver):
             str|dict|list|int|float|None: resolved value.
         """
 
-        rfc_pointer = Pointer.from_string(ptr).get_rfc_pointer()
+        rfc_pointer = ReferencePointer.from_string(ptr).rfc_pointer
 
         if self.cache_enabled and rfc_pointer in self.__ref_cache:
             return self.__copy_value(self.__ref_cache[rfc_pointer])
@@ -162,7 +162,7 @@ class ReferenceResolver(AbstractReferenceResolver):
             dict|list|None: JSON content of the file
         """
 
-        path_to_file = Pointer.from_string(ptr).pointer
+        path_to_file = FilePointer.from_string(ptr).path
 
         if self.cache_enabled and path_to_file in self.__file_cache:
             return self.__copy_value(self.__file_cache[path_to_file])

@@ -1,135 +1,80 @@
 """Pointer to JSON element"""
-from enum import Enum
 from dataclasses import dataclass
 from typing import Self
 
 POINTER_PREFIX = "/"
-REF_PREFIX = "!ref"
-FILE_PREFIX = "!file"
+REF_PREFIX = "!ref "
+FILE_PREFIX = "!file "
 REF_SEP = "/"
-APPEND_CHAR = '-'
 ROOT_POINTER = ''
+APPEND_CHAR = '-'
 
-REF_PREFIX_SYNTAX = f'{REF_PREFIX} '
-FILE_PREFIX_SYNTAX = f'{FILE_PREFIX} '
+POINTER_SYNTAX_HING_MSG = \
+    'JSON Pointer must start with "/" symbol ' \
+    '(e.g. "/a/b/c") or be empty string "" to reference entire document.'
 
-POINTER_SYNTAX_HINT_MSG = 'Pointer must be a string in format ' \
-                          '"/a/b/c" or "!ref /a/b/c" or "!file path/to/file".'
+REFERENCE_POINTER_SYNTAX_HING_MSG = \
+        'JSON Reference Pointer must start with "!ref" prefix (e.g. "!ref /a/b/c")' \
+        'and should not refer to entire document.'
 
-class PointerType(Enum):
-    """Type of pointer"""
-    POINTER = 0
-    REFERENCE = 1
-    FILE_REF = 2
+FILE_POINTER_SYNTAX_HING_MSG = \
+        'File Pointer must start with "!file" prefix (e.g. "!file path/to/file").'
+
 
 @dataclass(frozen=True, slots=True)
 class Pointer:
     """Class to wrap JSON Pointer (RFC6901).
     Provides parsing and validation of pointers.
-    Adds support of !ref and !file keywords for advanced JSON parsing.
     """
-    pointer: tuple|None
-    type: PointerType
+    path: tuple|None
+    rfc_pointer: str
     raw: str
-    is_file: bool
-    is_reference: bool
-    is_pointer: bool
 
-    def __str__(self):
-        return f'{self.type.name}: {self.raw}'
-
-    def get_rfc_pointer(self) -> str:
-        """Returns pointer in format defined in RFC6901.
-        For Reference pointer - only pointer part will be returned.
-        For File reference pointer - empty string will be returned.
+    def parent(self) -> "Pointer":
+        """Returns immediate parent pointer of current pointer.
+        For example for pointer "/a/b/c" this function returns
+        pointer "/a/b".
 
         Returns:
-            str: pointer in RFC6901 format.
+            Pointer: instance of `Pointer` class
         """
-        result = ''
-        if self.is_pointer:
-            result = self.raw
-        elif self.is_reference:
-            ptr = REF_SEP.join([p.replace('~', '~0').replace('/', '~1') for p in self.pointer])
-            result = f'{REF_SEP}{ptr}'
+        if self.path is None:
+            return self
+        return Pointer.from_path(self.path[:-1])
 
-        return result
+    def is_child_of(self, pointer: 'Pointer') -> bool:
+        """Returns True if current pointer is a child of
+        given pointer.
+
+        Args:
+            pointer (Self): possible parent pointer.
+
+        Returns:
+            bool: True if given pointer is a parent of the current,
+            False otherwise.
+        """
+        if self.path is None or self.path == pointer.path:
+            # If current pointer is root pointer
+            # or same pointer - not a child
+            return False
+
+        # If given pointer root - every other pointer is child of it
+        if pointer.path is None:
+            return True
+
+        # Otherwise check for path chain to be the same
+        return pointer.path == self.path[:len(pointer.path)]
+
+    def __eq__(self, other):
+        return isinstance(other, Pointer) and self.path == other.path
+
+    def __str__(self):
+        return self.rfc_pointer
 
     @staticmethod
-    def from_string(pointer_str: str) -> Self:
-        """Parses given string pointer and return instance of Pointer class.
-        Raises errors if pointer has invalid structure.
-
-        Raises:
-            ValueError: when None passed
-            ValueError: when Pointer/Ref pointer doesn't start from root ('/')
-            ValueError: when Ref pointer target the whole document
-        """
-
-        if pointer_str is None:
-            raise ValueError(f'Null pointer was given. {POINTER_SYNTAX_HINT_MSG}')
-
-        raw = pointer_str
-        path = None
-        ptr_type = None
-        is_file = False
-        is_pointer = False
-        is_reference = False
-
-        if pointer_str == '':
-            return Pointer(None, PointerType.POINTER, pointer_str,
-                           False, False, True)
-
-        tokens = pointer_str.split(' ', maxsplit=1)
-        type_token = None
-        if len(tokens) > 0:
-            type_token = tokens[0]
-            if tokens[0] in (FILE_PREFIX, REF_PREFIX) and len(tokens) == 1:
-                raise ValueError(f'Invalid pointer syntax of pointer "{pointer_str}". '
-                                 '{POINTER_SYNTAX_HINT_MSG}')
-            tokens = tokens[1:]
-
-        if type_token and type_token == FILE_PREFIX:
-            ptr_type = PointerType.FILE_REF
-            is_file = True
-            path = ''.join(tokens).strip()
-        elif type_token and type_token == REF_PREFIX:
-            ptr_type = PointerType.REFERENCE
-            is_reference = True
-            pointer = ''.join(tokens).lstrip()
-        else:
-            ptr_type = PointerType.POINTER
-            is_pointer = True
-            pointer = pointer_str
-
-        if is_file:
-            if not path:
-                raise ValueError(f'Pointer "{pointer_str}" has invalid/empty path!')
-
-        else:
-            if not pointer.startswith(POINTER_PREFIX):
-                raise ValueError(f'Pointer "{pointer_str}" should start '
-                              'from root "/" element.'
-                              if is_pointer or pointer.strip() != '' else
-                              'Reference to the whole document is prohibited.')
-
-            if len(pointer) > 1:
-                path = tuple(
-                    v.replace('~1', '/').replace('~0', '~')
-                    for v in pointer[1:].split(REF_SEP)
-                )
-            else:
-                path = ('',)
-
-        return Pointer(pointer=path, raw=raw, type=ptr_type,
-                       is_file=is_file,
-                       is_pointer=is_pointer,
-                       is_reference=is_reference)
-
-    @staticmethod
-    def match_any_pointer(value: str) -> bool:
+    def match(pointer_str: str) -> bool:
         """Checks that given string matches expected pointer syntax:
-        starts from '/' or keywords "!ref"/"!file".
+        is string that starts with '/' or be equal to ''.
         May be used to check string before pointer creation, to avoid
         raising unwanted exception.
 
@@ -139,16 +84,103 @@ class Pointer:
         Returns:
             bool: True if string matches pointer syntax, otherwise Fasle
         """
-        return isinstance(value,str) and (
-            value == ''
-            or value.startswith(POINTER_PREFIX)
-            or value.startswith(REF_PREFIX_SYNTAX)
-            or value.startswith(FILE_PREFIX_SYNTAX))
+        return isinstance(pointer_str, str) and (
+            pointer_str == ROOT_POINTER
+            or pointer_str.startswith(POINTER_PREFIX)
+        )
 
     @staticmethod
-    def match_ref_pointer(value: str) -> bool:
-        """Checks that given string matches expected reference
-        pointer syntax (have keywords "!ref"/"!file").
+    def from_string(pointer_str: str) -> "Pointer":
+        """Parses given string pointer and return instance of Pointer class.
+        Raises errors if pointer has invalid structure.
+
+        Raises:
+            ValueError: when None passed, not a string was passed, or pointer
+            is not an entire document pointer, but doesn't start from root ('/').
+
+        Returns:
+            Pointer: instance of `Pointer` class
+        """
+        if not Pointer.match(pointer_str):
+            raise ValueError(f'Invalid JSON Pointer syntax "{pointer_str}". '
+                             f'{POINTER_SYNTAX_HING_MSG}')
+
+        if pointer_str == '':
+            return Pointer(None, pointer_str, pointer_str)
+
+        return Pointer(
+            path = tuple(
+                Pointer.decode_escaped_chars(v)
+                for v in pointer_str[1:].split(REF_SEP)
+            ),
+            rfc_pointer = pointer_str,
+            raw = pointer_str
+        )
+
+    @staticmethod
+    def from_path(pointer_path: tuple|list) -> "Pointer":
+        """Creates pointer from path
+
+        Args:
+            pointer_path (tuple | list): path of pointer.
+
+        Returns:
+            Pointer: instance of `Pointer` class
+        """
+        if not pointer_path:
+            return Pointer(None, ROOT_POINTER, ROOT_POINTER)
+
+        pointer_path = tuple(str(p) for p in pointer_path)
+        escaped_path = REF_SEP.join((Pointer.encode_escaped_chars(p) for p in pointer_path))
+
+        rfc_pointer = f'{REF_SEP}{escaped_path}'
+        return Pointer(pointer_path, rfc_pointer, rfc_pointer)
+
+    @staticmethod
+    def decode_escaped_chars(value: str) -> str:
+        """Decodes escaped characts:
+        ~0 - to ~
+        ~1 - to /
+
+        Args:
+            value (str): string to decode.
+
+        Returns:
+            str: decoded string
+        """
+        return value.replace('~1', '/').replace('~0', '~')
+
+    @staticmethod
+    def encode_escaped_chars(value: str) -> str:
+        """Decodes escaped characts:
+        ~0 - to ~
+        ~1 - to /
+
+        Args:
+            value (str): string to decode.
+
+        Returns:
+            str: decoded string
+        """
+        return value.replace('~', '~0').replace('/', '~1')
+
+
+@dataclass(frozen=True, slots=True)
+class ReferencePointer(Pointer):
+    """Extends JSON Pointer syntax with '!ref ' token,
+    marking pointer a reference pointer to some node
+    of the document.
+    """
+
+    def parent(self):
+        return self
+
+    def is_child_of(self, pointer: Pointer) -> bool:
+        return False
+
+    @staticmethod
+    def match(pointer_str: str) -> bool:
+        """Checks that given string matches expected pointer syntax: "!ref /a/b/c".
         May be used to check string before pointer creation, to avoid
         raising unwanted exception.
 
@@ -156,14 +188,64 @@ class Pointer:
             value (str): String to check.
 
         Returns:
-            bool: True if string matches ref pointer syntax, otherwise Fasle
+            bool: True if string matches pointer syntax, otherwise Fasle
         """
-        return isinstance(value, str) and value.startswith(REF_PREFIX_SYNTAX)
+        return isinstance(pointer_str, str) and pointer_str.startswith(REF_PREFIX)
 
     @staticmethod
-    def match_file_ref_pointer(value: str) -> bool:
-        """Checks that given string matches expected file reference
-        pointer syntax (starts from keyword !file").
+    def from_string(pointer_str: str) -> Self:
+        """Parses given string pointer and return instance of Pointer class.
+        Raises errors if pointer has invalid structure.
+
+        Raises:
+            ValueError: when None or not a string was passed, or pointer
+            is not an Reference Pointer.
+        """
+        err_msg = f'Invalid JSON Reference Pointer syntax "{pointer_str}. '\
+                    f'{REFERENCE_POINTER_SYNTAX_HING_MSG}'
+
+        if not ReferencePointer.match(pointer_str):
+            raise ValueError(err_msg)
+
+        pointer_path = pointer_str[len(REF_PREFIX):]
+        if not pointer_path:
+            raise ValueError(f'Invalid JSON Reference Pointer syntax "{pointer_str}". '
+                             'Refering to entire document is not allowed.')
+
+        rfc_pointer = pointer_str[len(REF_PREFIX):].lstrip()
+        if not rfc_pointer.startswith(POINTER_PREFIX):
+            raise ValueError(err_msg)
+
+        return ReferencePointer(
+            path=tuple(
+                Pointer.decode_escaped_chars(v)
+                for v in rfc_pointer[1:].split(REF_SEP)
+            ),
+            raw=pointer_str,
+            rfc_pointer=rfc_pointer)
+
+
+@dataclass(frozen=True, slots=True)
+class FilePointer(Pointer):
+    """Extends JSON Pointer syntax with '!file ' token,
+    marking pointer to a file.
+    """
+
+    def parent(self):
+        return self
+
+    def is_child_of(self, pointer: Pointer) -> bool:
+        return False
+
+    def __eq___(self, other):
+        return isinstance(other, FilePointer) and self.path == other.path
+
+    def __str__(self):
+        return f'<file>{self.path}'
+
+    @staticmethod
+    def match(pointer_str: str) -> bool:
+        """Checks that given string matches expected pointer syntax: "!file path/to/file".
         May be used to check string before pointer creation, to avoid
         raising unwanted exception.
 
@@ -171,6 +253,25 @@ class Pointer:
             value (str): String to check.
 
         Returns:
-            bool: True if string matches ref pointer syntax, otherwise Fasle
+            bool: True if string matches pointer syntax, otherwise Fasle
         """
-        return isinstance(value, str) and value.startswith(FILE_PREFIX_SYNTAX)
+        return isinstance(pointer_str, str) and pointer_str.startswith(FILE_PREFIX)
+
+    @staticmethod
+    def from_string(pointer_str: str) -> Self:
+        """Parses given string pointer and return instance of Pointer class.
+        Raises errors if pointer has invalid structure.
+
+        Raises:
+            ValueError: when None or not a string was passed, or pointer
+            is not an File Pointer
+        """
+        if not FilePointer.match(pointer_str):
+            raise ValueError(f'Invalid File Pointer syntax "{pointer_str}. '
+                             f'{FILE_POINTER_SYNTAX_HING_MSG}')
+
+        pointer_path = pointer_str[len(FILE_PREFIX):].lstrip()
+        if not pointer_path:
+            raise ValueError('Empty File Pointer is not allowed!')
+
+        return FilePointer(path=pointer_path, raw=pointer_str, rfc_pointer=None)
