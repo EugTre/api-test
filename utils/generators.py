@@ -1,6 +1,7 @@
-
+"""Generators and generator manager, to provide access generator collection them."""
 import typing
 import random
+from utils.basic_manager import BasicManager
 
 class NamesGenerator:
     MALE_NAMES = (
@@ -49,44 +50,43 @@ class NamesGenerator:
         return random.choice(NamesGenerator.LAST_NAMES)
 
 
-class GeneratorsManager():
+class GeneratorsManager(BasicManager):
     """Class to register and provide access to data generator objects from various points
-    in the framework (e.g. for compiler procedures)."""
+    in the framework (e.g. for compiler procedures).
 
-    def __init__(self):
-        self.collection = {}
+    Manager also handles cache to ensure calls to same generator with same correlation_id
+    will return the very same value.
+    """
+
+    def __init__(self) -> None:
+        super().__init__()
         self.cache = {}
 
-    def register(self, generator: callable, name: str = None) -> None:
+    def add(self, item: typing.Callable, name: str | None = None, override: bool = False):
         """Registers given generator under given name.
 
         Args:
-            generator (callable): generator function.
-            name (str, optional): registration name. Defaults to callable.__name__.
+            item (callable): generator function.
+            name (str, optional): registration name. Defaults to item.__name__.
+            override (bool, optional): flag to override already registered names.
+            Defaults to False.
 
         Raises:
             ValueError: when name already occupied.
         """
-        if not name:
-            name = generator.__name__
+        return super().add(item, name, override)
 
-        if name in self.collection:
-            raise ValueError(f'"{name}" already registered!')
-
-        self.collection[name] = generator
-
-    def bulk_register(self, generators: tuple|list) -> None:
+    def add_all(self, items: tuple[typing.Callable, str | None] | list[typing.Callable],
+                override: bool = False):
         """Registers given collection of generators.
 
         Args:
-            generators (list | tuple): collection of generators where each element is
+            items (list | tuple): collection of generators where each element is
             'callable' or ('callable', 'name<str>').
+            override (bool, optional): flag to override already registered names.
+            Defaults to False.
         """
-        for generator_data in generators:
-            if isinstance(generator_data, (tuple, list)):
-                self.register(*generator_data)
-            else:
-                self.register(generator_data)
+        return super().add_all(items, override)
 
     def generate(self, name: str, args: tuple|list = (), kwargs: dict = None,
                  correlation_id: str = None) -> typing.Any:
@@ -112,7 +112,7 @@ class GeneratorsManager():
             typing.Any: generated value.
         """
         if name not in self.collection:
-            raise ValueError(f'Failed to find matcher with name "{name}"!')
+            raise ValueError(f'Failed to find generator with name "{name}"!')
 
         # Format cache id and retrieve data from cache if present
         if correlation_id:
@@ -132,8 +132,16 @@ class GeneratorsManager():
 
         return value
 
+    def _check_type_on_add(self, item: typing.Any):
+        if callable(item):
+            return
+
+        raise ValueError(f'Registraion failed for item "{item}" at {self.__class__.__name__}. '
+                         f'Only callable items are allowed!')
+
+# Default collection of generators.
 generators_manager = GeneratorsManager()
-generators_manager.bulk_register((
+generators_manager.add_all((
     [NamesGenerator.generate_first_name, 'FirstName'],
     [NamesGenerator.generate_last_name, 'LastName']
 ))

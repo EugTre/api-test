@@ -4,6 +4,7 @@ import shutil
 import uuid
 import pathlib
 import json
+import typing
 
 import pytest
 
@@ -31,12 +32,12 @@ def handle_tmp_path(tmp_path_factory):
     shutil.rmtree(tmpdir)
 
 @pytest.fixture(name='json_file')
-def get_json_file(tmp_folder):
-    """Provides unqiue path to JSON file"""
+def get_json_file(tmp_folder) -> AppendableFilePath:
+    """Provides unqiue path to JSON file, content of which may be written/appended"""
     return AppendableFilePath(tmp_folder / f'{uuid.uuid4()}.json')
 
 @pytest.fixture(name='get_file')
-def get_unique_file(tmp_folder):
+def get_unique_file(tmp_folder) -> typing.Callable:
     """Return unique file path generator"""
     def callback(prefix: str = "", ext: str = "json"):
         return AppendableFilePath(tmp_folder / f'{prefix}_{uuid.uuid4()}.{ext}')
@@ -44,6 +45,6 @@ def get_unique_file(tmp_folder):
 
 
 @pytest.fixture(name='ini_file')
-def get_ini_file(tmp_folder):
+def get_ini_file(tmp_folder) -> AppendableFilePath:
     """Provides unqiue path to INI file"""
     return AppendableFilePath(tmp_folder / f'{uuid.uuid4()}.ini')

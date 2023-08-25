@@ -1,0 +1,220 @@
+"""Tests for matchers and matcher manager
+
+pytest -s -vv ./utils/test_generators.py
+
+"""
+import random
+import pytest
+import utils.generators as gen
+
+class TestGeneratosManager:
+    def simple_generator(self):
+        return True
+
+    def configurable_generator(self, a, b):
+        return f'{a}/{b}'
+
+    def heavy_configurable_generator(self, a, b, c = 'c.default', d = 'd.default'):
+        return '/'.join((a,b,c,d))
+
+    def random_generator(self, min = 0, max = 100):
+        return random.randrange(min, max)
+
+    def test_manager_register(self):
+        manager = gen.GeneratorsManager()
+        manager.add(gen.NamesGenerator.generate_first_name)
+
+        assert manager.collection
+        assert len(manager.collection) == 1
+
+        manager.add(gen.NamesGenerator.generate_last_name)
+        assert len(manager.collection) == 2
+
+    def test_manager_register_with_name(self):
+        reg_name = "FooBar"
+        manager = gen.GeneratorsManager()
+        manager.add(gen.NamesGenerator.generate_first_name, name=reg_name)
+
+        assert manager.collection
+        assert len(manager.collection) == 1
+        assert reg_name in manager
+
+    def test_manager_register_override(self):
+        manager = gen.GeneratorsManager()
+        manager.add(gen.NamesGenerator.generate_first_name)
+
+        assert manager.collection
+        assert len(manager.collection) == 1
+
+        manager.add(gen.NamesGenerator.generate_first_name, override=True)
+        assert len(manager.collection) == 1
+
+    def test_manager_bulk_registration(self):
+        manager = gen.GeneratorsManager()
+        manager.add_all([
+            gen.NamesGenerator.generate_first_name,
+            gen.NamesGenerator.generate_last_name
+        ])
+
+        assert manager.collection
+        assert len(manager.collection) == 2
+        assert gen.NamesGenerator.generate_first_name.__name__ in manager
+        assert gen.NamesGenerator.generate_last_name.__name__ in manager
+
+    def test_manager_bulk_registration_with_name(self):
+        collection = [
+            (gen.NamesGenerator.generate_first_name, 'Foo1'),
+            (gen.NamesGenerator.generate_last_name, 'Foo2')
+        ]
+        manager = gen.GeneratorsManager()
+        manager.add_all(collection)
+
+        assert manager.collection
+        assert len(manager.collection) == 2
+        assert collection[0][1] in manager
+        assert collection[1][1] in manager
+
+    def test_manager_unregister(self):
+        reg_name = "FooBar"
+        manager = gen.GeneratorsManager()
+        manager.add(gen.NamesGenerator.generate_first_name, name=reg_name)
+
+        assert manager.collection
+        assert reg_name in manager
+
+        op_result = manager.remove(reg_name)
+        assert op_result
+        assert not manager.collection
+        assert reg_name not in manager
+
+    def test_manager_generate_by_name(self):
+        generator = self.simple_generator
+        reg_name = "FooBar"
+        manager = gen.GeneratorsManager()
+        manager.add(generator, name=reg_name)
+
+        assert manager.generate(reg_name)
+
+    def test_manager_generate_by_autoname(self):
+        generator = self.simple_generator
+        reg_name = generator.__name__
+        manager = gen.GeneratorsManager()
+        manager.add(generator)
+
+        assert manager.generate(reg_name)
+
+    def test_manager_generate_with_args(self):
+        generator = self.configurable_generator
+        reg_name = generator.__name__
+        manager = gen.GeneratorsManager()
+        manager.add(generator)
+
+        assert manager.generate(reg_name, ('foo', 'bar')) == 'foo/bar'
+
+    def test_manager_generate_with_kwargs(self):
+        generator = self.configurable_generator
+        reg_name = generator.__name__
+        manager = gen.GeneratorsManager()
+        manager.add(generator)
+
+        assert manager.generate(reg_name, kwargs={'a': 'foo', 'b': 'bar'}) == 'foo/bar'
+
+    def test_manager_generate_with_mixed_args(self):
+        generator = self.heavy_configurable_generator
+        reg_name = generator.__name__
+        manager = gen.GeneratorsManager()
+        manager.add(generator)
+
+        assert manager.generate(reg_name, ('foo', 'bar'), kwargs={'c': 'baz'}) \
+            == 'foo/bar/baz/d.default'
+
+    def test_manager_generate_with_correlation_id(self):
+        generator = self.random_generator
+        reg_name = generator.__name__
+        cid = 'FooBar'
+
+        manager = gen.GeneratorsManager()
+        manager.add(generator)
+
+        generated_value = manager.generate(reg_name, correlation_id=cid)
+        for _ in range(10):
+            assert manager.generate(reg_name, correlation_id=cid) == generated_value
+        assert manager.generate(reg_name, correlation_id='BazBar') != generated_value
+
+    def test_manager_generate_with_args_and_correlation_id(self):
+        generator = self.random_generator
+        reg_name = generator.__name__
+        cid = 'FooBar'
+
+        manager = gen.GeneratorsManager()
+        manager.add(generator)
+
+        generated_value = manager.generate(reg_name, (100, 500), correlation_id=cid)
+        for i in range(10):
+            assert manager.generate(reg_name, (100 * i, 500 * i), correlation_id=cid) \
+                == generated_value
+        assert manager.generate(reg_name, (0, 20), correlation_id='BazBar') \
+            != generated_value
+
+    # --- Negative
+    def test_manager_unregister_by_invalid_name_quietly_fails(self):
+        reg_name = "FooBar"
+        invalid_name = "BazBar"
+
+        manager = gen.GeneratorsManager()
+        manager.add(self.simple_generator, name=reg_name)
+        assert reg_name in manager
+
+        op_result = not manager.remove(invalid_name)
+        assert op_result
+        assert reg_name in manager
+        assert len(manager.collection) == 1
+
+    def test_manager_register_duplicate_fails(self):
+        manager = gen.GeneratorsManager()
+        manager.add(self.simple_generator)
+
+        assert manager.collection
+        assert len(manager.collection) == 1
+
+        with pytest.raises(ValueError, match=".* already registered!"):
+            manager.add(self.simple_generator)
+
+    def test_manager_register_duplicate_name_fails(self):
+        manager = gen.GeneratorsManager()
+        manager.add(self.simple_generator, "FooBar")
+
+        assert manager.collection
+        assert len(manager.collection) == 1
+
+        with pytest.raises(ValueError, match=".* already registered!"):
+            manager.add(self.configurable_generator, "FooBar")
+
+    def test_manager_register_non_compatible_type_fails(self):
+        manager = gen.GeneratorsManager()
+        with pytest.raises(ValueError, match="Registraion failed for item.*"):
+            manager.add([], "Foo")
+
+    def test_manager_contains_fails(self):
+        collection = [
+            (self.simple_generator, 'Foo1'),
+            (self.configurable_generator, 'Foo2'),
+            (self.heavy_configurable_generator, 'Foo3')
+        ]
+        manager = gen.GeneratorsManager()
+        manager.add_all(collection)
+
+        assert 'Foo' not in manager
+        assert 'Foo33' not in manager
+        assert 'Bar1' not in manager
+
+
+
+class TestGenerators:
+    def test_names_generator_first_name_generator(self):
+        assert gen.NamesGenerator.generate_first_name() in gen.NamesGenerator.MALE_NAMES
+        assert gen.NamesGenerator.generate_first_name('male') in gen.NamesGenerator.MALE_NAMES
+        assert gen.NamesGenerator.generate_first_name('female') in gen.NamesGenerator.FEMALE_NAMES
+
+    def test_names_generator_last_name_generator(self):
+        assert gen.NamesGenerator.generate_last_name() in gen.NamesGenerator.LAST_NAMES

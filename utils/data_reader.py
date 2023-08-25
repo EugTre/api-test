@@ -17,12 +17,10 @@ class DataReader:
         Returns:
             tuple: tuple of parsed values
         """
-        print(f'Parsing tuple from [{value}] of type {type(value)}.')
         if not value:
             return tuple()
 
         if isinstance(value, list):
-            print('Converting list to tuple')
             return tuple(list)
 
         # Try to parse tuple as is - e.g. quoted comma-separated values
@@ -31,11 +29,9 @@ class DataReader:
                         for v in value.strip(" \n()").split(',')
                         if v.strip(' "\'')]
         if len(parsed_value) > 1:
-            print(f'Parsed tuple from line = {parsed_value}')
             return tuple(parsed_value)
 
         # If not parsed - consider value to be a filename and read it
-        print(f'Parsing tuple: read from file [{value}]')
         return tuple(DataReader.read_json_from_file(value))
 
     @staticmethod

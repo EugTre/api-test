@@ -1,7 +1,10 @@
 """Module provides matche object of various kinds"""
 import re
+import typing
 from dataclasses import dataclass
 from abc import ABC
+
+from utils.basic_manager import BasicManager
 
 @dataclass(frozen=True, slots=True)
 class AbstractMatcher(ABC):
@@ -13,7 +16,7 @@ class AbstractMatcher(ABC):
         return ''
 
 @dataclass(frozen=True, slots=True)
-class Any(AbstractMatcher):
+class Anything(AbstractMatcher):
     """Matches to any value"""
     def __eq__(self, other):
         return True
@@ -23,14 +26,13 @@ class Any(AbstractMatcher):
 
 
 @dataclass(slots=True, frozen=True)
-class AnyText(Any):
+class AnyText(Anything):
     """Matches to any text (string), including empty string"""
     def __eq__(self, other):
-        return isinstance(other, str)
+        return isinstance(other, (str, Anything, AnyText))
 
     def __repr__(self):
         return '<Any Text>'
-
 
 @dataclass(slots=True, frozen=True)
 class AnyTextLike(AnyText):
@@ -38,11 +40,13 @@ class AnyTextLike(AnyText):
     pattern: str
 
     def __eq__(self, other):
+        if isinstance(other, (Anything, AnyText)):
+            return True
+
         return isinstance(other, str) and re.match(self.pattern, other)
 
     def __repr__(self):
         return f'<Any Text Like {self.pattern}>'
-
 
 @dataclass(slots=True, frozen=True)
 class AnyTextWith(AnyText):
@@ -50,7 +54,7 @@ class AnyTextWith(AnyText):
     substring: str
 
     def __eq__(self, other):
-        if isinstance(other, (Any, AnyText)):
+        if isinstance(other, (Anything, AnyText)):
             return True
 
         return isinstance(other, str) and self.substring in other
@@ -60,7 +64,7 @@ class AnyTextWith(AnyText):
 
 
 @dataclass(slots=True, frozen=True)
-class AnyNumber(Any):
+class AnyNumber(Anything):
     def __eq__(self, other):
         return isinstance(other, (int, float))
 
@@ -69,47 +73,72 @@ class AnyNumber(Any):
 
 @dataclass(slots=True, frozen=True)
 class AnyNumberGreaterThan(AnyNumber):
-    def __init__(self, num):
-        self.num = num
+    number: int|float
 
     def __eq__(self, other):
-        if not isinstance(other, (int, float)):
-            return False
+        result = False
+        if isinstance(other, AnyNumberGreaterThan):
+            # >16 vs >2 -- definetly in range of other, so ok, but >2 in >16 is not.
+            result = self.number >= other.number
+        elif isinstance(other, AnyNumberLessThan):
+            # >6 vs <10 -- range will always be pretty narrow in scale of +-inf, so not equal
+            result = False
+        elif isinstance(other, AnyNumber) or type(other) is Anything:
+            result = True
+        elif not isinstance(other, (int, float)):
+            result = False
+        else:
+            # Chompare with given int/float
+            num = self.number
+            if not isinstance(num, float) and isinstance(other, float):
+                num = float(num)
+            elif isinstance(num, float) and not isinstance(other, float):
+                other = float(other)
 
-        num = self.num
-        if not isinstance(num, float) and isinstance(other, float):
-            num = float(num)
-        elif isinstance(num, float) and not isinstance(other, float):
-            other = float(other)
+            result = other > num
 
-        return other > num
+        return result
 
     def __repr__(self):
-        return f'<Any Number Greater Than ({self.num})>'
+        return f'<Any Number Greater Than ({self.number})>'
 
 @dataclass(slots=True, frozen=True)
 class AnyNumberLessThan(AnyNumber):
-    def __init__(self, num):
-        self.num = num
+    number: int|float
 
     def __eq__(self, other):
-        if not isinstance(other, (int, float)):
-            return False
+        result = False
+        if isinstance(other, AnyNumberLessThan):
+            # <6 vs <10 -- definetly in range of other, so ok, but >2 in >16 is not.
+            result = self.number <= other.number
+        elif isinstance(other, AnyNumberGreaterThan):
+            # <16 vs >2 -- range will always be pretty narrow in scale of +-inf, so not equal
+            result = False
+        elif isinstance(other, AnyNumberLessThan):
+            # >6 vs <10 -- range will always be pretty narrow in scale of +-inf, so not equal
+            result = False
+        elif isinstance(other, AnyNumber) or type(other) is Anything:
+            result = True
+        elif not isinstance(other, (int, float)):
+            result = False
+        else:
+            # Chompare with given int/float
+            num = self.number
+            if not isinstance(num, float) and isinstance(other, float):
+                num = float(num)
+            elif isinstance(num, float) and not isinstance(other, float):
+                other = float(other)
 
-        num = self.num
-        if not isinstance(num, float) and isinstance(other, float):
-            num = float(num)
-        elif isinstance(num, float) and not isinstance(other, float):
-            other = float(other)
+            result = other < num
 
-        return other < num
+        return result
 
     def __repr__(self):
-        return f'<Any Number Less Than ({self.num})>'
+        return f'<Any Number Less Than ({self.number})>'
 
 
 @dataclass(slots=True, frozen=True)
-class AnyBool(Any):
+class AnyBool(Anything):
     def __eq__(self, other):
         return isinstance(other, bool)
 
@@ -118,44 +147,68 @@ class AnyBool(Any):
 
 
 @dataclass(slots=True, frozen=True)
-class AnyList(Any):
+class AnyList(Anything):
     def __eq__(self, other):
-        return isinstance(other, (list, Any, AnyList))
+        return isinstance(other, (list, Anything, AnyList))
 
     def __repr__(self):
         return '<Any List>'
 
 @dataclass(slots=True, frozen=True)
 class AnyListOf(AnyList):
+    size: int = None
+    item_type: str|int|float|bool|dict|list = None
+
     REPR_MSG = '<Any List Of{size_desc}{type_desc}>'
     SIZE_COMPARE_OP = '=='
 
-    def __init__(self, size = None, type = None):
-        self.size = size
-        self.type = type
+    def __post_init__(self):
+        object.__setattr__(self, 'item_type', type(self.item_type))
 
     def __eq__(self, other) -> bool:
-        if isinstance(other, (Any, AnyList)):
-            return True
+        result = False
+        if isinstance(other, AnyListLongerThan):
+            result = (any((self.size is None,
+                           self.size >= other.size))
+                      and
+                      any((self.item_type is None,
+                           self.item_type == other.item_type)) )
+        elif isinstance(other, AnyListShorterThan):
+            result = (any((self.size is None,
+                           self.size <= other.size))
+                      and
+                      any((self.item_type is None,
+                           self.item_type == other.item_type)))
+        elif isinstance(other, AnyListOf):
+            result = (any((self.size is None or other.size is None,
+                           self.size == other.size))
+                      and
+                      any((self.item_type is None or other.item_type is None,
+                           self.item_type == other.item_type)))
+        elif isinstance(other, AnyList):
+            result = True
+        elif type(other) is Anything:
+            result = True
+        elif not isinstance(other, list):
+            result = False
+        else:
+            size_test = True
+            if self.size is not None:
+                match self.SIZE_COMPARE_OP:
+                    case '==': size_test = len(other) == self.size
+                    case '>': size_test = len(other) > self.size
+                    case '<': size_test = len(other) < self.size
 
-        if not isinstance(other, list):
-            return False
+            type_test = True if self.item_type is None else \
+                all((isinstance(itm, self.item_type) for itm in other))
 
-        size_test = True
-        if self.size is not None:
-            match self.SIZE_COMPARE_OP:
-                case '==': size_test = len(other) == self.size
-                case '>': size_test = len(other) > self.size
-                case '<': size_test = len(other) < self.size
+            result = size_test and type_test
 
-        type_test = True if self.type is None else \
-            all((isinstance(itm, self.type) for itm in other))
-
-        return size_test and type_test
+        return result
 
     def __repr__(self):
         size_desc = "" if self.size is None else f' {self.size} item(s)'
-        type_desc = "" if self.type is None else f' of type "{self.type.__name__}"'
+        type_desc = "" if self.item_type is None else f' of type "{self.item_type.__name__}"'
         return self.REPR_MSG.format(size_desc=size_desc, type_desc=type_desc)
 
     @staticmethod
@@ -204,7 +257,7 @@ class AnyListShorterThan(AnyListOf):
     SIZE_COMPARE_OP = '<'
 
 @dataclass(slots=True, frozen=True)
-class AnyDict(Any):
+class AnyDict(Anything):
     def __eq__(self, other):
         return isinstance(other, dict)
 
@@ -220,43 +273,31 @@ class AnyNonEmptyDict(AnyDict):
         return '<Any Non-Empty Dict>'
 
 
-class MatchersManager:
+class MatchersManager(BasicManager):
     """Class to register and provide access to matcher objects from various points
     in the framework (e.g. for compiler procedures).
     """
-    def __init__(self):
-        self.collection = {}
-
-    def register(self, matcher: AbstractMatcher, name: str = None) -> None:
+    def add(self, item: AbstractMatcher, name: str | None = None, override: bool = False):
         """Registers given matcher under given name.
 
         Args:
-            matcher (Any): matcher class.
+            matcher (AbstractMatcher): matcher class.
             name (str, optional): registration name. Defaults to class.__name__.
 
         Raises:
             ValueError: when name already occupied.
         """
-        if not name:
-            name = matcher.__name__
+        return super().add(item, name, override)
 
-        if name in self.collection:
-            raise ValueError(f'"{name}" already registered!')
-
-        self.collection[name] = matcher
-
-    def bulk_register(self, matchers: list|tuple) -> None:
+    def add_all(self, items: tuple[AbstractMatcher, str] | list[AbstractMatcher],
+                override: bool = False):
         """Registers given collection of matchers.
 
         Args:
             matchers (list | tuple): collection of matchers where each element is
             'class<cls>' or ('class<cls>', 'name<str>').
         """
-        for matcher_data in matchers:
-            if isinstance(matcher_data, (tuple, list)):
-                self.register(*matcher_data)
-            else:
-                self.register(matcher_data)
+        return super().add_all(items, override)
 
     def get(self, name: str, args:tuple=(), kwargs:dict=None) -> AbstractMatcher:
         """Creates an instance of registerd matcher object by it's name and
@@ -283,10 +324,20 @@ class MatchersManager:
         matcher = matcher_cls(*args, **kwargs)
         return matcher
 
+    def _check_type_on_add(self, item: typing.Any):
+        """Raises exception, if given item have unexpected type."""
+        if issubclass(item, AbstractMatcher):
+            return
 
+        raise ValueError(f'Registraion failed for item "{item}" at {self.__class__.__name__}. '
+                         f'Only subclass items of class "{AbstractMatcher.__name__}" '
+                         f'are allowed!')
+
+
+# Default collection of matchers.
 matchers_manager = MatchersManager()
-matchers_manager.bulk_register((
-    Any,
+matchers_manager.add_all((
+    Anything,
     AnyText,
     AnyTextLike,
     AnyTextWith,

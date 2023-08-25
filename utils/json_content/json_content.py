@@ -5,21 +5,18 @@ import copy
 
 from typing import Self, Any
 from utils.data_reader import DataReader
-from utils.json_content.json_wrapper import AbstractContentWrapper, JsonWrapper
-from utils.json_content.reference_resolver import AbstractReferenceResolver, ReferenceResolver
-from utils.json_content.pointer import ROOT_POINTER
+from utils.json_content.json_wrapper import JsonWrapper
+from utils.json_content.composer import Composer
+
+from utils.json_content.pointer import Pointer, ROOT_POINTER
+from utils.json_content.composition_handlers import DEFAULT_COMPOSITION_HANDLERS_COLLECTION
 
 class JsonContent:
     """Class to wrap JSON with get/update/delete methods and
     reference resolution mechanism"""
-    __slots__ = ["content", "resolver"]
+    __slots__ = ["content", "composer"]
 
-    def __init__(self, content: dict|list,
-                 allow_references: bool = False,
-                 enable_cache: bool = False,
-                 wrapper: AbstractContentWrapper = JsonWrapper,
-                 resolver: AbstractReferenceResolver = ReferenceResolver
-                ):
+    def __init__(self, content: dict|list, composer_setup: dict = None):
         """Create a new instance of `JsonContent` wrapper class.
         One may use existing dictionary (by using 'content' arg) or read JSON
         data from a file ('from_file' arg).
@@ -43,29 +40,17 @@ class JsonContent:
             raise ValueError('Content must be JSON-like of type dict or list! '
                              f'Given value is {type(content)}.')
 
-        self.content: AbstractContentWrapper = wrapper(content)
-        self.resolver: AbstractReferenceResolver = None
-        if allow_references:
-            self.resolver = resolver(self.content, enable_cache)
-            self.resolver.resolve_all()
+        self.content = JsonWrapper(content)
+        self.composer = None
+        if composer_setup is not None:
+            self.composer = Composer(self.content, handlers=composer_setup)
+            self.composer.compose_content()
 
-    def has(self, pointer: str) -> bool:
-        """Checks that property presents in the content.
-        Returns True if pointer refers to existing property.
-
-        Args:
-            pointer (str): JSON pointer to a property as string.
-
-        Returns:
-            bool: True if property presents, otherwise False.
-        """
-        return self.content.has(pointer)
-
-    def get(self, pointer: str = ROOT_POINTER, make_copy: bool = False) -> Any:
-        """Returns property at given pointer.
+    def get(self, pointer: str|Pointer = ROOT_POINTER, make_copy: bool = False) -> Any:
+        """Returns property at given JSON pointer.
 
         Args:
-            pointer (str, optional): JSON pointer to a property as string.
+            pointer (str|Pointer, optional): JSON pointer to a property as string.
             Defaults to empty (return whole content).
             make_copy (bool, optional): Flag to return a copy of the mutable property.
             Defaults to False.
@@ -93,12 +78,13 @@ class JsonContent:
         value = self.content.get(pointer)
         return self.__copy_value(value) if make_copy else value
 
-    def get_or_default(self, pointer: str, default_value: Any, make_copy: bool = False) -> Any:
+    def get_or_default(self, pointer: str|Pointer,
+                       default_value: Any, make_copy: bool = False) -> Any:
         """Returns property at given pointer or default_value
         if property is not present.
 
         Args:
-            pointer (str): JSON pointer to a property as string.
+            pointer (str|Pointer): JSON pointer to a property as string.
             default_value (Any): value to fallback to.
             make_copy (bool, optional): Flag to return a copy of the mutable property.
             Defaults to False.
@@ -109,17 +95,16 @@ class JsonContent:
         value = self.content.get_or_default(pointer, default_value)
         return self.__copy_value(value) if make_copy else value
 
-    def update(self, pointer: str, value: Any) -> Self:
+    def update(self, pointer: str|Pointer, value: Any) -> Self:
         """Updates or add content to wrapped JSON structure.
         If end key is not exists - it will be added with new value,
         but non-existent keys in the middle cause KeyError exception.
         On update of a list one can use:
-        - element index in range of list (starts from 0)
-        - element's negative index in range of list (e.g. -1 means last element)
-        - append char "-" to add new element in the end
+        - element index in range of list (starts from 0) - '/a/b/0'
+        - append char "-" to add new element in the end - /a/b/-'
 
         Args:
-            pointer (str): JSON pointer to a property as string.
+            pointer (str|Pointer): JSON pointer to a property as string.
             value (Any): New value to set. May be a '!ref' or '!file' pointer which
             will be resolved before updating content.
 
@@ -154,12 +139,13 @@ class JsonContent:
         }
         """
 
-        if self.resolver is not None:
-            value = self.resolver.resolve(value, '<update>')
         self.content.update(pointer, value)
+        if self.composer is not None:
+            self.composer.compose_content(pointer)
+
         return self
 
-    def delete(self, *pointers: str) -> Self:
+    def delete(self, *pointers: str|Pointer) -> Self:
         """Deletes node at given pointer or several nodes, if list
         of pointers was given.
         No error will be raised if desired node doesn't exists.
@@ -179,14 +165,6 @@ class JsonContent:
 
         return self
 
-    def invalidate_cache(self) -> Self:
-        """Invalidate cache of underlaying ReferenceResolver.
-
-        Returns:
-            Self: instance of `JsonContent` class
-        """
-        self.resolver.invalidate_cache()
-
     def __str__(self):
         return str(self.content.get(ROOT_POINTER))
 
@@ -199,8 +177,8 @@ class JsonContent:
 
         return False
 
-    def __contains__(self, pointer: str):
-        if not isinstance(pointer, str):
+    def __contains__(self, pointer: str|Pointer):
+        if not isinstance(pointer, (str, Pointer)):
             return False
         return pointer in self.content
 
@@ -231,23 +209,20 @@ class JsonContentBuilder:
 
     """
 
-    __slots__ = ["__content", "__allow_reference_resolution",
-                 "__enable_reference_cache", "__wrapper_cls", "__resolver_cls"]
+    __slots__ = ["__content", "__use_composer",
+                 "__composer_handlers",]
 
     def __init__(self):
         self.__content = {}
-        self.__allow_reference_resolution = False
-        self.__enable_reference_cache = False
-        self.__wrapper_cls = JsonWrapper
-        self.__resolver_cls = ReferenceResolver
+        self.__use_composer = False
+        self.__composer_handlers = None
 
     def build(self) -> JsonContent:
         """Creates instance of `JsonContent` class with desired setup."""
-        return JsonContent(content=self.__content,
-                            allow_references=self.__allow_reference_resolution,
-                            enable_cache=self.__enable_reference_cache,
-                            wrapper=self.__wrapper_cls,
-                            resolver=self.__resolver_cls)
+        return JsonContent(
+            content=self.__content,
+            composer_setup=(self.__composer_handlers if self.__use_composer else None)
+        )
 
     def from_data(self, content: dict|list, make_copy: bool = False) -> Self:
         """Sets source of data for JsonContent object - variable or literal.
@@ -274,60 +249,23 @@ class JsonContentBuilder:
         self.__content = DataReader.read_json_from_file(filepath)
         return self
 
-    def set_reference_policy(self, allow: bool, cache: bool) -> Self:
-        """Sets policy of reference handling. If references allowed (`allow` = True),
-        values like '!ref /a/b' or '!file file.json' will be considered as references,
-        and will be resolved to actual values (e.g. !ref /a/b will be replaced
-        with value at pointer /a/b of content; for file - file content fill be read
-        and placed as value).
-
-        If `cache` is set to True: resolved references will be saved and if the same
-        reference occures once again - it will be instantly resolved to the very
-        same value (copy will be used).
-        Use it when your content refers to the same file or value.
+    def use_composer(self, use: bool = True, handlers: dict = None) -> Self:
+        """Enable compsoer for instance of JsonWrapper
 
         Args:
-            allow (bool): allow reference resolution.
-            cache (bool): allow caching of resolved references.
+            use (bool, optional): flag to enable/disable compsoer. Defaults to True.
+            handlers (dict, optional): configuration of handlers as dict, where keys - class names
+            of the handles and values - dict of kwargs for handler constructor.
+            Defaults to DEFAULT_COMPOSITION_HANDLERS_COLLECTION.
 
         Returns:
             Self: builder instance.
         """
-        self.__allow_reference_resolution = allow
-        self.__enable_reference_cache = cache
-        return self
+        self.__use_composer = use
 
-    def set_wrapper(self, wrapper: AbstractContentWrapper) -> Self:
-        """Sets preferred wrapper class.
-        Wrapper is a class inherited from `AbstractContentWrapper`
-        that's provide get, update and delete methods to access actual
-        content by JSON pointer.
+        if use:
+            if handlers is None:
+                handlers = DEFAULT_COMPOSITION_HANDLERS_COLLECTION
+            self.__composer_handlers = handlers
 
-        By default `json_content.json_content_wrapper.JsonContentWrapper`
-        will be used.
-
-        Args:
-            wrapper (AbstractContentWrapper): _description_
-
-        Returns:
-            Self: _description_
-        """
-        self.__wrapper_cls = wrapper
-        return self
-
-    def set_resolver(self, resolver: AbstractReferenceResolver) -> Self:
-        """Sets preferred reference resolver class.
-        Reference resolver is a class inherited from `AbstractReferenceResolver`
-        that's provide resolve method to resolve reference values in actual data.
-
-        By default `json_content.reference_resolver.ReferenceResolver`
-        will be used.
-
-        Args:
-            wrapper (AbstractContentWrapper): _description_
-
-        Returns:
-            Self: _description_
-        """
-        self.__resolver_cls = resolver
         return self

@@ -112,7 +112,7 @@ class ApiConfigurationReader:
         logging.info('Compiling Request catalog for "%s"', api_config.name)
 
         json_content = JsonContentBuilder().from_file(api_config.requests)\
-            .set_reference_policy(True, True).build()
+            .use_composer(True).build()
 
         json_content.delete(self.REQUEST_CATALOG_DEFINES_KEY)
         compiled_catalog = json_content.get()

@@ -9,6 +9,9 @@ import pytest
 from utils.json_content.json_wrapper import JsonWrapper
 from utils.json_content.pointer import Pointer
 
+KEY_ERROR_MSG_ON_FAIL_TO_FIND = 'Failed to find value by ".*" JSON Pointer in the document.*'
+INVALID_INDEX_MSG_ON_POINTER_FAIL = 'Invalid list index .*'
+
 # --- Pytest fixtures
 @pytest.fixture(name='wrapper')
 def get_wrapper() -> JsonWrapper:
@@ -60,7 +63,8 @@ class TestData:
             "foo~bar": False,
             "foo~/bar": {
                 "a/~b": "foo"
-            }
+            },
+            "xil": None
         }
 
     # Strings that can't be parsed to valid pointer
@@ -82,23 +86,19 @@ class TestData:
         '/missing-node/a',
         '/missing-node/0',
         '/d/0/missing-node/0/obj',
-        '/d/0/missing-node/0/obj/0'
+        '/d/0/missing-node/0/obj/0',
+        '/xil/a/b'
     )
     # Pointers to valid list node, but index is out of bounds
     OUT_OF_BOUNDS_INDEX_POINTERS = (
         '/a/b2/3',
-        '/a/b2/-4',
         '/c/5/0',
-        '/c/-5/0',
         '/c/5/enabled',
-        '/c/-5/enabled'
     )
     # Pointers that have out of bounds index of list node in the middle
     OUT_OF_BOUNDS_NODE_INDEX_POINTER = (
         '/c/2/0',
-        '/c/-3/0',
         '/d/0/arr/5/obj/0',
-        '/d/0/arr/-5/obj/0',
     )
     # Pointer to valid list node, but index is not integer
     INVALID_INDEX_POINTER = (
@@ -115,6 +115,7 @@ class TestData:
         '/a/b1/key-from-int',
         '/a/b3/key-from-string',
         '//key-from-bool',
+        '/xil/a',
 
         '/a/b1/1',
         '/a/b3/1',
@@ -151,7 +152,6 @@ class TestJsonWrapperGet:
         ('/a/b1', TestData.CONTENT['a']['b1']),
         ('/', TestData.CONTENT['']),
         ('/c/1/enabled', TestData.CONTENT['c'][1]['enabled']),
-        ('/c/-1/enabled', TestData.CONTENT['c'][-1]['enabled']),
         ('/  /   a', TestData.CONTENT['  ']['   a']),
         ('/foo~1bar', TestData.CONTENT['foo/bar']),
         ('/foo~0bar', TestData.CONTENT['foo~bar']),
@@ -165,10 +165,7 @@ class TestJsonWrapperGet:
     @pytest.mark.parametrize('pointer, expected', (
         ('/a/b2/0', TestData.CONTENT['a']['b2'][0]),
         ('/a/b2/2', TestData.CONTENT['a']['b2'][2]),
-        ('/a/b2/-2', TestData.CONTENT['a']['b2'][-2]),
-        ('/a/b2/-0', TestData.CONTENT['a']['b2'][-0]),
         ('/c/0/1', TestData.CONTENT['c'][0][1]),
-        ('/c/-2/1', TestData.CONTENT['c'][-2][1]),
     ))
     def test_get_by_index_pointer(
         self, wrapper: JsonWrapper, pointer: str, expected: Any):
@@ -179,35 +176,33 @@ class TestJsonWrapperGet:
         "/a",
         "/a/b1",
         "/a/b2/0",
-        "/a/b2/-1",
         "/c/1/enabled"
     ])
-    def test_has_on_existing_key(self,
+    def test_contains_on_existing_key(self,
         wrapper: JsonWrapper, pointer: str):
         """Has method returns True if pointer is valid"""
-        assert wrapper.has(pointer)
+        assert pointer in wrapper
+        assert Pointer.from_string(pointer) in wrapper
 
     @pytest.mark.parametrize('pointer', [
         "/x",
         "/a/b2/5",
-        "/a/b2/-5",
         "/a/b5/3",
         "/c/5/enabled",
         "/d/b2/0/3",
-        "/d/b2/-5/key",
         "/a/b1/key",
         "/a/b1/5"
     ])
-    def test_has_on_non_existing_key(self,
+    def test_contains_on_non_existing_key(self,
         wrapper: JsonWrapper, pointer: str):
         """Has method returns False if pointer is not exists"""
-        assert not wrapper.has(pointer)
+        assert pointer not in wrapper
+        assert Pointer.from_string(pointer) not in wrapper
 
     @pytest.mark.parametrize('pointer', [
         "/a",
         "/a/b1",
         "/a/b2/0",
-        "/a/b2/-1",
         "/c/1/enabled",
     ])
     def test_get_or_default_exists_returns_value(
@@ -218,11 +213,9 @@ class TestJsonWrapperGet:
     @pytest.mark.parametrize('pointer', [
         "/x",
         "/a/b2/5",
-        "/a/b2/-5",
         "/a/b5/3",
         "/c/5/enabled",
         "/d/b2/0/3",
-        "/d/b2/-5/key"
     ])
     def test_get_or_default_non_existent_returns_default(
         self, wrapper: JsonWrapper, pointer: str):
@@ -261,7 +254,6 @@ class TestJsonWrapperGet:
         "/a",
         "/a/b1",
         "/a/b2/0",
-        "/a/b2/-1",
         "/c/1/enabled"
     ])
     def test_check_exists_by_in(self, pointer: str):
@@ -273,12 +265,9 @@ class TestJsonWrapperGet:
         "/x",
         "//x",
         "/a/b2/5",
-        "/a/b2/-5",
         "/a/b5/3",
         "/c/5/enabled",
-        "/c/-5/0",
         "/d/b2/0/3",
-        "/d/b2/-5/key",
         "/a/b1/key",
         "/a/b1/5"
     ])
@@ -303,7 +292,7 @@ class TestJsonWrapperGet:
         """Get using pointer to valid dict node, but key is missing
         should fail with exception"""
         with pytest.raises(KeyError,
-                           match='Key ".*" is not present.*'):
+                           match=KEY_ERROR_MSG_ON_FAIL_TO_FIND):
             wrapper.get(ptr)
 
     @pytest.mark.parametrize('ptr', TestData.MISSING_NODE_POINTERS)
@@ -312,7 +301,7 @@ class TestJsonWrapperGet:
         """Get using pointer that have some missing node in the middle
         should fail with exception"""
         with pytest.raises(KeyError,
-                           match='Key ".*" is not present.*'):
+                           match=KEY_ERROR_MSG_ON_FAIL_TO_FIND):
             wrapper.get(ptr)
 
     @pytest.mark.parametrize('ptr', TestData.OUT_OF_BOUNDS_INDEX_POINTERS)
@@ -320,8 +309,8 @@ class TestJsonWrapperGet:
         self, wrapper: JsonWrapper, ptr: str):
         """Get using pointer to valid list node, but index is out of bounds
         should fail with exception"""
-        with pytest.raises(IndexError,
-                           match='Index ".*" is out of range for given node.*'):
+        with pytest.raises(KeyError,
+                           match=KEY_ERROR_MSG_ON_FAIL_TO_FIND):
             wrapper.get(ptr)
 
     @pytest.mark.parametrize('ptr', TestData.OUT_OF_BOUNDS_NODE_INDEX_POINTER)
@@ -329,8 +318,8 @@ class TestJsonWrapperGet:
         self, wrapper: JsonWrapper, ptr: str):
         """Get using pointer that have out of bounds index of list node in the middle
         should fail with exception"""
-        with pytest.raises(IndexError,
-                           match='Index ".*" is out of range for given node.*'):
+        with pytest.raises(KeyError,
+                           match=KEY_ERROR_MSG_ON_FAIL_TO_FIND):
             wrapper.get(ptr)
 
     @pytest.mark.parametrize('ptr', TestData.INVALID_INDEX_POINTER)
@@ -338,8 +327,8 @@ class TestJsonWrapperGet:
         self, wrapper: JsonWrapper, ptr: str):
         """Get using pointer to valid list node, but index is not integer
         should fail with exception"""
-        with pytest.raises(IndexError,
-                           match='Invalid list index .*'):
+        with pytest.raises(KeyError,
+                           match=KEY_ERROR_MSG_ON_FAIL_TO_FIND):
             wrapper.get(ptr)
 
     @pytest.mark.parametrize('ptr', TestData.INVALID_INDEX_OF_NODE_POINTER)
@@ -347,8 +336,8 @@ class TestJsonWrapperGet:
         self, wrapper: JsonWrapper, ptr: str):
         """Get using pointer that have not-integer index of list node in the middle
         should fail with exception"""
-        with pytest.raises(IndexError,
-                           match='Invalid list index .*'):
+        with pytest.raises(KeyError,
+                           match=KEY_ERROR_MSG_ON_FAIL_TO_FIND):
             wrapper.get(ptr)
 
     @pytest.mark.parametrize('ptr', TestData.INVALID_STORAGE_POINTERS)
@@ -357,7 +346,7 @@ class TestJsonWrapperGet:
         """Get using pointer that tries to pick key/index from not a dict/list
         should fail with exception"""
         with pytest.raises(KeyError,
-                           match='Path node ".*" at pointer ".*" is not a dict or list.*'):
+                           match=KEY_ERROR_MSG_ON_FAIL_TO_FIND):
             wrapper.get(ptr)
 
 class TestJsonWrapperUpdate:
@@ -368,7 +357,6 @@ class TestJsonWrapperUpdate:
         ('/a/b1', 1, "['a']['b1']"),
         ('/', 2, "['']"),
         ('/c/1/enabled', 3, "['c'][1]['enabled']"),
-        ('/c/-1/enabled', 4, "['c'][-1]['enabled']"),
         ('/  /   a', 5, "['  ']['   a']"),
         ('/foo~1bar', 6, "['foo/bar']"),
         ('/foo~0bar', 7, "['foo~bar']"),
@@ -382,14 +370,12 @@ class TestJsonWrapperUpdate:
         exec_modification(content, update_path, value)
         assert wrapper.update(ptr, value)
         assert wrapper.get('') == content
+        assert wrapper.get(ptr) == value
 
     @pytest.mark.parametrize('ptr, value, update_path', [
         ('/a/b2/0', 1, "['a']['b2'][0]"),
         ('/a/b2/2', 2, "['a']['b2'][2]"),
-        ('/a/b2/-2', 3, "['a']['b2'][-2]"),
-        ('/a/b2/-0', 4, "['a']['b2'][-0]"),
         ('/c/0/1', 5, "['c'][0][1]"),
-        ('/c/-2/1', 6, "['c'][-2][1]"),
     ])
     def test_update_by_index_pointer(
         self, wrapper: JsonWrapper, content: dict,
@@ -400,6 +386,7 @@ class TestJsonWrapperUpdate:
         exec_modification(content, update_path, value)
         assert wrapper.update(ptr, value)
         assert wrapper.get('') == content
+        assert wrapper.get(ptr) == value
 
     @pytest.mark.parametrize('ptr, value, update_path', [
         ('/x', 1, "['x']"),
@@ -415,17 +402,159 @@ class TestJsonWrapperUpdate:
         exec_modification(content, update_path, value)
         assert wrapper.update(ptr, value)
         assert wrapper.get('') == content
+        assert wrapper.get(ptr) == value
 
-    def test_update_append_index_pointer(
-        self, wrapper: JsonWrapper, content):
-        """Update by append will add new element of list."""
-        assert wrapper.update('/a/b2/-', 4)
-        content['a']['b2'].append(4)
+    def test_update_append_index_pointer(self):
+        """Update by append will add new element to list."""
+        content = {
+            'arr': [1,2],
+            'arr_obj': [
+                {'enabled': True, 'allow': False}
+            ]
+        }
+        wrapper = JsonWrapper(copy.deepcopy(content))
 
-        assert wrapper.update('/c/-', {'enabled': False, 'allow': False})
-        content['c'].append({'enabled': False, 'allow': False})
+        value = 4
+        assert wrapper.update('/arr/-', value)
+        content['arr'].append(value)
+
+        append_obj = {'enabled': False, 'allow': False}
+        assert wrapper.update('/arr_obj/-', append_obj)
+        content['arr_obj'].append(append_obj)
 
         assert wrapper.get('') == content
+        assert wrapper.get('/arr/2') == value
+        assert wrapper.get('/arr_obj/1') == append_obj
+
+    def test_update_with_container_recalculates_structure(self):
+        """Update by adding container will cause recalculation
+        of the nodes structure"""
+        content = {
+            'a': 100
+        }
+        expected_content = {
+            'a': [1,2,3],
+            'b': {
+                'id': 1,
+                'guid': 333
+            }
+        }
+        wrapper = JsonWrapper(content)
+        wrapper.update('/a', expected_content['a'])
+        wrapper.update('/b', expected_content['b'])
+
+        assert wrapper == expected_content
+        for ptr in [
+            '/a', '/a/0', '/a/1', '/a/2',
+            '/b', '/b/id', '/b/guid'
+        ]:
+            assert ptr in wrapper
+
+    def test_update_container_with_container_recalculates_structure(self):
+        """Replacement of one container with another one will cause
+        recalculation of nodes structure"""
+        content = {
+            "arr": [
+                [1,2,3],
+                [4,5,6]
+            ],
+            "obj": {
+                "id": 4,
+                "posts": [3,4,5],
+                "location": {
+                    "long": 34.43434,
+                    "lat": 35.333535
+                }
+            }
+        }
+        expected_content = {
+            "arr": [
+                [9, 12],
+                [0, 1]
+            ],
+            "obj":  {
+                "size": {
+                    "height": 100,
+                    "width": 300
+                },
+                "color": [11,22,33]
+            }
+        }
+        wrapper = JsonWrapper(content)
+        wrapper.update('/arr', expected_content['arr'])
+        wrapper.update('/obj', expected_content['obj'] )
+
+        # Check existing keys are present
+        for ptr in [
+            '/arr',
+            '/arr/0',
+            '/arr/0/0',
+            '/arr/0/1',
+            '/arr/1/0',
+            '/arr/1/1',
+
+            '/obj',
+            '/obj/size',
+            '/obj/size/height',
+            '/obj/size/width',
+            '/obj/color',
+            '/obj/color/0',
+            '/obj/color/1',
+            '/obj/color/2',
+        ]:
+            assert ptr in wrapper
+
+        # Check removed keys are not present
+        for ptr in [
+            '/arr/0/2',
+            '/arr/1/2',
+
+            '/obj/id',
+            '/obj/posts',
+            '/obj/posts/0',
+            '/obj/posts/1',
+            '/obj/posts/2',
+            '/obj/location',
+            '/obj/location/long',
+            '/obj/location/lat',
+        ]:
+            assert ptr not in wrapper
+
+        # Values updated
+        assert wrapper == expected_content
+
+    def test_update_container_with_plain_value_recalculate_structure(self):
+        """Update by replacing container with single plain value
+        recalculates structure"""
+        content = {
+            "a": [1, 2, 3],
+            "b": {
+                "x": 100,
+                "y": 200
+            }
+        }
+        expected_content = {
+            "a": 100,
+            "b": 200
+        }
+
+        wrapper = JsonWrapper(content)
+        wrapper.update("/a", expected_content['a'])
+        wrapper.update("/b", expected_content['b'])
+
+        assert wrapper == expected_content
+
+        # Nodes map recalculated
+        assert '/a' in wrapper
+        assert '/b' in wrapper
+        assert '/a/0' not in wrapper
+        assert '/a/1' not in wrapper
+        assert '/a/2' not in wrapper
+        assert '/b/x' not in wrapper
+        assert '/b/y' not in wrapper
+
+        # New values applied and mmay be accesed
+        assert wrapper == expected_content
 
     # --- Negative tests
     def test_update_root_should_fail(self):
@@ -437,7 +566,8 @@ class TestJsonWrapperUpdate:
     def test_update_using_append_char_in_middle_fails(self, wrapper):
         """Update attempt to modify content using '-' (append char)
         in the middle of the pointer"""
-        with pytest.raises(IndexError, match='Invalid list index ".*" at node.*'):
+        with pytest.raises(KeyError,
+                           match=KEY_ERROR_MSG_ON_FAIL_TO_FIND):
             wrapper.update('/c/-/-', 100)
 
     @pytest.mark.parametrize('ptr', TestData.INVALID_POINTERS)
@@ -449,13 +579,22 @@ class TestJsonWrapperUpdate:
                            match='Invalid pointer.*'):
             wrapper.update(ptr, 333)
 
-    @pytest.mark.parametrize('ptr', TestData.OUT_OF_BOUNDS_INDEX_POINTERS)
-    def test_update_by_oob_index_fails(
-        self, wrapper: JsonWrapper, ptr: str):
+    def test_update_by_oob_index_fails(self, wrapper: JsonWrapper):
         """Update using pointer to valid list node, but index is out of bounds
         should fail with exception"""
         with pytest.raises(IndexError,
-                           match='Index ".*" is out of range for given node.*'):
+                           match='Update failed due to invalid list index.*'):
+            wrapper.update('/a/b2/3', 333)
+
+    @pytest.mark.parametrize("ptr", [
+        '/c/5/0',
+        '/c/5/enabled'
+    ])
+    def test_update_by_oob_node_index_fails(self, wrapper: JsonWrapper, ptr: str):
+        """Update using pointer to valid list node, but index is out of bounds
+        should fail with exception"""
+        with pytest.raises(KeyError,
+                           match=KEY_ERROR_MSG_ON_FAIL_TO_FIND):
             wrapper.update(ptr, 333)
 
     @pytest.mark.parametrize('ptr', TestData.INVALID_INDEX_POINTER)
@@ -464,7 +603,7 @@ class TestJsonWrapperUpdate:
         """Update using pointer to valid list node, but index is not integer
         should fail with exception"""
         with pytest.raises(IndexError,
-                           match='Invalid list index .*'):
+                           match='Update failed due to invalid list index .*'):
             wrapper.update(ptr, 333)
 
     @pytest.mark.parametrize('ptr', TestData.INVALID_STORAGE_POINTERS)
@@ -472,40 +611,109 @@ class TestJsonWrapperUpdate:
         self, wrapper: JsonWrapper, ptr: str):
         """Update using pointer that tries to pick key/index from not a dict/list
         should fail with exception"""
-        with pytest.raises(KeyError,
-                           match='Path node ".*" at pointer ".*" is not a dict or list.*'):
+        with pytest.raises(ValueError,
+                           match='Not possible to add new key/element to path node.*'):
             wrapper.update(ptr, 333)
 
 class TestJsonWrapperDelete:
     """Tests JsonWrapper .delete() method using JSON dict object"""
     # --- Positive tests
-    @pytest.mark.parametrize("ptr, delete_path", [
-        ('/a/b1', "['a']['b1']"),
-        ('/c', "['c']")
+    @pytest.mark.parametrize("ptr, delete_path, ptr_expected_to_remove", [
+        ('/a/b1', "['a']['b1']", ['/a/b1']),
+        ('/c', "['c']", [
+            '/c',
+            '/c/0', '/c/0/0', '/c/0/1', '/c/0/2',
+            '/c/1', '/c1/enabled'
+        ])
     ])
     def test_delete_by_key(self, wrapper: JsonWrapper, content: dict,
-                                                ptr: str, delete_path: str):
+                                                ptr: str, delete_path: str,
+                                                ptr_expected_to_remove: list):
         """Delete by key should be successful and return True"""
         exec_deletion(content, delete_path)
         assert wrapper.delete(ptr), f'Deletion of content at pointer "{ptr}" was unsuccessfull!'
-        assert wrapper.get('') == content
 
-    @pytest.mark.parametrize("ptr, delete_path", [
-        ('/a/b2/-1', "['a']['b2'][-1]"),
-        ('/c/-2/-3', "['c'][-2][-3]"),
-        ('/d/0/arr/0/obj/2', "['d'][0]['arr'][0]['obj'][2]"),
+        for ptr in ptr_expected_to_remove:
+            assert ptr not in wrapper
+        assert wrapper == content
+
+    @pytest.mark.parametrize("ptr, delete_path, ptr_expected_to_remove", [
+        # Last item deleted and pointer no longer available
+        ('/a/b2/2', "['a']['b2'][2]", ['/a/b2/2']),
+        # 2nd item deleted and 3rd item moves to index 1 and pointer to index 2 should be removed
+        ('/c/0/1', "['c'][0][1]", ['/c/0/2']),
+        # Deletes subsection element in array
+        ('/d/0/arr/0', "['d'][0]['arr'][0]", [
+            '/d/0/arr/0',
+            '/d/0/arr/0/obj',
+            '/d/0/arr/0/obj/0',
+            '/d/0/arr/0/obj/1',
+            '/d/0/arr/0/obj/2'
+        ])
     ])
     def test_delete_by_index(self, wrapper: JsonWrapper, content: dict,
-                                                   ptr: str, delete_path: str):
+                            ptr: str, delete_path: str, ptr_expected_to_remove: list):
         """Delete by negative indicies should be successful and return True"""
         exec_deletion(content, delete_path)
         assert wrapper.delete(ptr), f'Deletion of content at pointer "{ptr}" was unsuccessfull!'
+
         assert wrapper.get('') == content
+        for ptr in ptr_expected_to_remove:
+            assert ptr not in wrapper
+
 
     def test_delete_all(self, wrapper: JsonWrapper):
         """Deletion of entire content should be successful and return True"""
         assert wrapper.delete('')
         assert wrapper.get('') == {}
+        assert not wrapper._node_map
+
+    def test_delete_container_recalculates_structure(self):
+        """Deletion of container should recalculate structure and remove
+        refs to deleted nodes"""
+        content = {
+            "arr": [1,2,3],
+            "obj": {
+                "id": 1,
+                "guid": 333
+            },
+            "c": 100
+        }
+        wrapper = JsonWrapper(content)
+        wrapper.delete('/arr')
+        wrapper.delete('/obj')
+
+        assert '/c' in wrapper
+        for ptr in [
+            '/arr', '/arr/0', '/arr/1', '/arr/2',
+            '/obj', '/obj/id', '/obj/guid'
+        ]:
+            assert ptr not in  wrapper
+
+    def test_delete_nested_container_recalculates_substructure(self):
+        """Deletion of container should recalculate structure and remove
+        refs to deleted nodes"""
+        content = {
+            "a": {
+                "arr": [1,2,3],
+                "obj": {
+                    "id": 1,
+                    "guid": 333
+                }
+            },
+            "c": 100
+        }
+        wrapper = JsonWrapper(content)
+        wrapper.delete('/a/arr')
+        wrapper.delete('/a/obj')
+
+        assert '/a' in wrapper
+        assert '/c' in wrapper
+        for ptr in [
+            '/a/arr', '/a/arr/0', '/a/arr/1', '/a/arr/2',
+            '/a/obj', '/a/obj/id', '/a/obj/guid'
+        ]:
+            assert ptr not in wrapper
 
     # --- Negative tests
     @pytest.mark.parametrize('ptr', (
@@ -528,7 +736,7 @@ class TestJsonWrapperDelete:
     def test_delete_invalid_pointer_fails(
         self, wrapper: JsonWrapper, ptr: str):
         """Delete by invalid pointer should fail with exception"""
-        with pytest.raises(ValueError, match='Invalid pointer.*'):
+        with pytest.raises(ValueError, match='Invalid pointer .*'):
             wrapper.delete(ptr)
 
 class TestJsonWrapperIterate:
@@ -568,10 +776,7 @@ class TestJsonWrapperArrayGet:
 
     @pytest.mark.parametrize('ptr, expected', (
         ('/0', ArrayTestData.CONTENT[0]),
-        ('/-0', ArrayTestData.CONTENT[-0]),
-        ('/-1', ArrayTestData.CONTENT[-1]),
         ('/1/posts/0', ArrayTestData.CONTENT[1]['posts'][0]),
-        ('/1/posts/-1', ArrayTestData.CONTENT[1]['posts'][-1]),
     ))
     def test_array_get_by_index(
         self, array_wrapper: JsonWrapper, ptr: str, expected: Any):
@@ -580,7 +785,6 @@ class TestJsonWrapperArrayGet:
 
     @pytest.mark.parametrize('ptr, expected', (
         ('/0/id', ArrayTestData.CONTENT[0]['id']),
-        ('/-1/enabled', ArrayTestData.CONTENT[-1]['enabled']),
     ))
     def test_array_get_by_key(
         self, array_wrapper: JsonWrapper, ptr: str, expected: Any):
@@ -592,7 +796,7 @@ class TestJsonWrapperArrayUpdate:
 
     @pytest.mark.parametrize('ptr, value, update_path', [
         ('/0/enabled', False, "[0]['enabled']"),
-        ('/-1/posts', [100, 200, 300], "[-1]['posts']"),
+        ('/1/posts', [100, 200, 300], "[1]['posts']"),
         ('/1/posts/0', 1337, "[1]['posts'][0]"),
     ])
     def test_array_update(self,
@@ -604,58 +808,121 @@ class TestJsonWrapperArrayUpdate:
         assert array_wrapper.update(ptr, value)
         assert array_wrapper.get('') == array_content
 
-    def test_array_update_add_key(self,
-                                               array_wrapper: JsonWrapper,
-                                               array_content: list):
+    def test_array_update_add_key(self, array_wrapper: JsonWrapper,
+                                        array_content: list):
         """Update is able to add new key to array's element"""
-        array_content[0]['posts'] = [1, 5, 76]
-        assert array_wrapper.update('/0/posts', [1, 5, 76])
-        assert array_wrapper.get('') == array_content
+        array_content[0]['posts'] = [1, 5]
+        assert array_wrapper.update('/0/posts', [1, 5])
 
-    def test_array_update_append(self,
-                                               array_wrapper: JsonWrapper,
-                                               array_content: list):
+        assert array_wrapper == array_content
+        for ptr in [
+            '/0/posts/2',
+            '/0/posts/3'
+        ]:
+            assert ptr not in array_wrapper
+
+    def test_array_update_append(self, array_wrapper: JsonWrapper, array_content: list):
         """Update is able to append to array (list)"""
-        array_content[-1]['posts'].append(100)
-        assert array_wrapper.update('/-1/posts/-', 100)
-        assert array_wrapper.get('') == array_content
+        array_content[1]['posts'].append(100)
+        assert array_wrapper.update('/1/posts/-', 100)
+
+        assert array_wrapper == array_content
+        assert array_wrapper.get('/1/posts/4') == array_content[1]['posts'][4]
+
+    def test_array_update_replace_container_with_plain_value(self, array_wrapper: JsonWrapper,
+                                                             array_content: list):
+        """Update by replacing container with plain value should recalculate node map"""
+        array_content[1] = 100
+        array_wrapper.update('/1', 100)
+
+        assert array_wrapper == array_content
+        for ptr in [
+            '/1/id', '/1/enabled', '/1/posts',
+            '/1/posts/0', '/1/posts/1', '/1/posts/2', '/1/posts/3'
+        ]:
+            assert ptr not in array_wrapper
 
 class TestJsonWrapperArrayDelete:
     """Tests .delete() method of JsonWrapper object based on JSON array"""
 
-    @pytest.mark.parametrize('ptr, delete_path', [
-        ('/0/enabled', "[0]['enabled']"),
-        ('/1/enabled', "[1]['enabled']"),
-        ('/-1/posts', "[-1]['posts']"),
+    @pytest.mark.parametrize('ptr, delete_path, ptr_expected_to_remove', [
+        ('/0/enabled', "[0]['enabled']", ['/0/enabled']),
+        ('/1/posts', "[1]['posts']", [
+            '/1/posts', '/1/posts/0', '/1/posts/1', '/1/posts/2', '/1/posts/3'
+        ]),
     ])
-    def test_array_delete_by_key(self,
-                                               array_wrapper: JsonWrapper,
-                                               array_content: list,
-                                               ptr: str, delete_path: str):
+    def test_array_delete_by_key(self, array_wrapper: JsonWrapper, array_content: list,
+                                ptr: str, delete_path: str, ptr_expected_to_remove: list):
         """Delete by valid key pointer should be valid and return True"""
         exec_deletion(array_content, delete_path)
         assert array_wrapper.delete(ptr)
         assert array_wrapper.get('') == array_content
+        for ptr in ptr_expected_to_remove:
+            assert ptr not in array_wrapper
 
-    @pytest.mark.parametrize('ptr, delete_path', [
-        ('/-1', "[-1]"),
-        ('/1/posts/1', "[1]['posts'][1]"),
-        ('/1/posts/-1', "[1]['posts'][-1]"),
+    @pytest.mark.parametrize('ptr, delete_path, ptr_expected_to_remove', [
+        # When deleting by index - only last index should be removed,
+        # as elements will be shifted to the beginning of the list
+        ('/1/posts/3', "[1]['posts'][3]", ['/1/posts/3']),
+        ('/1/posts/0', "[1]['posts'][0]", ['/1/posts/3']),
     ])
-    def test_array_delete_by_index(self,
-                                               array_wrapper: JsonWrapper,
-                                               array_content: list,
-                                               ptr: str, delete_path: str):
+    def test_array_delete_by_index(self, array_wrapper: JsonWrapper, array_content: list,
+                                    ptr: str, delete_path: str, ptr_expected_to_remove: list):
         """Delete by valid index pointer should be valid and return True"""
         exec_deletion(array_content, delete_path)
         assert array_wrapper.delete(ptr)
         assert array_wrapper.get('') == array_content
+        for ptr in ptr_expected_to_remove:
+            assert ptr not in array_wrapper
 
-    def test_array_delete_all(self,
-                                               array_wrapper: JsonWrapper):
+    def test_array_delete_all(self, array_wrapper: JsonWrapper):
         """Deletion of entire content should be successful and return True"""
         assert array_wrapper.delete('')
-        assert array_wrapper.get('') == []
+        assert array_wrapper == []
+        assert not array_wrapper._node_map
+
+    def test_array_delete_value_at_root(self):
+        """Delete elements of root array updates nodes successfully"""
+        content = [1,2,3]
+        wrapper = JsonWrapper(copy.deepcopy(content))
+
+        del content[0]
+        wrapper.delete('/0')
+
+        assert wrapper.get('') == content
+        assert '/0' in wrapper
+        assert '/1' in wrapper
+        assert '/2' not in wrapper
+
+    def test_array_delete_container_at_root_recalculates_map(self, array_wrapper: JsonWrapper,
+                                                    array_content: list):
+        """Deletion of array element will recalculate node map.
+        In this test elements will be shifted and new map should reflect that.
+        """
+        del array_content[2]
+        del array_content[0]
+
+        array_wrapper.delete('/2')
+        array_wrapper.delete('/0')
+
+        assert array_wrapper.get('') == array_content
+
+        # Now element 0 is {'id': 2, 'enabled': True, "posts": [1,2,3,55]}
+        for ptr in [
+            '/0', '/0/id', '/0/enabled', '/0/posts',
+            '/0/posts/0', '/0/posts/1', '/0/posts/2', '/0/posts/3'
+        ]:
+            assert ptr in array_wrapper
+
+        # Other elements pointers should be removed
+        for ptr in [
+            '/1', '/1/id', '/1/enabled', '/1/posts',
+                '/1/posts/0', '/1/posts/1', '/1/posts/2', '/1/posts/3'
+            '/2', '/2/id', '/2/enabled', '/2/posts'
+        ]:
+            assert ptr not in array_wrapper
+
+
 
 class TestJsonWrapperArrayIterate:
     """Tests JsonWrapper .__iter__() method using JSON wrapper based on JSON array"""

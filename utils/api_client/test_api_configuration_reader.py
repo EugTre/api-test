@@ -205,14 +205,14 @@ def test_api_config_reader_request_catalog_with_references(
         },
         "Get": {
             "request": {
-                "method": "!ref /$defs/ref_string",
+                "method": {"!ref": "/$defs/ref_string"},
                 "path": "count",
-                "headers": "!ref /$defs/ref_dict",
-                "cookies": "!ref /$defs/ref_dict",
+                "headers": {"!ref": "/$defs/ref_dict"},
+                "cookies": {"!ref": "/$defs/ref_dict"},
             },
             "response": {
                 "status_code": 200,
-                "headers": "!ref /$defs/ref_dict",
+                "headers": {"!ref": "/$defs/ref_dict"},
             }
         }
     }
@@ -243,13 +243,13 @@ def test_api_config_reader_request_catalog_with_file_references(
             "request": {
                 "method": "GET",
                 "path": "count",
-                "headers": f"!file {ref_file}",
-                "cookies": f"!file {ref_file}",
-                "json": f"!file {ref_file}"
+                "headers": {"!file": str(ref_file)},
+                "cookies": {"!file": str(ref_file)},
+                "json": {"!file": str(ref_file)}
             },
             "response": {
                 "status_code": 200,
-                "headers": f"!file {ref_file}"
+                "headers": {"!file": str(ref_file)},
             }
         }
     }

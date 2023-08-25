@@ -1,16 +1,12 @@
 """Pointer to JSON element"""
 from dataclasses import dataclass
-from abc import ABC, abstractmethod
-from typing import Self
 
 POINTER_PREFIX = "/"
-REF_PREFIX = "!ref "
-FILE_PREFIX = "!file "
 POINTER_SEP = "/"
 ROOT_POINTER = ''
 APPEND_CHAR = '-'
 
-POINTER_SYNTAX_HING_MSG = \
+POINTER_SYNTAX_HINT_MSG = \
     'JSON Pointer must start with "/" symbol ' \
     '(e.g. "/a/b/c") or be empty string "" to reference entire document.'
 
@@ -18,63 +14,14 @@ POINTER_CHILD_SYNTAX_HINT_MSG = \
     'Child sub-path must be non empty string symbol, integer, '\
     'or list/tuple of nodes names.'
 
-REFERENCE_POINTER_SYNTAX_HING_MSG = \
-        'JSON Reference Pointer must start with "!ref" prefix (e.g. "!ref /a/b/c")' \
-        'and should not refer to entire document.'
-
-FILE_POINTER_SYNTAX_HING_MSG = \
-        'File Pointer must start with "!file" prefix (e.g. "!file path/to/file").'
 
 @dataclass(frozen=True, slots=True)
-class AbstractPointer(ABC):
-    """Basic class for pointers"""
-    path: tuple|None
-    raw: str
-
-    @staticmethod
-    @abstractmethod
-    def match(pointer_str: str) -> bool:
-        """Checks that given string matches basic expected pointer syntax."""
-
-    @staticmethod
-    @abstractmethod
-    def from_string(pointer_str: str) -> 'AbstractPointer':
-        """Parses given string pointer and return instance of Pointer class."""
-
-    @staticmethod
-    def decode_escaped_chars(value: str) -> str:
-        """Decodes escaped characts:
-        ~0 - to ~
-        ~1 - to /
-
-        Args:
-            value (str): string to decode.
-
-        Returns:
-            str: decoded string
-        """
-        return value.replace('~1', '/').replace('~0', '~')
-
-    @staticmethod
-    def encode_escaped_chars(value: str) -> str:
-        """Decodes escaped characts:
-        ~0 - to ~
-        ~1 - to /
-
-        Args:
-            value (str): string to decode.
-
-        Returns:
-            str: decoded string
-        """
-        return value.replace('~', '~0').replace('/', '~1')
-
-
-@dataclass(frozen=True, slots=True)
-class Pointer(AbstractPointer):
+class Pointer:
     """Class to wrap JSON Pointer (RFC6901).
     Provides parsing and validation of pointers.
     """
+    path: tuple|None
+    raw: str
     rfc_pointer: str
 
     def parent(self) -> "Pointer":
@@ -141,8 +88,31 @@ class Pointer(AbstractPointer):
         # Otherwise check for path chain to be the same
         return pointer.path == self.path[:len(pointer.path)]
 
+    def is_parent_of(self, pointer: 'Pointer') -> bool:
+        """Returns True if current pointer is a parent of
+        given pointer.
+
+        Args:
+            pointer (Self): possible child pointer.
+
+        Returns:
+            bool: True if given pointer is a child of the current,
+            False otherwise.
+        """
+        if pointer.path is None or self.path == pointer.path:
+            # If given pointer is root pointer
+            # or same pointer - not a parent
+            return False
+
+        # If current pointer root - every other pointer is child of it
+        if self.path is None:
+            return True
+
+        # Otherwise check for path chain to be the same
+        return self.path == pointer.path[:len(self.path)]
+
     def __eq__(self, other):
-        return isinstance(other, (Pointer, ReferencePointer)) and self.path == other.path
+        return isinstance(other, Pointer) and self.path == other.path
 
     def __str__(self):
         return self.rfc_pointer
@@ -179,7 +149,7 @@ class Pointer(AbstractPointer):
         """
         if not Pointer.match(pointer_str):
             raise ValueError(f'Invalid JSON Pointer syntax "{pointer_str}". '
-                             f'{POINTER_SYNTAX_HING_MSG}')
+                             f'{POINTER_SYNTAX_HINT_MSG}')
 
         if pointer_str == '':
             return Pointer(None, pointer_str, pointer_str)
@@ -212,103 +182,30 @@ class Pointer(AbstractPointer):
         rfc_pointer = f'{POINTER_SEP}{escaped_path}'
         return Pointer(pointer_path, rfc_pointer, rfc_pointer)
 
-
-@dataclass(frozen=True, slots=True)
-class ReferencePointer(AbstractPointer):
-    """Extends JSON Pointer syntax with '!ref ' token,
-    marking pointer a reference pointer to some node
-    of the document.
-    """
-    rfc_pointer: str
-
     @staticmethod
-    def match(pointer_str: str) -> bool:
-        """Checks that given string matches expected pointer syntax: "!ref /a/b/c".
-        May be used to check string before pointer creation, to avoid
-        raising unwanted exception.
+    def decode_escaped_chars(value: str) -> str:
+        """Decodes escaped characts:
+        ~0 - to ~
+        ~1 - to /
 
         Args:
-            value (str): String to check.
+            value (str): string to decode.
 
         Returns:
-            bool: True if string matches pointer syntax, otherwise Fasle
+            str: decoded string
         """
-        return isinstance(pointer_str, str) and pointer_str.startswith(REF_PREFIX)
+        return value.replace('~1', '/').replace('~0', '~')
 
     @staticmethod
-    def from_string(pointer_str: str) -> Self:
-        """Parses given string pointer and return instance of Pointer class.
-        Raises errors if pointer has invalid structure.
-
-        Raises:
-            ValueError: when None or not a string was passed, or pointer
-            is not an Reference Pointer.
-        """
-        err_msg = f'Invalid JSON Reference Pointer syntax "{pointer_str}. '\
-                    f'{REFERENCE_POINTER_SYNTAX_HING_MSG}'
-
-        if not ReferencePointer.match(pointer_str):
-            raise ValueError(err_msg)
-
-        pointer_path = pointer_str[len(REF_PREFIX):]
-        if not pointer_path:
-            raise ValueError(f'Invalid JSON Reference Pointer syntax "{pointer_str}". '
-                             'Refering to entire document is not allowed.')
-
-        rfc_pointer = pointer_str[len(REF_PREFIX):].lstrip()
-        if not rfc_pointer.startswith(POINTER_PREFIX):
-            raise ValueError(err_msg)
-
-        return ReferencePointer(
-            path=tuple(
-                Pointer.decode_escaped_chars(v)
-                for v in rfc_pointer[1:].split(POINTER_SEP)
-            ),
-            raw=pointer_str,
-            rfc_pointer=rfc_pointer)
-
-
-@dataclass(frozen=True, slots=True)
-class FilePointer(AbstractPointer):
-    """Extends AbstractPointer syntax with '!file ' token,
-    marking pointer to a file.
-    """
-
-    def __eq___(self, other):
-        return isinstance(other, FilePointer) and self.path == other.path
-
-    def __str__(self):
-        return f'<file>{self.path}'
-
-    @staticmethod
-    def match(pointer_str: str) -> bool:
-        """Checks that given string matches expected pointer syntax: "!file path/to/file".
-        May be used to check string before pointer creation, to avoid
-        raising unwanted exception.
+    def encode_escaped_chars(value: str) -> str:
+        """Decodes escaped characts:
+        ~0 - to ~
+        ~1 - to /
 
         Args:
-            value (str): String to check.
+            value (str): string to decode.
 
         Returns:
-            bool: True if string matches pointer syntax, otherwise Fasle
+            str: decoded string
         """
-        return isinstance(pointer_str, str) and pointer_str.startswith(FILE_PREFIX)
-
-    @staticmethod
-    def from_string(pointer_str: str) -> Self:
-        """Parses given string pointer and return instance of Pointer class.
-        Raises errors if pointer has invalid structure.
-
-        Raises:
-            ValueError: when None or not a string was passed, or pointer
-            is not an File Pointer
-        """
-        if not FilePointer.match(pointer_str):
-            raise ValueError(f'Invalid File Pointer syntax "{pointer_str}. '
-                             f'{FILE_POINTER_SYNTAX_HING_MSG}')
-
-        pointer_path = pointer_str[len(FILE_PREFIX):].lstrip()
-        if not pointer_path:
-            raise ValueError('Empty File Pointer is not allowed!')
-
-        return FilePointer(path=pointer_path, raw=pointer_str)
+        return value.replace('~', '~0').replace('/', '~1')
