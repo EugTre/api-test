@@ -6,7 +6,7 @@ from abc import ABC
 
 from utils.basic_manager import BasicManager
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, eq=False)
 class AbstractMatcher(ABC):
     """Abstract Matcher to any value"""
     def __eq__(self, other):
@@ -15,7 +15,7 @@ class AbstractMatcher(ABC):
     def __repr__(self):
         return ''
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, eq=False)
 class Anything(AbstractMatcher):
     """Matches to any value"""
     def __eq__(self, other):
@@ -25,8 +25,8 @@ class Anything(AbstractMatcher):
         return '<Any>'
 
 
-@dataclass(slots=True, frozen=True)
-class AnyText(Anything):
+@dataclass(slots=True, frozen=True, eq=False)
+class AnyText(AbstractMatcher):
     """Matches to any text (string), including empty string"""
     def __eq__(self, other):
         return isinstance(other, (str, Anything, AnyText))
@@ -34,7 +34,7 @@ class AnyText(Anything):
     def __repr__(self):
         return '<Any Text>'
 
-@dataclass(slots=True, frozen=True)
+@dataclass(slots=True, frozen=True, eq=False)
 class AnyTextLike(AnyText):
     """Matches to any text (string) that matches to given regex"""
     pattern: str
@@ -48,9 +48,10 @@ class AnyTextLike(AnyText):
     def __repr__(self):
         return f'<Any Text Like {self.pattern}>'
 
-@dataclass(slots=True, frozen=True)
+@dataclass(slots=True, frozen=True, eq=False)
 class AnyTextWith(AnyText):
-    """Matches to any text (string) that contains given substring"""
+    """Object that matches to any text (string) that
+    contains given substring"""
     substring: str
 
     def __eq__(self, other):
@@ -63,16 +64,19 @@ class AnyTextWith(AnyText):
         return f'<Any Text With "{self.substring}">'
 
 
-@dataclass(slots=True, frozen=True)
-class AnyNumber(Anything):
+@dataclass(slots=True, frozen=True, eq=False)
+class AnyNumber(AbstractMatcher):
+    """Object that matches to any number (int or float)"""
     def __eq__(self, other):
         return isinstance(other, (int, float))
 
     def __repr__(self):
         return '<Any Number>'
 
-@dataclass(slots=True, frozen=True)
+@dataclass(slots=True, frozen=True, eq=False)
 class AnyNumberGreaterThan(AnyNumber):
+    """Object that matches to any number (int or float) that
+    is greater than given 'number'"""
     number: int|float
 
     def __eq__(self, other):
@@ -83,7 +87,7 @@ class AnyNumberGreaterThan(AnyNumber):
         elif isinstance(other, AnyNumberLessThan):
             # >6 vs <10 -- range will always be pretty narrow in scale of +-inf, so not equal
             result = False
-        elif isinstance(other, AnyNumber) or type(other) is Anything:
+        elif isinstance(other, (AnyNumber, Anything)):
             result = True
         elif not isinstance(other, (int, float)):
             result = False
@@ -102,8 +106,10 @@ class AnyNumberGreaterThan(AnyNumber):
     def __repr__(self):
         return f'<Any Number Greater Than ({self.number})>'
 
-@dataclass(slots=True, frozen=True)
+@dataclass(slots=True, frozen=True, eq=False)
 class AnyNumberLessThan(AnyNumber):
+    """Object that matches to any number (int or float) that
+    is less than given 'number'"""
     number: int|float
 
     def __eq__(self, other):
@@ -117,7 +123,7 @@ class AnyNumberLessThan(AnyNumber):
         elif isinstance(other, AnyNumberLessThan):
             # >6 vs <10 -- range will always be pretty narrow in scale of +-inf, so not equal
             result = False
-        elif isinstance(other, AnyNumber) or type(other) is Anything:
+        elif isinstance(other, (AnyNumber, Anything)):
             result = True
         elif not isinstance(other, (int, float)):
             result = False
@@ -137,8 +143,9 @@ class AnyNumberLessThan(AnyNumber):
         return f'<Any Number Less Than ({self.number})>'
 
 
-@dataclass(slots=True, frozen=True)
-class AnyBool(Anything):
+@dataclass(slots=True, frozen=True, eq=False)
+class AnyBool(AbstractMatcher):
+    """Object that matches to any bool"""
     def __eq__(self, other):
         return isinstance(other, bool)
 
@@ -146,16 +153,19 @@ class AnyBool(Anything):
         return '<Any Bool>'
 
 
-@dataclass(slots=True, frozen=True)
-class AnyList(Anything):
+@dataclass(slots=True, frozen=True, eq=False)
+class AnyList(AbstractMatcher):
+    """Object that matches to any list"""
     def __eq__(self, other):
         return isinstance(other, (list, Anything, AnyList))
 
     def __repr__(self):
         return '<Any List>'
 
-@dataclass(slots=True, frozen=True)
+@dataclass(slots=True, frozen=True, eq=False)
 class AnyListOf(AnyList):
+    """Object that matches to any list of given size and/or
+    having elements of given type"""
     size: int = None
     item_type: str|int|float|bool|dict|list = None
 
@@ -163,7 +173,8 @@ class AnyListOf(AnyList):
     SIZE_COMPARE_OP = '=='
 
     def __post_init__(self):
-        object.__setattr__(self, 'item_type', type(self.item_type))
+        if self.item_type is not None:
+            object.__setattr__(self, 'item_type', type(self.item_type))
 
     def __eq__(self, other) -> bool:
         result = False
@@ -185,9 +196,7 @@ class AnyListOf(AnyList):
                       and
                       any((self.item_type is None or other.item_type is None,
                            self.item_type == other.item_type)))
-        elif isinstance(other, AnyList):
-            result = True
-        elif type(other) is Anything:
+        elif isinstance(other, (AnyList, Anything)):
             result = True
         elif not isinstance(other, list):
             result = False
@@ -208,11 +217,14 @@ class AnyListOf(AnyList):
 
     def __repr__(self):
         size_desc = "" if self.size is None else f' {self.size} item(s)'
-        type_desc = "" if self.item_type is None else f' of type "{self.item_type.__name__}"'
+        type_desc = "" if self.item_type is None else f' type "{self.item_type.__name__}"'
+        if size_desc and type_desc:
+            type_desc = f' of {type_desc}'
         return self.REPR_MSG.format(size_desc=size_desc, type_desc=type_desc)
 
     @staticmethod
     def assert_repr_compare(left, right):
+        """Method to print detailed comparison fail info"""
         output = ["Comparing List matcher:", f" {left} != {right}"]
 
         if right.size is not None:
@@ -246,26 +258,37 @@ class AnyListOf(AnyList):
 
         return output
 
-@dataclass(slots=True, frozen=True)
+@dataclass(slots=True, frozen=True, eq=False)
 class AnyListLongerThan(AnyListOf):
+    """Object that matches to any list with size
+    greater than given 'size' and, optionally,
+    having elements of given type"""
+    size: int
     REPR_MSG = '<Any List Longer Than{size_desc}{type_desc}>'
     SIZE_COMPARE_OP = '>'
 
-@dataclass(slots=True, frozen=True)
+@dataclass(slots=True, frozen=True, eq=False)
 class AnyListShorterThan(AnyListOf):
+    """Object that matches to any list with size
+    less than given 'size' and, optionally,
+    having elements of given type"""
+    size: int
     REPR_MSG = '<Any List Shorter Than{size_desc}{type_desc}>'
     SIZE_COMPARE_OP = '<'
 
-@dataclass(slots=True, frozen=True)
-class AnyDict(Anything):
+
+@dataclass(slots=True, frozen=True, eq=False)
+class AnyDict(AbstractMatcher):
+    """Object that matches to any dict"""
     def __eq__(self, other):
         return isinstance(other, dict)
 
     def __repr__(self):
         return '<Any Dict>'
 
-@dataclass(slots=True, frozen=True)
+@dataclass(slots=True, frozen=True, eq=False)
 class AnyNonEmptyDict(AnyDict):
+    """Object that matches to any non-empty dict"""
     def __eq__(self, other) -> bool:
         return isinstance(other, dict) and other
 

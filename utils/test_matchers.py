@@ -7,6 +7,7 @@ import pytest
 import utils.matchers as matcher
 
 class TestMatcherManager:
+    """Tests for matcher manager"""
     def test_manager_register(self):
         manager = matcher.MatchersManager()
         manager.add(matcher.Anything)
@@ -173,6 +174,7 @@ class TestMatcherManager:
 
 
 class TestMatchers:
+    """Positive tests for matchers"""
     @pytest.mark.parametrize("match_value",[
         None,
         "text",
@@ -185,7 +187,7 @@ class TestMatchers:
         {"a": 10},
         matcher.Anything()
     ])
-    def test_any(self, match_value):
+    def test_anything(self, match_value):
         matcher_instance = matcher.Anything()
         assert matcher_instance == match_value
         assert match_value == matcher_instance
@@ -210,21 +212,244 @@ class TestMatchers:
         assert matcher_instance == match_value
         assert match_value == matcher_instance
 
-    # TODO:
-    # AnyTextWith(contains)
-    # AnyNumber
-    # AnyNumberGreaterThan(size)
-    # AnyNumberLessThan(size)
-    # AnyBool
-    # AnyList
-    # AnyListOf(size, type)
-    # AnyListLongerThan(size, type)
-    # AnyListShorterThan(size, type)
-    # AnyDict
-    # AnyNonEmptyDict
+    @pytest.mark.parametrize("match_value, matcher_pattern",[
+        ("", ""),
+        ("text info", "info"),
+        ("text info", "text"),
+        ("text info", " "),
+        ("text", "x"),
+        ('24', '2')
+    ])
+    def test_any_text_with(self, match_value, matcher_pattern):
+        matcher_instance = matcher.AnyTextWith(matcher_pattern)
+        assert matcher_instance == match_value
+        assert match_value == matcher_instance
+
+    @pytest.mark.parametrize("match_value",[
+        0,
+        12,
+        -12,
+        12.345,
+        -12.345
+    ])
+    def test_any_number(self, match_value):
+        matcher_instance = matcher.AnyNumber()
+        assert matcher_instance == match_value
+        assert match_value == matcher_instance
+
+    @pytest.mark.parametrize("match_value", [12, 12.22])
+    @pytest.mark.parametrize("match_param", [5, 5.22])
+    def test_any_number_greater_than(self, match_value, match_param):
+        matcher_instance = matcher.AnyNumberGreaterThan(match_param)
+        assert matcher_instance == match_value
+        assert match_value == matcher_instance
+
+    @pytest.mark.parametrize("match_value", [5, 5.11])
+    @pytest.mark.parametrize("match_param", [12, 12.22])
+    def test_any_number_less_than(self, match_value, match_param):
+        matcher_instance = matcher.AnyNumberLessThan(match_param)
+        assert matcher_instance == match_value
+        assert match_value == matcher_instance
+
+    @pytest.mark.parametrize("match_value",[
+        True,
+        False
+    ])
+    def test_any_bool(self, match_value):
+        matcher_instance = matcher.AnyBool()
+        assert matcher_instance == match_value
+        assert match_value == matcher_instance
+
+    @pytest.mark.parametrize("match_value",[
+        [],
+        [1,2,3],
+        ['a', 'b'],
+        [ [], [] ]
+    ])
+    def test_any_list(self, match_value):
+        matcher_instance = matcher.AnyList()
+        assert matcher_instance == match_value
+        assert match_value == matcher_instance
+
+    # --- AnyListOf
+    @pytest.mark.parametrize("match_value, match_param",[
+        (
+            [],
+            {'size': 0}
+        ),
+        (
+            [1,2,3],
+            {'size': 3}
+        ),
+        (
+            [ [], [] ],
+            {'size': 2}
+        )
+    ])
+    def test_any_list_of_size(self, match_value, match_param):
+        matcher_instance = matcher.AnyListOf(**match_param)
+        assert matcher_instance == match_value
+        assert match_value == matcher_instance
+
+    @pytest.mark.parametrize("match_value, match_param",[
+        (
+            [],
+            {'item_type': None}
+        ),
+        (
+            [1,2,3],
+            {'item_type': 1}
+        ),
+        (
+            [ [], [] ],
+            {'item_type': []}
+        ),
+        (
+            [ 'a', 'b' ],
+            {'item_type': 'str'}
+        )
+    ])
+    def test_any_list_of_type(self, match_value, match_param):
+        matcher_instance = matcher.AnyListOf(**match_param)
+        assert matcher_instance == match_value
+        assert match_value == matcher_instance
+
+    @pytest.mark.parametrize("match_value, match_param",[
+        (
+            [],
+            {'size': 0, 'item_type': None}
+        ),
+        (
+            [1,2,3],
+            {'size': 3, 'item_type': 1}
+        ),
+        (
+            [ [], [] ],
+            {'size': 2, 'item_type': []}
+        ),
+        (
+            [ 'a', 'b' ],
+            {'size': 2, 'item_type': 'str'}
+        )
+    ])
+    def test_any_list_of_size_and_type(self, match_value, match_param):
+        matcher_instance = matcher.AnyListOf(**match_param)
+        assert matcher_instance == match_value
+        assert match_value == matcher_instance
+
+    # --- AnyListLongerThan(size, type)
+    @pytest.mark.parametrize("match_value, match_param",[
+        (
+            [],
+            {'size': -1}
+        ),
+        (
+            [1,2,3],
+            {'size': 2}
+        ),
+        (
+            [ [], [] ],
+            {'size': 1}
+        ),
+        (
+            [ 'a', 'b' ],
+            {'size': 0}
+        )
+    ])
+    def test_any_list_longer_than(self, match_value, match_param):
+        matcher_instance = matcher.AnyListLongerThan(**match_param)
+        assert matcher_instance == match_value
+        assert match_value == matcher_instance
+
+    @pytest.mark.parametrize("match_value, match_param",[
+        (
+            [],
+            {'size': -1, 'item_type': None}
+        ),
+        (
+            [1,2,3],
+            {'size': 2, 'item_type': 1}
+        ),
+        (
+            [ [], [] ],
+            {'size': 1, 'item_type': []}
+        ),
+        (
+            [ 'a', 'b' ],
+            {'size': 1, 'item_type': 'str'}
+        )
+    ])
+    def test_any_list_longer_than_size_and_type(self, match_value, match_param):
+        matcher_instance = matcher.AnyListLongerThan(**match_param)
+        assert matcher_instance == match_value
+        assert match_value == matcher_instance
+
+    # --- AnyListShorterThan(size, type)
+    @pytest.mark.parametrize("match_value, match_param",[
+        (
+            [],
+            {'size': 1}
+        ),
+        (
+            [1,2,3],
+            {'size': 4}
+        ),
+        (
+            [ [], [] ],
+            {'size': 3}
+        ),
+        (
+            [ 'a', 'b' ],
+            {'size': 333}
+        )
+    ])
+    def test_any_list_shorter_than(self, match_value, match_param):
+        matcher_instance = matcher.AnyListShorterThan(**match_param)
+        assert matcher_instance == match_value
+        assert match_value == matcher_instance
+
+    @pytest.mark.parametrize("match_value, match_param",[
+        (
+            [],
+            {'size': 1, 'item_type': None}
+        ),
+        (
+            [1,2,3],
+            {'size': 4, 'item_type': 1}
+        ),
+        (
+            [ [], [] ],
+            {'size': 3, 'item_type': []}
+        ),
+        (
+            [ 'a', 'b' ],
+            {'size': 143, 'item_type': 'str'}
+        )
+    ])
+    def test_any_list_shorter_than_size_and_type(self, match_value, match_param):
+        matcher_instance = matcher.AnyListShorterThan(**match_param)
+        assert matcher_instance == match_value
+        assert match_value == matcher_instance
+
+    # --- AnyDict
+    @pytest.mark.parametrize("match_value",[
+        {},
+        {"a": 1, "b": 2}
+    ])
+    def test_any_dict(self, match_value):
+        matcher_instance = matcher.AnyDict()
+        assert matcher_instance == match_value
+        assert match_value == matcher_instance
+
+    def test_any_non_empty_dict(self):
+        matcher_instance = matcher.AnyNonEmptyDict()
+        assert matcher_instance == {'a': 1}
+        assert {'a': 1} == matcher_instance
 
 
-    # --- Negative tests
+class TestMatchersNegative:
+    """Negative tests for matchers"""
+
     @pytest.mark.parametrize("match_value",[
         12, 12.33, [], {}, None
     ])
@@ -237,9 +462,223 @@ class TestMatchers:
         ("", ".*e.*"),
         ("call text", "^te.*"),
         ("text info", ".*xt$"),
-        ('text', '[0-9]+')
+        ('text', '[0-9]+'),
+        (1234, '[0-9]+'),
+        ([1,2,3], '[0-9]+')
     ])
     def test_any_text_like_not_match(self, match_value, matcher_pattern):
         matcher_instance = matcher.AnyTextLike(matcher_pattern)
         assert matcher_instance != match_value
         assert match_value != matcher_instance
+
+    @pytest.mark.parametrize("match_value, matcher_pattern",[
+        ("", "word"),
+        ("text info", "word"),
+        ('text', 'w'),
+        (1234, '4'),
+        ([1,2,3], '4')
+    ])
+    def test_any_text_with_not_match(self, match_value, matcher_pattern):
+        matcher_instance = matcher.AnyTextWith(matcher_pattern)
+        assert matcher_instance != match_value
+        assert match_value != matcher_instance
+
+    # Number negative tests
+    @pytest.mark.parametrize('match_value', [
+        "str", None, [], {}
+    ])
+    def test_any_number_fails(self, match_value):
+        matcher_instance = matcher.AnyNumber()
+        assert matcher_instance != match_value
+        assert match_value != matcher_instance
+
+    @pytest.mark.parametrize("match_value, match_param", [
+        (12, 50),
+        (12, 12)
+    ])
+    def test_any_number_greater_than_fails(self, match_value, match_param):
+        matcher_instance = matcher.AnyNumberGreaterThan(match_param)
+        assert matcher_instance != match_value
+        assert match_value != matcher_instance
+
+    @pytest.mark.parametrize("match_value, match_param", [
+        (50, 12),
+        (12, 12),
+        ('str', 12),
+        ([1,2], 12),
+    ])
+    def test_any_number_less_than_fails(self, match_value, match_param):
+        matcher_instance = matcher.AnyNumberLessThan(match_param)
+        assert matcher_instance != match_value
+        assert match_value != matcher_instance
+
+    @pytest.mark.parametrize("match_value", [
+        0, 1, 123, 'str', '', None, [], {}, [1,2], {'a': 1}
+    ])
+    def test_any_bool_fails(self, match_value):
+        matcher_instance = matcher.AnyBool()
+        assert matcher_instance != match_value
+        assert match_value != matcher_instance
+
+    # List negative tests
+    @pytest.mark.parametrize("match_value",[
+        123, 'str', None, {}, False
+    ])
+    def test_any_list_fails(self, match_value):
+        matcher_instance = matcher.AnyList()
+        assert matcher_instance != match_value
+        assert match_value != matcher_instance
+
+    # --- AnyListOf
+    @pytest.mark.parametrize("match_value, match_param",[
+        (
+            [],
+            {'size': 3}
+        ),
+        (
+            [1,2,3],
+            {'size': 2}
+        ),
+        (
+            [ [], [] ],
+            {'size': 1}
+        )
+    ])
+    def test_any_list_of_size_fails(self, match_value, match_param):
+        matcher_instance = matcher.AnyListOf(**match_param)
+        assert matcher_instance != match_value
+        assert match_value != matcher_instance
+
+    @pytest.mark.parametrize("match_value, match_param",[
+        (
+            [1,2,3],
+            {'item_type': 'str'}
+        ),
+        (
+            [ [], [] ],
+            {'item_type': False}
+        ),
+        (
+            [ 'a', 'b' ],
+            {'item_type': []}
+        )
+    ])
+    def test_any_list_of_type_fails(self, match_value, match_param):
+        matcher_instance = matcher.AnyListOf(**match_param)
+        assert matcher_instance != match_value
+        assert match_value != matcher_instance
+
+    @pytest.mark.parametrize("match_value, match_param",[
+        (
+            # Type mismatch
+            [1,2,3],
+            {'size': 3, 'item_type': 'str'}
+        ),
+        (
+            # Size mismatch
+            [ [], [] ],
+            {'size': 5, 'item_type': []}
+        ),
+        (
+            # Not matching size and type
+            [ 'a', 'b' ],
+            {'size': 55, 'item_type': 1}
+        )
+    ])
+    def test_any_list_of_size_and_type_fails(self, match_value, match_param):
+        matcher_instance = matcher.AnyListOf(**match_param)
+        assert matcher_instance != match_value
+        assert match_value != matcher_instance
+
+    # --- AnyListLongerThan(size, type)
+    @pytest.mark.parametrize("match_value, match_param",[
+        (
+            [1,2,3],
+            {'size': 3}
+        ),
+        # Value is not a list:
+        (123, {'size': 1}),
+        ('str', {'size': 1}),
+        ({}, {'size': 1}),
+        (False, {'size': 1}),
+    ])
+    def test_any_list_longer_than_fails(self, match_value, match_param):
+        matcher_instance = matcher.AnyListLongerThan(**match_param)
+        assert matcher_instance != match_value
+        assert match_value != matcher_instance
+
+    @pytest.mark.parametrize("match_value, match_param",[
+        (
+            # Size mismatch
+            [1,2,3],
+            {'size': 22, 'item_type': 1}
+        ),
+        (
+            # Type mismatch
+            [ [], [] ],
+            {'size': 1, 'item_type': 1}
+        ),
+        (
+            # Size and type mismatch
+            [ 'a', 'b' ],
+            {'size': 10, 'item_type': False}
+        )
+    ])
+    def test_any_list_longer_than_size_and_type_fails(self, match_value, match_param):
+        matcher_instance = matcher.AnyListLongerThan(**match_param)
+        assert matcher_instance != match_value
+        assert match_value != matcher_instance
+
+    # --- AnyListShorterThan(size, type)
+    @pytest.mark.parametrize("match_value, match_param",[
+        (
+            [1,2,3],
+            {'size': 1}
+        ),
+        # Value is not a list:
+        (123, {'size': 1}),
+        ('str', {'size': 1}),
+        ({}, {'size': 1}),
+        (False, {'size': 1}),
+    ])
+    def test_any_list_shorter_than_fails(self, match_value, match_param):
+        matcher_instance = matcher.AnyListShorterThan(**match_param)
+        assert matcher_instance != match_value
+        assert match_value != matcher_instance
+
+    @pytest.mark.parametrize("match_value, match_param",[
+         (
+            # Size mismatch
+            [1,2,3],
+            {'size': 1, 'item_type': 1}
+        ),
+        (
+            # Type mismatch
+            [ [], [] ],
+            {'size': 1, 'item_type': 1}
+        ),
+        (
+            # Size and type mismatch
+            [ 'a', 'b' ],
+            {'size': 2, 'item_type': False}
+        )
+    ])
+    def test_any_list_shorter_than_size_and_type_fails(self, match_value, match_param):
+        matcher_instance = matcher.AnyListShorterThan(**match_param)
+        assert matcher_instance != match_value
+        assert match_value != matcher_instance
+
+    # Dict negative tests
+    def test_any_dict_fails(self):
+        matcher_instance = matcher.AnyDict()
+        assert matcher_instance != 123
+        assert 123 != matcher_instance
+        assert matcher_instance != 'asfs'
+        assert matcher_instance != [1,2,3]
+
+    def test_any_non_empty_dict_fails(self):
+        matcher_instance = matcher.AnyNonEmptyDict()
+        assert matcher_instance != {}
+        assert {} != matcher_instance
+        assert matcher_instance != 'asfs'
+        assert matcher_instance != [1,2,3]
