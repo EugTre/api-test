@@ -44,7 +44,7 @@ class JsonContent:
         self.composer = None
         if composer_setup is not None:
             self.composer = Composer(self.content, handlers=composer_setup)
-            self.composer.compose_content()
+            self.composer.compose_content(remove_defs=True)
 
     def get(self, pointer: str|Pointer = ROOT_POINTER, make_copy: bool = False) -> Any:
         """Returns property at given JSON pointer.
@@ -202,11 +202,8 @@ class JsonContentBuilder:
 
     By default:
         - Content is empty dict = {};
-        - Reference resolution is disabled;
-        - Reference cache is disabled;
-        - Wrapper class is `json_content.json_content_wrapper.JsonContentWrapper`;
-        - Reference resolver is `json_content.reference_resolver.ReferenceResolver`.
-
+        - Composer is not used;
+        - Composer handlers are not set.
     """
 
     __slots__ = ["__content", "__use_composer",
@@ -246,7 +243,7 @@ class JsonContentBuilder:
         Returns:
             Self: builder instance.
         """
-        self.__content = DataReader.read_json_from_file(filepath)
+        self.__content = DataReader.read_from_file(filepath, 'json')
         return self
 
     def use_composer(self, use: bool = True, handlers: dict = None) -> Self:

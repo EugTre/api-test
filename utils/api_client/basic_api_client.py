@@ -1,27 +1,18 @@
 """Basic API Client wrapper"""
 import logging
 from logging import ERROR, INFO
-from enum import Enum
 from abc import ABC, abstractmethod
 
 import requests
-from utils.api_client.models import RequestCatalogEntity
+from utils.api_client.models import HTTPMethod, ApiClientSpecification, RequestCatalogEntity
 
-DEFAULT_TIMEOUT = 240
+DEFAULT_TIMEOUT = 60
 
-class HTTPMethod(Enum):
-    """Enumerations of supported HTTP methods"""
-    GET = 'get'
-    POST = 'post'
-    PUT = 'put'
-    PATCH = 'patch'
-    DELETE = 'delete'
 
 class AbstractApiClient(ABC):
     """Abstract class for API Client"""
     @abstractmethod
-    def __init__(self, base_url, endpoint, name, logger_name,
-                 request_defaults, request_catalog):
+    def __init__(self, api_spec_as_dict: dict):
         """Init required fields"""
 
     @abstractmethod
@@ -36,50 +27,51 @@ class AbstractApiClient(ABC):
     def get_from_catalog(self, name: str):
         """Get RequestCatalogEntity from api's client request catalog"""
 
+    @staticmethod
+    def from_api_spec(api_spec: ApiClientSpecification) -> 'AbstractApiClient':
+        """Creates instance of Api Client using
+        ApiClientSpecification as config"""
+
 
 class BasicApiClient(AbstractApiClient):
     """Basic API Client class and base class for inheritence.
     Wraps `requests` module with little custom logic and logging of request & response.
-
-    Args:
-        base_url (str): base URL for API;
-        endpoint (str, optional): endpoint for API, default - empty;
-        default_timeout (int, optional): default timeout for requests, in sceonds, default 240 sec;
-        logger_name (str, optional): name of the logger to log requests and responses;
-        request_catalog (dict, optional): catalogue of reference requests/response data,
-        default - None.
     """
     instnace_count = 0   # TODO: Remove debug info
 
-    def __init__(self,
-                 base_url: str,
-                 endpoint: str = '',
-                 name: str = '',
-                 logger_name: str = None,
-                 request_defaults: dict = None,
-                 request_catalog: dict = None,
-        ):
+    def __init__(self, api_spec_as_dict: dict):
         """Creates an instance of `BasicApiClient` class.
 
         Args:
-            base_url (str): base URL of API.
-            endpoint (str, optional): API's endpoint. Defaults to ''.
-            name (str, optional): API name. Defaults to ''.
-            logger_name (str, optional): logger name to use for reqeust/response
-            logging. Defaults to None.
-            request_defaults (dict, optional): settings to apply for each request. Defaults to None.
-            request_catalog (dict, optional): catalog of API requests. Defaults to None.
+            api_spec_as_dict (dict): api client parameters as dict.
+            Dict keys and values:
+            - base_url (str): base URL of API.
+            - endpoint (str, optional): API's endpoint.
+            - name (str, optional): API name.
+            - logger_name (str, optional): logger name to use for reqeust/response
+            logging.
+            - request_defaults (dict, optional): settings to apply for each request -
+            headers, cookies, auth and timeout (each optional).
+            - request_catalog (dict, optional): catalog of API requests.
         """
-        self.base_url = base_url.rstrip(r'/')
-        self.endpoint = endpoint.strip(r'/')
-        self.request_defaults = request_defaults
-        self.logger = logging.getLogger(logger_name) if logger_name else None
-        self.request_catalog = request_catalog
-        self.name = name
-        if not self.name:
-            self.name = f'Client for {self.get_api_url()} API'
 
-        if not self.request_defaults['timeout']:
+        print(api_spec_as_dict)
+
+        self.base_url = api_spec_as_dict['base_url'].rstrip(r'/')
+        self.endpoint = api_spec_as_dict['endpoint'].strip(r'/')
+
+        self.request_catalog = api_spec_as_dict.get('request_catalog', None)
+        self.request_defaults = api_spec_as_dict.get('request_defaults', {})
+
+        self.logger = None
+        if api_spec_as_dict.get('logger_name') is not None:
+            self.logger = logging.getLogger(api_spec_as_dict['logger_name'])
+
+        self.name = api_spec_as_dict.get('name', f'Client for {self.get_api_url()} API')
+
+        # Apply defaults
+        if not self.request_defaults.get('timeout'):
+            print(self.request_defaults)
             self.request_defaults['timeout'] = DEFAULT_TIMEOUT
 
         # TODO: Remove debug info
@@ -140,7 +132,7 @@ class BasicApiClient(AbstractApiClient):
 
     def get_api_url(self) -> str:
         '''Returns API URL - base url + endpoint'''
-        return self._compose_url('')
+        return self.compose_url('')
 
     def get_from_catalog(self, name: str) -> RequestCatalogEntity:
         """Selects and return 'RequestCatalogEntity' by given name.
@@ -151,10 +143,27 @@ class BasicApiClient(AbstractApiClient):
         Returns:
             RequestCatalogEntity: instance of `RequestCatalogEntity`
         """
-        if name not in self.request_catalog:
+        if not self.request_catalog or name not in self.request_catalog:
             return None
 
         return self.request_catalog[name]
+
+    def compose_url(self, path: str) -> str:
+        """Composes URL by mergin Base URL, enpoint and given path.
+        Strips unneccessary `/` symbols inbetween.
+
+        Args:
+            path (str): URI path.
+
+        Returns:
+            str: absoulte URL.
+        """
+        url_path = [self.base_url]
+        if self.endpoint:
+            url_path.append(self.endpoint)
+        if path:
+            url_path.append(path.strip(r'/'))
+        return '/'.join(url_path)
 
     def _prepare_request_params(self, method: str, path: str,
                                 override_defaults: bool, **params) -> dict:
@@ -177,7 +186,7 @@ class BasicApiClient(AbstractApiClient):
 
         request_params = {
             'method': method.lower(),
-            'url': self._compose_url(path),
+            'url': self.compose_url(path),
             **params
         }
 
@@ -190,11 +199,11 @@ class BasicApiClient(AbstractApiClient):
         # So to override Client's defaults - one should just set 'header'/'cookies'
         # with any value.
         for param in ('headers', 'cookies'):
-            default = self.request_defaults[param]
+            default = self.request_defaults.get(param)
             print(f'"{param}" defaults are {default}')
 
             if param in request_params:
-                print(f'"{param}" defined in request. Override flag set to "{override_defaults}".')
+                print(f'"{param}" defined in request. Override flag set to "{override_defaults}.')
 
                 if not override_defaults:
                     print(f'"{param}" will be extended with defaults".')
@@ -210,10 +219,10 @@ class BasicApiClient(AbstractApiClient):
 
         # Auth param will be set to defaults if not set in request, but never overwritten
         if not 'auth' in request_params:
-            request_params['auth'] = self.request_defaults['auth']
+            request_params['auth'] = self.request_defaults.get('auth')
 
         if not 'timeout' in request_params:
-            request_params['timeout'] = self.request_defaults['timeout']
+            request_params['timeout'] = self.request_defaults.get('timeout')
 
         return request_params
 
@@ -225,6 +234,9 @@ class BasicApiClient(AbstractApiClient):
             request_value (dict): Request data.
             config_value (dict): Config-level values
         """
+        # Default value is None - ignore and return
+        if not default_value:
+            return
 
         # If request has empty dict - just merge both
         if not request_value:
@@ -235,18 +247,6 @@ class BasicApiClient(AbstractApiClient):
         for key, value in default_value.items():
             if key not in request_value:
                 request_value[key] = value
-
-    def _compose_url(self, path: str) -> str:
-        """Composes URL by mergin Base URL, enpoint and given path.
-        Strips unneccessary `/` symbols inbetween.
-
-        Args:
-            path (str): URI path.
-
-        Returns:
-            str: absoulte URL.
-        """
-        return '/'.join((self.base_url, self.endpoint, path.lstrip(r'/')))
 
     def _log(self, level: int, msg: str, extra: dict = None, exc_info:bool = False) -> None:
         """Logging request and response data by given logger.
@@ -260,3 +260,9 @@ class BasicApiClient(AbstractApiClient):
         if not self.logger:
             return
         self.logger.log(level, msg, exc_info=exc_info, extra=extra)
+
+    @staticmethod
+    def from_api_spec(api_spec: ApiClientSpecification):
+        """Creates instance of BasicApiClient using
+        ApiClientSpecification as config"""
+        return BasicApiClient(api_spec.as_dict())

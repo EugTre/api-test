@@ -4,7 +4,7 @@ from typing import Any, Type
 
 from utils.json_content.pointer import Pointer
 from utils.json_content.json_wrapper import JsonWrapper
-from utils.json_content.composition_handlers import CompositionHandler, \
+from utils.json_content.composition_handlers import CompositionHandler, CompositionStatus, \
     DEFAULT_COMPOSITION_HANDLERS_COLLECTION
 
 HANDLER_CONTEXT_KEY = "content_context"
@@ -69,7 +69,7 @@ class Composer:
         self._target_nodes: list[Pointer] = None
         self.__stack_nodes = []
 
-    def compose_content(self, node_pointer: Pointer|str = ''):
+    def compose_content(self, node_pointer: Pointer|str = '', remove_defs: bool = False):
         """Scans content and converts every composition met to a value.
 
         Method start loop and checks required nodes for compositions.
@@ -91,6 +91,7 @@ class Composer:
             RuntimeError: when some composition cannot be resolved (e.g.
             recursion reference)
         """
+
         if isinstance(node_pointer, str):
             node_pointer = Pointer.from_string(node_pointer)
 
@@ -122,6 +123,9 @@ class Composer:
                     '- referencing to non-existent nodes;\n'
                     '- recursion references;\n'
                     '- unresolvable order of referencing, etc.')
+
+        if remove_defs:
+            self.content.delete('/$defs')
 
     def scan_and_compose_values(self, value: Any, node_context: str|tuple|None) -> Any:
         """Recursively scans deep into given collection and search for compositions.
@@ -180,19 +184,27 @@ class Composer:
     def _handle_composition(self, handler: CompositionHandler, pointer: Pointer, composition: dict):
         """Converts composition into a value, handling additional logic to track changed nodes"""
         try:
-            composition_result, result_value = handler.compose(composition)
+            composition_status, result_value = handler.compose(composition)
         except Exception as err:
             err.add_note(f'Error occured on composing value at pointer "{pointer}".')
             raise err
 
-        if not composition_result:
+        if composition_status == CompositionStatus.RETRY:
             # On error - register problematic node and return untouched value
             self._target_nodes.append(pointer)
             return composition
 
-        # On success - return new value, but if value is dict/list - register
-        # current node for re-visit (in case there are nested compositions may be found)
-        if isinstance(result_value, (list, dict)):
+        if composition_status == CompositionStatus.COMPOSE_IN_SEPARATE_CONTEXT:
+            if isinstance(result_value, (list, dict)):
+                context = JsonWrapper(result_value)
+                Composer(context, DEFAULT_COMPOSITION_HANDLERS_COLLECTION) \
+                    .compose_content(remove_defs=True)
+                return context.get('')
+
+        if composition_status == CompositionStatus.SUCCESS and \
+           isinstance(result_value, (list, dict)):
+            # If value is dict/list - register current node for re-visit
+            # (in case there are nested compositions may be found)
             self._target_nodes.append(pointer)
 
         return result_value

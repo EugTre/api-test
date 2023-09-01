@@ -6,8 +6,11 @@ pytest -s -vv ./utils/json_content/test_composition_handlers.py
 import random
 
 import pytest
-from utils.json_content.composition_handlers import ReferenceCompositionHandler, \
-    FileReferenceCompositionHandler, GeneratorCompositionHandler, \
+from utils.json_content.composition_handlers import CompositionStatus, \
+    ReferenceCompositionHandler, \
+    FileReferenceCompositionHandler, \
+    IncludeFileCompositionHandler, \
+    GeneratorCompositionHandler, \
     MatcherCompositionHandler
 from utils.json_content.json_wrapper import JsonWrapper
 from utils import matchers
@@ -30,6 +33,10 @@ def get_ref_handler() -> ReferenceCompositionHandler:
 @pytest.fixture(name='file_ref_handler', scope='session')
 def get_file_ref_handler() -> FileReferenceCompositionHandler:
     return FileReferenceCompositionHandler()
+
+@pytest.fixture(name='include_file_handler', scope='session')
+def get_include_file_handler() -> IncludeFileCompositionHandler:
+    return IncludeFileCompositionHandler()
 
 @pytest.fixture(name='generator_handler', scope='session')
 def get_generator_handler() -> GeneratorCompositionHandler:
@@ -59,12 +66,12 @@ class TestReferenceCompositionHandler:
     ])
     def test_compose(self, input_value, expected_pointer, ref_handler: ReferenceCompositionHandler):
         result, value = ref_handler.compose(input_value)
-        assert result
+        assert result == CompositionStatus.SUCCESS
         assert value == ref_handler.content_context.get(expected_pointer)
 
     def test_compose_with_unexpected_args(self, ref_handler: ReferenceCompositionHandler):
         result, value = ref_handler.compose({"!ref": "/a", "!args": [1,2,3], "stuff": "kek"})
-        assert result
+        assert result == CompositionStatus.SUCCESS
         assert value == ref_handler.content_context.get("/a")
 
     # --- Negative
@@ -77,7 +84,7 @@ class TestReferenceCompositionHandler:
     def test_compose_on_missing_pointer_quitely_fails(self, input_value,
                                                       ref_handler: ReferenceCompositionHandler):
         result, value = ref_handler.compose(input_value)
-        assert not result
+        assert result == CompositionStatus.RETRY
         assert value is None
 
     def test_compose_on_invalid_pointer_fails(self, ref_handler):
@@ -101,10 +108,10 @@ class TestFileReferenceCompositionHandler:
     def test_compose(self, json_file, file_ref_handler):
         input_value = {"!file": str(json_file)}
         content = {"a": 100}
-        json_file.append_as_json(content)
+        json_file.write_as_json(content)
 
         composition_result, composed_value = file_ref_handler.compose(input_value)
-        assert composition_result
+        assert composition_result == CompositionStatus.SUCCESS
         assert composed_value == content
 
     def test_compose_and_cache(self, json_file):
@@ -115,13 +122,13 @@ class TestFileReferenceCompositionHandler:
         handler = FileReferenceCompositionHandler(use_cache=True)
 
         result1, value1 = handler.compose(input_value)
-        assert result1
+        assert result1 == CompositionStatus.SUCCESS
         assert value1 == content
 
         # Change file and try to read composition again
         json_file.append_text("extra text")
         result2, value2 = handler.compose(input_value)
-        assert result2
+        assert result2 == CompositionStatus.SUCCESS
         assert value1 == value2
 
     def test_compose_with_unexpected_args(self, json_file, file_ref_handler):
@@ -133,7 +140,7 @@ class TestFileReferenceCompositionHandler:
             "size": 100500
         })
 
-        assert result
+        assert result == CompositionStatus.SUCCESS
         assert value == content
 
     # --- Negative
@@ -146,8 +153,112 @@ class TestFileReferenceCompositionHandler:
         assert not file_ref_handler.match(input_value)
 
     def test_compose_file_not_found_fails(self, file_ref_handler):
-        with pytest.raises(FileNotFoundError, match='Failed to find .* file'):
+        with pytest.raises(FileNotFoundError, match='DataReader failed to find ".*" file'):
             file_ref_handler.compose({"!file": "Unknown"})
+
+
+class TestIncludeFileCompositionHandler:
+    """Tests IncludeFileCompositionHandler"""
+    def test_create(self):
+        assert IncludeFileCompositionHandler()
+
+    def test_create_with_cache(self):
+        assert IncludeFileCompositionHandler(use_cache=True)
+
+    def test_matches(self, include_file_handler):
+        assert include_file_handler.match({
+            "!include": "foo.bar"
+        })
+
+    def test_compose(self, json_file, include_file_handler):
+        input_value = {"!include": str(json_file)}
+        content = {"a": 100}
+        json_file.write_as_json(content)
+
+        result, result_value = include_file_handler.compose(input_value)
+        assert result == CompositionStatus.COMPLETED
+        assert result_value == content
+
+    def test_compose_and_cache(self, json_file):
+        input_value = {"!include": str(json_file)}
+        content = {"a": 100}
+        json_file.write_as_json(content)
+
+        handler = IncludeFileCompositionHandler(use_cache=True)
+
+        result1, value1 = handler.compose(input_value)
+        assert result1 == CompositionStatus.COMPLETED
+        assert value1 == content
+
+        # Change file and try to read composition again
+        json_file.append_text("extra text")
+        result2, value2 = handler.compose(input_value)
+        assert result2 == CompositionStatus.COMPLETED
+        assert value1 == value2
+
+    def test_compose_with_unexpected_args(self, json_file, include_file_handler):
+        content = {"a": 100}
+        json_file.append_as_json(content)
+        result, value = include_file_handler.compose({
+            "!include": str(json_file),
+            "!args": [1,2,3],
+            "size": 100500
+        })
+
+        assert result == CompositionStatus.COMPLETED
+        assert value == content
+
+    def test_compose_by_explicit_json_format(self, include_file_handler, get_file):
+        content = {"a": 100}
+        file = get_file(ext='txt')
+        file.write_as_json(content)
+
+        result, value = include_file_handler.compose({
+            "!include": str(file),
+            "!format": "json"
+        })
+        assert result == CompositionStatus.COMPLETED
+        assert value == content
+
+    def test_compose_by_explicit_txt_format(self, include_file_handler, get_file):
+        content = "Some text as content"
+        file = get_file(ext='json')
+        file.append_text(content)
+
+        result, value = include_file_handler.compose({
+            "!include": str(file),
+            "!format": "txt"
+        })
+        assert result == CompositionStatus.COMPLETED
+        assert value == content
+
+    def test_compose_with_compose_flag(self, include_file_handler, json_file):
+        content = {
+            "a": 100,
+            "b": {"!ref": "/a"}
+        }
+        json_file.write_as_json(content)
+
+        result, value = include_file_handler.compose({
+            "!include": str(json_file),
+            "!compose": True
+        })
+
+        assert result == CompositionStatus.COMPOSE_IN_SEPARATE_CONTEXT
+        assert value == content
+
+    # --- Negative
+    @pytest.mark.parametrize('input_value', [
+        {"!incl": "Anything"},
+        {"!includ": "Anything"},
+        {"include": "Anything"}
+    ])
+    def test_match_fails(self, input_value, include_file_handler):
+        assert not include_file_handler.match(input_value)
+
+    def test_compose_file_not_found_fails(self, include_file_handler):
+        with pytest.raises(FileNotFoundError, match='DataReader failed to find ".*" file'):
+            include_file_handler.compose({"!include": "Unknown"})
 
 
 class TestGeneratorCompositionHandler:
@@ -178,7 +289,7 @@ class TestGeneratorCompositionHandler:
     ])
     def test_compose(self, input_value, expected, generator_handler):
         composition_result, composed_value = generator_handler.compose(input_value)
-        assert composition_result
+        assert composition_result == CompositionStatus.SUCCESS
         assert isinstance(composed_value, expected)
 
     def test_compose_with_same_correlation_id_identical_result(self,
@@ -188,13 +299,13 @@ class TestGeneratorCompositionHandler:
             "!gen": "RandomNumber",
             "!id": cid
         })
-        assert result
+        assert result == CompositionStatus.SUCCESS
 
         result, value2 = generator_handler.compose({
             "!gen": "RandomNumber",
             "!id": cid
         })
-        assert result
+        assert result == CompositionStatus.SUCCESS
         assert value1 == value2
 
 
@@ -249,7 +360,7 @@ class TestMatcherCompositionHandler:
         handler = MatcherCompositionHandler(matchers.matchers_manager)
         composition_result, composed_value = handler.compose(input_value)
 
-        assert composition_result
+        assert composition_result == CompositionStatus.SUCCESS
         assert composed_value == expected
 
     # --- Negative

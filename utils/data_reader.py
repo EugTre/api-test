@@ -1,156 +1,123 @@
 """Data read module"""
-import os
+import re
 import json
 import pathlib
-import logging
+from typing import Any
 
 
 class DataReader:
     """Data processing class to help deserialize data"""
-    @staticmethod
-    def parse_tuple(value: str|list) -> tuple:
-        """Parses given value as tuple string or file, depending on value format.
-        Used to parse base config file values.
-
-        Args:
-            value (str): value to parse, e.g. `("val1", "val2")`.
-        Returns:
-            tuple: tuple of parsed values
-        """
-        if not value:
-            return tuple()
-
-        if isinstance(value, list):
-            return tuple(list)
-
-        # Try to parse tuple as is - e.g. quoted comma-separated values
-        # in round brackets defined in base config
-        parsed_value = [v.strip(' "\'')
-                        for v in value.strip(" \n()").split(',')
-                        if v.strip(' "\'')]
-        if len(parsed_value) > 1:
-            return tuple(parsed_value)
-
-        # If not parsed - consider value to be a filename and read it
-        return tuple(DataReader.read_json_from_file(value))
+    INT_PATTERN = re.compile(r'^-?\d+$')
+    FLOAT_PATTERN = re.compile(r'^-?\d+\.\d+?$')
 
     @staticmethod
-    def parse_json(value: str) -> dict:
-        """Parses value as JSON string or file, depending on value format.
-        Used to parse base config file values.
+    def read_from_file(filename: str|pathlib.Path, extension: str = None) -> Any:
+        """Reads data from file and parse it according to file extension.
+
+        JSON files will be parsed using standard json lib.
+        Plain files will be parsed to value of pythonic data type or to a string.
+
         Args:
-            value (str): value to parse.
-        Returns:
-            dict: parsed JSON.
-        """
-        logging.debug('Parsing JSON from [%s] of type %s.', value, type(value))
-        if value is None:
-            return {}
+            filename (str | pathlib.Path): path to file.
+            extension (str, optional): Extension use for parser selection.
+            Defaults to None, file exstension will be used.
 
-        parsed_value = None
-        # Try to parse JSON as is - e.g. JSON pieces defined in base config
-        parsed_value = DataReader.convert_to_json(value)
-        if parsed_value is not None:
-            return parsed_value
-
-        # If not parsed - consider value to be a filename and read it
-        logging.debug('Parsing JSON: read from file [%s]', value)
-        return DataReader.read_json_from_file(value)
-
-    @staticmethod
-    def convert_to_int(value: str) -> None:
-        """Converts value to integer.
-        Args:
-            value (str): value to convert.
-        Returns:
-            int: parsed value.
-        """
-        if value is None or isinstance(value, int):
-            return value
-        return int(value)
-
-    @staticmethod
-    def convert_to_tuple(value: str) -> tuple|None:
-        """Converts given value to a tuple. If string is not in
-        tuple format - returns None.
-        Args:
-            value (str): string in format ("val1", "val2")
-        Returns:
-            tuple|None: _description_
-        """
-        logging.debug('Convert to tuple invoked for [%s].', value)
-        value_substr = value.strip(' \n')
-        if not value_substr.startswith('('):
-            return None
-
-        logging.debug('Converting to tuple.')
-        return tuple([v.strip('"\'')
-                for v in value_substr.strip('\n()').split(',')
-                if v.strip('"\'')])
-
-    @staticmethod
-    def convert_to_json(value: str) -> dict|None:
-        """Tries to parse value to JSON, if string is not
-        in JSON-like format (single-/double-quoted lines) - returns None.
-        Args:
-            value (str): value to convert.
-        Returns:
-            dict|None: parsed JSON as dict,
-            or None, if value is not in json format
-        """
-        logging.debug('Convert to JSON invoked for [%s].', value)
-        if not value:
-            return {}
-
-        # Key-value pair should start from " or '
-        value_substr = ''.join(value.strip('\n').split('\n'))
-        if not (value_substr.startswith('"') or value_substr.startswith("'")):
-            return None
-
-        logging.debug('Converting to JSON.')
-        content = None
-        try:
-            content = json.loads(f'{{{value_substr}}}')
-        except json.decoder.JSONDecodeError as err:
-            error_line = err.doc.splitlines()[err.lineno - 1]
-            mark_error_line = ' ' * (err.colno-1)
-            err.add_note(f'Failed on line: \n{error_line}\n{mark_error_line}^')
-            raise err
-
-        return content
-
-    @staticmethod
-    def read_json_from_file(filename: str|pathlib.Path) -> dict:
-        """Reads json from given file.
-        Args:
-            filename (str): path to file.
         Raises:
-            FileNotFoundError: if file was not found.
+            FileNotFoundError: when file path doesn't exists.
+            json.decoder.JSONDecodeError: if JSON file parsed and syntax is invalid.
+
         Returns:
-            dict: parsed JSON.
+            Any: file content.
         """
-        logging.debug('Reading JSON from file: %s', filename)
         if not filename:
-            return {}
+            return None
 
         if isinstance(filename, str):
             filename = pathlib.Path(filename)
 
-        if not os.path.exists(filename):
-            raise FileNotFoundError(f'Failed to find "{filename}" file.')
+        if not filename.exists():
+            raise FileNotFoundError(f'DataReader failed to find "{filename}" file.')
 
+        if extension is None:
+            extension = filename.suffix.strip('.')
+
+        if extension == 'json':
+            return DataReader._read_json_from_file(filename)
+
+        return DataReader._read_plain_text_file(filename)
+
+    @staticmethod
+    def _read_json_from_file(filename: pathlib.Path) -> dict:
+        """Reads JSON from given file. Additionaly removes one-line C-like
+        comments ('// comment') before passing content to json parser.
+
+        Args:
+            filename (pathlib.Path): path to file.
+
+        Raises:
+            json.decoder.JSONDecodeError: if JSON syntax is invalid.
+
+        Returns:
+            dict: parsed JSON.
+        """
+        one_line_comment = re.compile(r'^\s*//.*')
         with open(filename, 'r', encoding='utf-8') as file:
-            content = None
-            try:
-                content = json.load(file)
-            except json.decoder.JSONDecodeError as err:
-                error_line = err.doc.splitlines()[err.lineno - 1] or ''
-                mark_error_line = ' ' * (err.colno-1)
-                err.add_note(f'Syntax error occured during "{filename}" file parsing.')
-                err.add_note(f'Failed on line {err.lineno} (char: {err.colno-1}): '
-                            f'\n{error_line}\n{mark_error_line}^')
-                if not error_line.strip():
-                    err.add_note('No content to parse.')
-                raise err
+            content = []
+            while line := file.readline():
+                if one_line_comment.match(line.strip()):
+                    continue
+                content.append(line)
 
-            return content
+        content = '\n'.join(content)
+        try:
+            json_content = json.loads(content)
+        except json.decoder.JSONDecodeError as err:
+            lines = err.doc.splitlines()
+            error_line = lines[err.lineno - 1] if lines else ''
+            mark_error_line = ' ' * (err.colno-1)
+            err.add_note(f'Syntax error occured during "{filename}" file parsing.')
+            err.add_note(f'Failed on line {err.lineno} (char: {err.colno-1}): '
+                        f'\n{error_line}\n{mark_error_line}^')
+            if not error_line.strip():
+                err.add_note('No content to parse.')
+            raise err
+
+        return json_content
+
+    @staticmethod
+    def _read_plain_text_file(filename: pathlib.Path) -> int|float|bool|str:
+        """Reads plain file text and tries to convert it to one of python data types:
+        - if multilines detected - convert to string, appended with whitespace
+        - if value matches digit syntax - convert to int or float
+        - if value matches to 'true' or 'false' - convert to bool
+        - otherwise - convert to str
+
+        Args:
+            filename (pathlib.Path): _description_
+
+        Returns:
+            int|float|bool|str: _description_
+        """
+        with open(filename, 'r', encoding='utf-8') as file:
+            content = [line.strip() for line in file.readlines()]
+
+        # Multiline - return concatenated string
+        if len(content) > 1:
+            return ' '.join(content)
+
+        content = content[0]
+
+        # Bool
+        if content.lower() in ('true', 'false'):
+            return content.lower() == 'true'
+
+        # Integer
+        if DataReader.INT_PATTERN.match(content):
+            return int(content)
+
+        # Float
+        if DataReader.FLOAT_PATTERN.match(content):
+            return float(content)
+
+        # Otherwise - return as is
+        return content

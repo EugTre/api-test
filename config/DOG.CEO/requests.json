@@ -1,5 +1,5 @@
 {
-    "$defs": "!file config/DOG.CEO/defines.json",
+    "$defs": {"!file": "config/DOG.CEO/defines.json"},
 
     "GetRandomImage": {
         "request": {
@@ -8,7 +8,7 @@
         },
         "response": {
             "status_code": 200,
-            "schema": "!ref /$defs/schema/SingleImage"
+            "schema": {"!ref": "/$defs/schema/SingleImage"}
         }
     },
     "GetMultipleRandomImages": {
@@ -18,7 +18,7 @@
         },
         "response": {
             "status_code": 200,
-            "schema": "!ref /$defs/schema/MultipleImages"
+            "schema": {"!ref": "/$defs/schema/MultipleImages"}
         }
     },
     "GetRandomImageByBreed": {
@@ -28,7 +28,7 @@
         },
         "response": {
             "status_code": 200,
-            "schema": "!ref /$defs/schema/SingleImage"
+            "schema": {"!ref": "/$defs/schema/SingleImage"}
         }
     },
     "GetMultipleRandomImageByBreed": {
@@ -38,7 +38,7 @@
         },
         "response": {
             "status_code": 200,
-            "schema": "!ref /$defs/schema/MultipleImages"
+            "schema": {"!ref": "/$defs/schema/MultipleImages"}
         }
     }
 }

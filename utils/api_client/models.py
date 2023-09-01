@@ -1,5 +1,6 @@
 """Models of framework data related to API Client"""
-from dataclasses import dataclass, field
+from dataclasses import dataclass
+from enum import Enum
 
 @dataclass(slots=True)
 class ApiConfiguration:
@@ -9,7 +10,7 @@ class ApiConfiguration:
     url: str
     endpoint: str = ''
     client: str = 'utils.api_client.basic_api_client.BasicApiClient'
-    logger: str = ''
+    logger: str = None
     timeout: str|int = None
     requests: str|dict = None
     auth: str|tuple = None
@@ -26,27 +27,27 @@ class ApiClientsSpecificationCollection:
 @dataclass(slots=True)
 class ApiClientSpecification:
     """Model to store values needed for API Client creation"""
+    name: str
     base_url: str
     endpoint: str
-    client: str
-    logger_name: str
-    request_defaults: dict
-    request_catalog: dict
-    name: str
+    request_defaults: dict|None
+    request_catalog: dict|None
+    logger_name: str|None
+    client_class: str
 
-    def __init__(self, api_config: ApiConfiguration, req_catalog: dict):
+    def __init__(self, api_config: ApiConfiguration, req_catalog: dict|None = None):
         self.base_url = api_config.url
         self.endpoint = api_config.endpoint
-        self.client = api_config.client
+        self.client_class = api_config.client
         self.logger_name = api_config.logger
         self.name = api_config.name
         self.request_defaults = {
             'timeout': api_config.timeout,
             'headers': api_config.headers,
             'cookies': api_config.cookies,
-            'auth': api_config.auth
+            'auth': tuple(api_config.auth) if api_config.auth else api_config.auth
         }
-        self.request_catalog = req_catalog
+        self.request_catalog = req_catalog if req_catalog is not None else None
 
     def as_dict(self) -> dict:
         """Exports object properties as dictionary.
@@ -69,10 +70,10 @@ class RequestEntity:
     """Model for API request"""
     method: str
     path: str
-    headers: dict = field(default_factory=dict)
-    query_params: dict = field(default_factory=dict)
-    path_params: dict = field(default_factory=dict)
-    cookies: dict = field(default_factory=dict)
+    headers: dict = None
+    query_params: dict = None
+    path_params: dict = None
+    cookies: dict = None
     auth: tuple = None
     json: dict|list = None
     timeout: int = None
@@ -91,3 +92,11 @@ class RequestCatalogEntity:
     name: str
     request: RequestEntity
     response: ResponseEntity
+
+class HTTPMethod(Enum):
+    """Enumerations of supported HTTP methods"""
+    GET = 'get'
+    POST = 'post'
+    PUT = 'put'
+    PATCH = 'patch'
+    DELETE = 'delete'

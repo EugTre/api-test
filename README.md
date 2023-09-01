@@ -1,5 +1,10 @@
 # API Test exercises
 
+# TODO:
+ - DB Logger
+ - ApiRequest tests
+ - Review ApiResponse to use with matchers
+
 ## How to use
 ### Installation
 1. Download Python 3.10+ (see https://www.python.org/downloads/)

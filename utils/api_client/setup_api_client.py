@@ -24,9 +24,9 @@ def setup_api_client(api_name: str,
 
     api_spec = api_clients_configurations.configs[api_name]
 
-    module_name, klass_name = api_spec.client.rsplit('.', 1)
-    client_loader = importlib.util.find_spec(module_name)
-    if not client_loader:
+    module_name, klass_name = api_spec.client_class.rsplit('.', 1)
+    client_class_loader = importlib.util.find_spec(module_name)
+    if not client_class_loader:
         raise ModuleNotFoundError(f'Failed to find API client module named \'{module_name}\' '
                                   f'for "{api_spec.name}" API.')
 
@@ -34,7 +34,7 @@ def setup_api_client(api_name: str,
     if not hasattr(module, klass_name):
         raise ModuleNotFoundError(f'Failed to find API client class "{klass_name}" in module '
                                   f'\'{module_name}\' for "{api_spec.name}" API.')
-    client = getattr(module, klass_name)
+    client_class = getattr(module, klass_name)
 
     print('-' * 100)
     spec = api_spec.as_dict()
@@ -47,9 +47,12 @@ def setup_api_client(api_name: str,
         print(f'{name:>15}: {spec["request_defaults"][name]}')
 
     print('\nRequest Catalogue:')
-    for entity_name, entity in spec['request_catalog'].items():
-        print(f'  Entity: {entity_name}')
-        print(entity)
+    if spec['request_catalog'] is None:
+        print(f'{"- Empty -":>15}')
+    else:
+        for entity_name, entity in spec['request_catalog'].items():
+            print(f'  Entity: {entity_name}')
+            print(entity)
     print('-' * 100)
 
-    return client(**api_spec.as_dict())
+    return client_class(api_spec.as_dict())

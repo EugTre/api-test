@@ -1,7 +1,6 @@
 """Tests for matchers and matcher manager
 
 pytest -s -vv ./utils/test_generators.py
-
 """
 import random
 import pytest
@@ -139,7 +138,11 @@ class TestGeneratosManager:
         generated_value = manager.generate(reg_name, correlation_id=cid)
         for _ in range(10):
             assert manager.generate(reg_name, correlation_id=cid) == generated_value
-        assert manager.generate(reg_name, correlation_id='BazBar') != generated_value
+        assert manager.generate(
+            reg_name,
+            correlation_id='BazBar',
+            kwargs={'min': 500, 'max': 600}
+        ) != generated_value
 
     def test_manager_generate_with_args_and_correlation_id(self):
         generator = self.random_generator

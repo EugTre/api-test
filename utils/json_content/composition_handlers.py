@@ -3,14 +3,30 @@ JSON nodes of specifc structure into specific values (e.g. value by reference,
 generated value, etc.)"""
 import json
 import copy
+import pathlib
 from typing import Any
 from abc import ABC, abstractmethod
+from enum import Enum
 
 from utils.json_content.json_wrapper import JsonWrapper
 from utils.json_content.pointer import Pointer
 from utils.data_reader import DataReader
 from utils.matchers import MatchersManager, matchers_manager
 from utils.generators import GeneratorsManager, generators_manager
+
+
+class CompositionStatus(Enum):
+    """Status of the composition after handling"""
+
+    # Composition processed and futher handling is allowed
+    SUCCESS = 0
+    # Composition failed to process, need to retry later
+    RETRY = 10
+    # Composition is fully processed and should never be processed again
+    COMPLETED = 20
+    # Result of composition should be processed in custom context before
+    # mergin data to main content
+    COMPOSE_IN_SEPARATE_CONTEXT = 21
 
 
 class CompositionHandler(ABC):
@@ -30,14 +46,14 @@ class CompositionHandler(ABC):
         return self.DEFINITION_KEY in obj
 
     @abstractmethod
-    def compose(self, obj: dict) -> tuple[bool, Any]:
+    def compose(self, obj: dict) -> tuple[CompositionStatus, Any]:
         """Transform object into definite value.
 
         Args:
             obj (dict): dictionary object to check.
 
         Returns:
-            tuple[bool, Any]: result of processing and composed value.
+            tuple[CompositionStatus, Any]: result of processing and composed value.
         """
 
     @staticmethod
@@ -51,6 +67,7 @@ class CompositionHandler(ABC):
             Any: copy (if value is mutable) of value or value
         """
         return copy.deepcopy(value) if isinstance(value, (dict, list)) else value
+
 
 class ReferenceCompositionHandler(CompositionHandler):
     """Handles reference to JSON node.
@@ -77,15 +94,16 @@ class ReferenceCompositionHandler(CompositionHandler):
             raise
 
         if pointer not in self.content_context:
-            return False, None
+            return CompositionStatus.RETRY, None
 
         value = self.content_context.get(pointer)
-        return True, self._copy_value(value)
+        return CompositionStatus.SUCCESS, self._copy_value(value)
 
 
 class FileReferenceCompositionHandler(CompositionHandler):
     """Handles file references.
-    Returns JSON content of the file as dict or list.
+    Returns JSON content of the file as dict or list for futher processing
+    by composer.
 
     File referense composition syntax:
     `{"!file": "path/to/file.ext"}`
@@ -102,20 +120,83 @@ class FileReferenceCompositionHandler(CompositionHandler):
 
     def compose(self, obj: dict) -> Any:
         path = obj[self.DEFINITION_KEY]
+
         if self.use_cache and path in self.cache:
-            return True, self._copy_value(self.cache[path])
+            # Return copy to avoid modification by reference
+            return CompositionStatus.SUCCESS, self._copy_value(self.cache[path])
 
         try:
-            content = DataReader.read_json_from_file(path)
+            content = DataReader.read_from_file(path)
         except Exception as err:
             err.add_note('Error occured on composing File '
                          f'Reference Composition {json.dumps(obj)}.')
             raise
 
         if self.use_cache:
-            self.cache[path] = content
+            # Save copy as content may be changed afterwards
+            self.cache[path] = self._copy_value(content)
 
-        return True, content
+        return CompositionStatus.SUCCESS, content
+
+
+class IncludeFileCompositionHandler(CompositionHandler):
+    """Handles file references.
+    Returns content of the file depending on it's extension or given '!format'.
+    For JSON - parses using 'json' lib. Otherwise return content as text, or
+    as parsed int/float/bool.
+
+    Include File composition syntax:
+    `{
+        "!include": "path/to/file.ext",
+        "!compose": True/False,
+        "!format": "json"/"txt"
+    }`
+
+    Params:
+        "!include" (str) - path to file.
+        "!compose" (optional, bool) - flag to compose file content before including
+        to it's data to parent document. Defaults to False.
+        "!format" (optional, str) - explicit file format definition as lower case.
+        If not set - uses file extension.
+
+    Should be instantiated with `use_cache` bool flag to enable/disable
+    file content cache.
+    """
+    DEFINITION_KEY = "!include"
+    COMPOSE_KEY = "!compose"
+    FORMAT_KEY = "!format"
+
+    CONTEXT = "<include content>{file_path}"
+    ERROR_HINT = 'Error occured on Including File Composition {composition}.'
+
+    def __init__(self, use_cache: bool = False):
+        self.use_cache = use_cache
+        self.cache = {} if use_cache else None
+
+    def compose(self, obj: dict) -> Any:
+        path = pathlib.Path(obj[self.DEFINITION_KEY])
+        compose = obj.get(self.COMPOSE_KEY, False)
+        data_format = obj.get(self.FORMAT_KEY)
+
+        handling_result = CompositionStatus.COMPOSE_IN_SEPARATE_CONTEXT \
+            if compose else CompositionStatus.COMPLETED
+
+        if self.use_cache and path in self.cache:
+            # Return copy to avoid modification by reference
+            return handling_result, self._copy_value(self.cache[path])
+
+        content = None
+        try:
+            content = DataReader.read_from_file(path, data_format)
+        except Exception as err:
+            err.add_note(self.ERROR_HINT.format(composition=json.dumps(obj)))
+            raise
+
+        if self.use_cache:
+            # Save copy as content may be changed afterwards
+            self.cache[path] = self._copy_value(content)
+
+        return handling_result, content
 
 
 class GeneratorCompositionHandler(CompositionHandler):
@@ -166,7 +247,7 @@ class GeneratorCompositionHandler(CompositionHandler):
             err.add_note(f"Error occured on composing Generator Composition {json.dumps(obj)}.")
             raise
 
-        return True, value
+        return CompositionStatus.SUCCESS, value
 
 
 class MatcherCompositionHandler(CompositionHandler):
@@ -211,7 +292,7 @@ class MatcherCompositionHandler(CompositionHandler):
             err.add_note(f"Error occured on composing Matcher Composition {json.dumps(obj)}.")
             raise
 
-        return True, matcher
+        return CompositionStatus.SUCCESS, matcher
 
 
 # Default collection of handlers.
@@ -221,7 +302,8 @@ class MatcherCompositionHandler(CompositionHandler):
 # May be updated from anywhere by standard dict methods
 DEFAULT_COMPOSITION_HANDLERS_COLLECTION: dict[CompositionHandler, dict[str, Any]] = {
 	ReferenceCompositionHandler: {"content_context": None},
-    FileReferenceCompositionHandler: {"use_cache": True},
+    FileReferenceCompositionHandler: {"use_cache": False},
+    IncludeFileCompositionHandler: {"use_cache": False},
     GeneratorCompositionHandler: {"manager": generators_manager},
     MatcherCompositionHandler: {"manager": matchers_manager}
 }

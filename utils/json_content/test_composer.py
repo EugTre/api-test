@@ -12,7 +12,10 @@ from utils.json_content.json_wrapper import JsonWrapper
 from utils.generators import GeneratorsManager
 from utils.matchers import MatchersManager, AnyText, AnyListOf
 from utils.json_content.composition_handlers import ReferenceCompositionHandler, \
-    FileReferenceCompositionHandler, GeneratorCompositionHandler, MatcherCompositionHandler
+    FileReferenceCompositionHandler, \
+    IncludeFileCompositionHandler, \
+    GeneratorCompositionHandler, \
+    MatcherCompositionHandler
 
 
 @pytest.fixture(name='handlers', scope='session')
@@ -111,6 +114,34 @@ class TestComposer:
         assert content_wrapper.get('') == {"a": file_content}
         assert content_wrapper.get('/a') == file_content
         assert content_wrapper.get('/a/x') == file_content['x']
+
+    def test_composer_compose_with_include_file(self, json_file):
+        """Compose include file composition"""
+        file_content = {
+            "x": 100,
+            "y": {"!ref": "/x"}
+        }
+        expected_content = {
+            "x": file_content['x'],
+            "y": file_content['x']
+        }
+        json_file.write_as_json(file_content)
+        content = {
+            "a": {
+                "!include": str(json_file),
+                "!compose": True
+            }
+        }
+        content_wrapper = JsonWrapper(content)
+        composer = Composer(content_wrapper, handlers={
+            IncludeFileCompositionHandler: {"use_cache": False}
+        })
+        composer.compose_content()
+
+        assert content_wrapper.get('') == {"a": expected_content}
+        assert content_wrapper.get('/a') == expected_content
+        assert content_wrapper.get('/a/x') == expected_content['x']
+        assert content_wrapper.get('/a/y') == expected_content['y']
 
     def test_composer_compose_with_generator(self):
         """Compose generation composition"""
@@ -357,7 +388,7 @@ class TestComposer:
 
     @pytest.mark.parametrize("content, expected_error, expected_msg", [
         # Missing file
-        ({"a": {"!file": "b.json"}}, FileNotFoundError, 'Failed to find.*file'),
+        ({"a": {"!file": "b.json"}}, FileNotFoundError, 'DataReader failed to find.*file'),
         # Unknown generator
         ({"a": {"!gen": "FooBar"}}, ValueError, 'Failed to find generator.*'),
         # Unknown matcher

@@ -1,7 +1,7 @@
 {
     "schema": {
-        "SingleImage": "!file config/DOG.CEO/schema/single_image_response.json",
-        "MultipleImages": "!file config/DOG.CEO/schema/multiple_image_response.json"
+        "SingleImage": {"!include": "config/DOG.CEO/schema/single_image_response.json"},
+        "MultipleImages": {"!include": "config/DOG.CEO/schema/multiple_image_response.json"}
     },
 
     "headers": {
