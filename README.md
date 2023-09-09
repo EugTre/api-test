@@ -1,6 +1,7 @@
 # API Test exercises
 
 # TODO:
+ - Matchers: Add assertrepr_compare methods and add to conftest.py
  - DB Logger
  - ApiRequest tests
  - Review ApiResponse to use with matchers

@@ -5,8 +5,36 @@ import uuid
 import pathlib
 import json
 import typing
+import http.server
+import socketserver
+import threading
 
 import pytest
+
+
+LOCAL_HOST = "127.0.0.1"
+LOCAL_PORT = 8000
+LOCAL_SERVER_URL = f"http://{LOCAL_HOST}:{LOCAL_PORT}"
+
+
+def start_server(server):
+    """Starts server. Should be executed in separate thread."""
+    with server:
+        server.serve_forever()
+
+@pytest.fixture(name='localhost_server', scope='class')
+def handle_local_server():
+    """Creates server in separate thread and stop it afterwards"""
+    server = socketserver.TCPServer(
+        (LOCAL_HOST, LOCAL_PORT),
+        http.server.BaseHTTPRequestHandler
+    )
+    srv_thread = threading.Thread(target=start_server, args=(server, ))
+    yield srv_thread.start()
+
+    server.shutdown()
+    srv_thread.join()
+
 
 class AppendableFilePath(type(pathlib.Path())):
     """Extension to Path class"""
@@ -22,7 +50,6 @@ class AppendableFilePath(type(pathlib.Path())):
     def append_as_json(self, value):
         """Append to file, converting given data to JSON"""
         self.append_text(json.dumps(value))
-
 
 @pytest.fixture(name='tmp_folder', scope='session')
 def handle_tmp_path(tmp_path_factory):
@@ -42,7 +69,6 @@ def get_unique_file(tmp_folder) -> typing.Callable:
     def callback(prefix: str = "", ext: str = "json"):
         return AppendableFilePath(tmp_folder / f'{prefix}_{uuid.uuid4()}.{ext}')
     return callback
-
 
 @pytest.fixture(name='ini_file')
 def get_ini_file(tmp_folder) -> AppendableFilePath:

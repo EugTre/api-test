@@ -315,6 +315,14 @@ class JsonWrapper:
                 continue
             yield ptr, val
 
+    def __repr__(self):
+        elements = []
+        for ptr, value in self:
+            value = f'"{value}"' if isinstance(value, str) else str(value)
+            elements.append(f'"{ptr}"={value}')
+
+        return f'JsonWrapper({", ".join(elements)})'
+
     @staticmethod
     def __convert_to_pointer_obj(pointer):
         if isinstance(pointer, Pointer):

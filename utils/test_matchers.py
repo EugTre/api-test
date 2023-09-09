@@ -1,7 +1,6 @@
 """Tests for matchers and matcher manager
 
 pytest -s -vv ./utils/test_matchers.py
-
 """
 import pytest
 import utils.matchers as matcher
@@ -173,7 +172,7 @@ class TestMatcherManager:
         assert 'Bar1' not in manager
 
 
-class TestMatchers:
+class TestMatchersBasic:
     """Positive tests for matchers"""
     @pytest.mark.parametrize("match_value",[
         None,
@@ -271,6 +270,23 @@ class TestMatchers:
         assert matcher_instance == match_value
         assert match_value == matcher_instance
 
+    # --- AnyDict
+    @pytest.mark.parametrize("match_value",[
+        {},
+        {"a": 1, "b": 2}
+    ])
+    def test_any_dict(self, match_value):
+        matcher_instance = matcher.AnyDict()
+        assert matcher_instance == match_value
+        assert match_value == matcher_instance
+
+    def test_any_non_empty_dict(self):
+        matcher_instance = matcher.AnyNonEmptyDict()
+        assert matcher_instance == {'a': 1}
+        assert {'a': 1} == matcher_instance
+
+
+class TestMatcherAnyListOf:
     # --- AnyListOf
     @pytest.mark.parametrize("match_value, match_param",[
         (
@@ -431,21 +447,47 @@ class TestMatchers:
         assert matcher_instance == match_value
         assert match_value == matcher_instance
 
-    # --- AnyDict
-    @pytest.mark.parametrize("match_value",[
-        {},
-        {"a": 1, "b": 2}
-    ])
-    def test_any_dict(self, match_value):
-        matcher_instance = matcher.AnyDict()
-        assert matcher_instance == match_value
-        assert match_value == matcher_instance
 
-    def test_any_non_empty_dict(self):
-        matcher_instance = matcher.AnyNonEmptyDict()
-        assert matcher_instance == {'a': 1}
-        assert {'a': 1} == matcher_instance
+class TestMatcherAnyListOfMatchers:
+    @pytest.mark.parametrize("matcher_item, size, compare_to", (
+        pytest.param(matcher.AnyNumber(), 3, [1,2,3], id='AnyNumber-3'),
+        pytest.param(matcher.AnyNumberGreaterThan(5), 3, [8,12,33], id='AnyNumberGreaterThan5-3'),
+        pytest.param(matcher.AnyNumberLessThan(5), 3, [1,2,3], id='AnyNumberLessThan5-3'),
+        pytest.param(matcher.AnyText(), 2, ["str", "another_str"], id='AnyText-2'),
+        pytest.param(matcher.AnyTextLike(r'\d+'), 2, ["34", "4242"], id='AnyTextLike-2'),
+        pytest.param(matcher.AnyListOf(2, 1), 2, [ [1,2], [0,4] ], id='AnyListOfIntsOfSize-2'),
+        pytest.param(matcher.Anything(), 2, [4, ['str', True]], id='Anything-2'),
+        pytest.param(matcher.AnyListOfMatchers(matcher.AnyList()), 2, [ [[1,2], [3,4]], [[5, 2]] ], id='AnyListOfMatchers-2')
+    ))
+    def test_basic(self, matcher_item, size, compare_to):
+        matcher_instance = matcher.AnyListOfMatchers(
+            matcher_item, size
+        )
 
+        assert matcher_instance == compare_to
+        assert compare_to == matcher_instance
+
+
+class TestMatcherAnyDictLike:
+    def test_basic(self):
+
+        assert [1,2,3] == matcher.AnyListOfMatchers(
+            matcher=matcher.AnyText()
+        )
+
+        list_to_compare = [
+            {"id": 3, "user": 15125, "comments": [1,4,545, 5533]},
+            {"id": 5, "user": 'ds', "comments": [524, 1024]},
+            {"id": 13, "user": 2442, "comments": [102, 632]}
+        ]
+        assert list_to_compare == matcher.AnyListOfMatchers(
+            matcher={
+                "id": matcher.AnyNumber(),
+                "user": matcher.AnyNumber(),
+                "comments": matcher.AnyListOf(item_type=1)
+            },
+            size=3
+        ), 'Все пропало!'
 
 class TestMatchersNegative:
     """Negative tests for matchers"""

@@ -27,11 +27,6 @@ class AbstractApiClient(ABC):
     def get_from_catalog(self, name: str):
         """Get RequestCatalogEntity from api's client request catalog"""
 
-    @staticmethod
-    def from_api_spec(api_spec: ApiClientSpecification) -> 'AbstractApiClient':
-        """Creates instance of Api Client using
-        ApiClientSpecification as config"""
-
 
 class BasicApiClient(AbstractApiClient):
     """Basic API Client class and base class for inheritence.
@@ -54,9 +49,6 @@ class BasicApiClient(AbstractApiClient):
             headers, cookies, auth and timeout (each optional).
             - request_catalog (dict, optional): catalog of API requests.
         """
-
-        print(api_spec_as_dict)
-
         self.base_url = api_spec_as_dict['base_url'].rstrip(r'/')
         self.endpoint = api_spec_as_dict['endpoint'].strip(r'/')
 
@@ -71,7 +63,6 @@ class BasicApiClient(AbstractApiClient):
 
         # Apply defaults
         if not self.request_defaults.get('timeout'):
-            print(self.request_defaults)
             self.request_defaults['timeout'] = DEFAULT_TIMEOUT
 
         # TODO: Remove debug info
@@ -106,15 +97,10 @@ class BasicApiClient(AbstractApiClient):
         Returns:
             `requests.Response:`: :class:`Response <Response>` object
         """
-        print(method)
-        print(path)
-        print(override_defaults)
-        print(params)
-
         if isinstance(method, HTTPMethod):
             method = method.value
 
-        request_params = self._prepare_request_params(method, path,
+        request_params = self.prepare_request_params(method, path,
                                                       override_defaults,
                                                       **params)
         response = None
@@ -165,7 +151,7 @@ class BasicApiClient(AbstractApiClient):
             url_path.append(path.strip(r'/'))
         return '/'.join(url_path)
 
-    def _prepare_request_params(self, method: str, path: str,
+    def prepare_request_params(self, method: str, path: str,
                                 override_defaults: bool, **params) -> dict:
         """Compose request parameters into a dictionary.
         Sets defaults to `timeout` parameter if missign to `self.default_timeout`.
@@ -180,18 +166,11 @@ class BasicApiClient(AbstractApiClient):
         Returns:
             dict: dictionary of the request parameters.
         """
-
-        print('_prepare_request_params:')
-        print(params)
-
         request_params = {
             'method': method.lower(),
             'url': self.compose_url(path),
             **params
         }
-
-        print('\n')
-        print(request_params)
 
         # If param is set and no override required - combine request
         # values with defaults.
@@ -200,21 +179,13 @@ class BasicApiClient(AbstractApiClient):
         # with any value.
         for param in ('headers', 'cookies'):
             default = self.request_defaults.get(param)
-            print(f'"{param}" defaults are {default}')
 
             if param in request_params:
-                print(f'"{param}" defined in request. Override flag set to "{override_defaults}.')
-
                 if not override_defaults:
-                    print(f'"{param}" will be extended with defaults".')
-
                     req_value = request_params.get(param, {})
                     self._combine_values(req_value, default)
                     request_params[param] = req_value
-
             else:
-                print(f'"{param}" is not defined in request. Apply defaults".')
-
                 request_params[param] = default
 
         # Auth param will be set to defaults if not set in request, but never overwritten
@@ -260,9 +231,3 @@ class BasicApiClient(AbstractApiClient):
         if not self.logger:
             return
         self.logger.log(level, msg, exc_info=exc_info, extra=extra)
-
-    @staticmethod
-    def from_api_spec(api_spec: ApiClientSpecification):
-        """Creates instance of BasicApiClient using
-        ApiClientSpecification as config"""
-        return BasicApiClient(api_spec.as_dict())

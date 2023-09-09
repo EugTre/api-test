@@ -7,6 +7,8 @@ import pytest
 import utils.generators as gen
 
 class TestGeneratosManager:
+    """Tests generators manager"""
+    # Generators to use
     def simple_generator(self):
         return True
 
@@ -16,9 +18,10 @@ class TestGeneratosManager:
     def heavy_configurable_generator(self, a, b, c = 'c.default', d = 'd.default'):
         return '/'.join((a,b,c,d))
 
-    def random_generator(self, min = 0, max = 100):
-        return random.randrange(min, max)
+    def random_generator(self, range_min = 0, range_max = 100):
+        return random.randrange(range_min, range_max)
 
+    # Tests
     def test_manager_register(self):
         manager = gen.GeneratorsManager()
         manager.add(gen.NamesGenerator.generate_first_name)
@@ -141,7 +144,7 @@ class TestGeneratosManager:
         assert manager.generate(
             reg_name,
             correlation_id='BazBar',
-            kwargs={'min': 500, 'max': 600}
+            kwargs={'range_min': 500, 'range_max': 600}
         ) != generated_value
 
     def test_manager_generate_with_args_and_correlation_id(self):
@@ -212,12 +215,16 @@ class TestGeneratosManager:
         assert 'Bar1' not in manager
 
 
-
 class TestGenerators:
     def test_names_generator_first_name_generator(self):
         assert gen.NamesGenerator.generate_first_name() in gen.NamesGenerator.MALE_NAMES
-        assert gen.NamesGenerator.generate_first_name('male') in gen.NamesGenerator.MALE_NAMES
-        assert gen.NamesGenerator.generate_first_name('female') in gen.NamesGenerator.FEMALE_NAMES
+
+    @pytest.mark.parametrize('arg, expected', [
+        ('male', gen.NamesGenerator.MALE_NAMES),
+        ('female', gen.NamesGenerator.FEMALE_NAMES)
+    ])
+    def test_names_generator_first_name_generator_gender_specific(self, arg, expected):
+        assert gen.NamesGenerator.generate_first_name(arg) in expected
 
     def test_names_generator_last_name_generator(self):
         assert gen.NamesGenerator.generate_last_name() in gen.NamesGenerator.LAST_NAMES

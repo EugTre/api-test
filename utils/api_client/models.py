@@ -78,7 +78,7 @@ class RequestEntity:
     json: dict|list = None
     timeout: int = None
 
-@dataclass(frozen=True, slots=True)
+@dataclass(slots=True)
 class ResponseEntity:
     """Model for  API response"""
     status_code: int
@@ -100,3 +100,6 @@ class HTTPMethod(Enum):
     PUT = 'put'
     PATCH = 'patch'
     DELETE = 'delete'
+
+    def __repr__(self):
+        return self.value.upper()

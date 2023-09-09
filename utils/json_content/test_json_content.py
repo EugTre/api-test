@@ -19,16 +19,16 @@ CONTENT = {
 }
 
 CONTENT_WITH_REFS = {
-    'defs': {
+    '$defs': {
         'int': 100,
         'values': [1, 2, 1337]
     },
-    'a': {"!ref": "/defs/int"},
+    'a': {"!ref": "/$defs/int"},
     'b': {
-        'c': {"!ref": "/defs/int"},
-        'd': {"!ref": "/defs/values"},
+        'c': {"!ref": "/$defs/int"},
+        'd': {"!ref": "/$defs/values"},
     },
-    'e': {"!ref": "/defs/values/1"}
+    'e': {"!ref": "/$defs/values/1"}
 }
 
 class TestJsonContent:
@@ -90,12 +90,13 @@ class TestJsonContent:
             .use_composer(True).build()
 
         raw_content = cnt.get('')
-        assert raw_content['a'] == CONTENT_WITH_REFS['defs']['int']
-        assert raw_content['b']['c'] == CONTENT_WITH_REFS['defs']['int']
-        assert raw_content['b']['d'] == CONTENT_WITH_REFS['defs']['values']
-        assert raw_content['e'] == CONTENT_WITH_REFS['defs']['values'][1]
+        assert raw_content['a'] == CONTENT_WITH_REFS['$defs']['int']
+        assert raw_content['b']['c'] == CONTENT_WITH_REFS['$defs']['int']
+        assert raw_content['b']['d'] == CONTENT_WITH_REFS['$defs']['values']
+        assert raw_content['e'] == CONTENT_WITH_REFS['$defs']['values'][1]
 
-        assert raw_content['b']['d'] is not CONTENT_WITH_REFS['defs']['values']
+        assert raw_content['b']['d'] is not CONTENT_WITH_REFS['$defs']['values']
+        assert '$defs' not in raw_content
 
     def test_build_fully_specified(self):
         """Build with fully specified params"""

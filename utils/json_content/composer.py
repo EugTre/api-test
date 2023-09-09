@@ -8,6 +8,7 @@ from utils.json_content.composition_handlers import CompositionHandler, Composit
     DEFAULT_COMPOSITION_HANDLERS_COLLECTION
 
 HANDLER_CONTEXT_KEY = "content_context"
+DEFS_POINTER = '/$defs'
 
 class Composer:
     """Class to compose content by resolving references, generating values
@@ -86,6 +87,8 @@ class Composer:
         Args:
             node_pointer (Pointer | str, optional): pointer to a node
             that should be composed. Defaults to '' (entire content).
+            remove_defs (bool, optional): flag to delete '/$defs' node
+            from document when all data will be composed.
 
         Raises:
             RuntimeError: when some composition cannot be resolved (e.g.
@@ -125,7 +128,7 @@ class Composer:
                     '- unresolvable order of referencing, etc.')
 
         if remove_defs:
-            self.content.delete('/$defs')
+            self.content.delete(DEFS_POINTER)
 
     def scan_and_compose_values(self, value: Any, node_context: str|tuple|None) -> Any:
         """Recursively scans deep into given collection and search for compositions.
@@ -146,15 +149,15 @@ class Composer:
         self.__append_node_stack(node_context)
 
         if isinstance(value, dict):
+            # Loop through nested elements and try to compose their values
+            for key, item_value in value.items():
+                self._process_nested_element(key, item_value)
+
+            # Now check for dict sturcture to be an composition
             handler: CompositionHandler = self._look_for_handler(value)
             if handler:
                 # Composition will be resolved into values
                 value = self._handle_composition(handler, self.__get_current_node_pointer(), value)
-            else:
-                # Loop through dict keys and try to compose their values
-                for key, item_value in value.items():
-                    self._process_nested_element(key, item_value)
-
         elif isinstance(value, list):
             # Loop through list elements and try to compose them
             for i, item_value in enumerate(value):

@@ -67,7 +67,7 @@ class TestComposerCreation:
 
 class TestComposer:
     """Tests related to actual composition handling"""
-    def test_composer_compose_no_composition(self):
+    def test_compose_no_composition(self):
         """Content without composition don't cause errors"""
         content = {
             "a": 100,
@@ -79,7 +79,7 @@ class TestComposer:
 
         assert content_wrapper.get('') == content
 
-    def test_composer_compose_with_ref(self):
+    def test_compose_with_ref(self):
         """Compose reference composition"""
         content = {
             "a": 100,
@@ -98,7 +98,7 @@ class TestComposer:
         assert content_wrapper.get('/b') == content_wrapper.get('/a')
         assert content_wrapper.get('/b') == expected_content['b']
 
-    def test_composer_compose_with_file_ref(self, json_file):
+    def test_compose_with_file_ref(self, json_file):
         """Compose file reference composition"""
         file_content = {"x": 100}
         json_file.write_as_json(file_content)
@@ -115,7 +115,7 @@ class TestComposer:
         assert content_wrapper.get('/a') == file_content
         assert content_wrapper.get('/a/x') == file_content['x']
 
-    def test_composer_compose_with_include_file(self, json_file):
+    def test_compose_with_include_file(self, json_file):
         """Compose include file composition"""
         file_content = {
             "x": 100,
@@ -143,7 +143,7 @@ class TestComposer:
         assert content_wrapper.get('/a/x') == expected_content['x']
         assert content_wrapper.get('/a/y') == expected_content['y']
 
-    def test_composer_compose_with_generator(self):
+    def test_compose_with_generator(self):
         """Compose generation composition"""
         content = {
             "a": 100,
@@ -166,7 +166,7 @@ class TestComposer:
         assert content_wrapper.get('/b') == 42
         assert content_wrapper == expected_content
 
-    def test_composer_compose_with_matcher(self):
+    def test_compose_with_matcher(self):
         """Compose matcher composition"""
         content = {
             "a": {"!match": "AnyText"}
@@ -187,7 +187,7 @@ class TestComposer:
         assert isinstance(content_wrapper.get('/a'), AnyText)
         assert content_wrapper == expected_content
 
-    def test_composer_compose_mixed_simple(self, json_file):
+    def test_compose_mixed_simple(self, json_file):
         """Several types of compositions in single document"""
         file_content = {"x": 300}
         json_file.write_as_json(file_content)
@@ -225,7 +225,7 @@ class TestComposer:
 
         assert wrapper.get('') == expected_content
 
-    def test_composer_compose_mixed_complex(self, handlers, json_file):
+    def test_compose_mixed_complex(self, handlers, json_file):
         """Complex mixing of compositions and references. Should be resolved
         in several passes."""
         file_content = [
@@ -259,7 +259,7 @@ class TestComposer:
 
         assert wrapper.get('') == expected_content
 
-    def test_composer_compose_mixed_ref_to_implied_node(self, handlers, json_file):
+    def test_compose_mixed_ref_to_implied_node(self, handlers, json_file):
         """References are in such order, that it won't be resolved in one pass.
         Test will expect Composer to revisit nodes few times to complete composition process"""
         file_content = [
@@ -289,6 +289,33 @@ class TestComposer:
         composer.compose_content()
 
         assert wrapper.get('') == expected_content
+
+    def test_compose_with_nested_compositions(self, handlers):
+        """When value of composition is also composition composer
+        should resolve from bottom to top."""
+
+        content = {
+            "a": 100,
+            "b": "/a",
+            # Ref to value referenced by /b:
+            # ref /b => /a
+            # ref /a => 100
+            "c": {"!ref": {"!ref": "/b"}}
+        }
+        expected_content = {
+            "a": 100,
+            "b": "/a",
+            "c": 100
+        }
+        wrapper = JsonWrapper(content)
+        composer = Composer(content_context=wrapper, handlers=handlers)
+        composer.compose_content()
+
+        assert wrapper.get('') == expected_content
+
+
+
+
 
     # --- Ref Resolution tests
     @pytest.mark.parametrize("content, expected_content", [
@@ -351,7 +378,7 @@ class TestComposer:
             "b": None
         })
     ])
-    def test_composer_compose_references(self, handlers, content, expected_content):
+    def test_compose_references(self, handlers, content, expected_content):
         """Complex reference composition"""
         wrapper = JsonWrapper(content)
         composer = Composer(content_context=wrapper, handlers=handlers)
@@ -377,7 +404,7 @@ class TestComposer:
             "a": {"!ref": "/a"}
         },
     ])
-    def test_composer_compose_mixed_ref_recursion(self, content, handlers):
+    def test_compose_mixed_ref_recursion(self, content, handlers):
         """Recursion referencing should raise an exception"""
         wrapper = JsonWrapper(content)
         composer = Composer(content_context=wrapper, handlers=handlers)
@@ -399,7 +426,7 @@ class TestComposer:
         }, TypeError, '.*'),
         ([{"!ref": ""}], ValueError, 'Referencing to document root is not allowed!.*')
     ])
-    def test_composer_compose_invalid_data(self, content, expected_error, expected_msg, handlers):
+    def test_compose_invalid_data(self, content, expected_error, expected_msg, handlers):
         """Recursion referencing should raise an exception"""
         wrapper = JsonWrapper(content)
         composer = Composer(content_context=wrapper, handlers=handlers)

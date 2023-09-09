@@ -75,16 +75,15 @@ class ApiRequestHelper:
 
         return self
 
-    def by_path(self, path: str, method: HTTPMethod = HTTPMethod.GET,
-                status_code: int = 200) -> Self:
-        """Sets custom path for request.
+    def by_path(self, path: str|None = None, method: HTTPMethod = HTTPMethod.GET) -> Self:
+        """Sets custom path and method for request, and initialize expected response
+        with default status code 200.
         Invocation of the method resets instance's properties.
 
         Args:
             path (str): path of API request;
             method (str or HTTPMethod, optional): method to use for request.
             Defaults to `utils.base_api_client.HTTPMethod.GET`.
-            status_code (int, optional): expected status code of the response. Defaults to 200.
 
         Returns:
             Self: instance of class `ApiRequestHelper`
@@ -93,9 +92,9 @@ class ApiRequestHelper:
 
         self.request = RequestEntity(
             method=method,
-            path=path
+            path=path if path is not None else ''
         )
-        self.expected = ResponseEntity(status_code=status_code)
+        self.expected = ResponseEntity(status_code=200)
 
         return self
 
@@ -111,8 +110,6 @@ class ApiRequestHelper:
 
         Raises:
             RuntimeError: request path is not defined yet.
-            KeyError: Missing path parameter.
-            ValueError: Extra path parameters given.
 
         Example:
 
@@ -122,9 +119,13 @@ class ApiRequestHelper:
         self.__check_request_initialized()
 
         if self.request.path_params is None:
-            self.request.path_params = path_params
-        else:
-            self.request.path_params.update(path_params)
+            self.request.path_params = {}
+
+        for par, value in path_params.items():
+            if value is None:
+                del self.request.path_params[par]
+            else:
+                self.request.path_params[par] = value
 
         return self
 
@@ -145,10 +146,15 @@ class ApiRequestHelper:
         """
         self.__check_request_initialized()
 
+        print(query_params)
         if self.request.query_params is None:
-            self.request.query_params = query_params
-        else:
-            self.request.query_params.update(query_params)
+            self.request.query_params = {}
+
+        for par, value in query_params.items():
+            if value is None:
+                del self.request.query_params[par]
+            else:
+                self.request.query_params[par] = value
 
         return self
 
@@ -210,7 +216,33 @@ class ApiRequestHelper:
         self.request.json = payload.get() if isinstance(payload, JsonContent) else payload
         return self
 
-    def check_for_missing_path_params(self) -> None:
+    def with_expected(self, status_code: int = None,
+                    schema: dict = None,
+                    headers: JsonContent|dict = None,
+                    json: JsonContent|dict|list = None) -> Self:
+        """Sets expected response data.
+
+        Args:
+            status_code (int, optional): expected status code. Defaults to None.
+            schema (dict, optional): expected JSON schema. Defaults to None.
+            headers (JsonContent | dict, optional): expected headers. Defaults to None.
+            json (JsonContent | dict | list, optional): expected JSON content. Defaults to None.
+
+        Returns:
+            Self: instance of `ApiRequestHelper` class
+        """
+        if status_code:
+            self.expected.status_code = status_code
+        if headers:
+            self.expected.headers = headers
+        if json:
+            self.expected.json = json
+        if schema:
+            self.expected.schema = schema
+
+        return self
+
+    def check_for_missing_path_params(self) -> bool:
         """Checks that given params fullfill all placeholders in given path.
         Missing or extra parameters will raise an exception.
 
@@ -219,22 +251,68 @@ class ApiRequestHelper:
             ValueError: Extra path parameters given.
         """
 
-        path = self.request.path
-        params = self.request.path_params
-
-        print(f'check_for_missing_path_params: Invoked:\nPath={path}\nParams={params}')
-        expected_path_params = set(self.PATH_PATTERN.findall(path))
-        print(f'check_for_missing_path_params: Expected params:{expected_path_params}')
-        params_set = set(params) if params else set()
-
+        expected_path_params = set(self.PATH_PATTERN.findall(self.request.path))
+        params_set = set(self.request.path_params) if self.request.path_params else set()
+        error_note = 'Error occured on attempting to perpare ' \
+                        f'request {self.request} to "{self.api_client.name}" API.'
         missing = expected_path_params - params_set
         if missing:
-            raise KeyError(f'Missing path parameter(s): {", ".join(missing)}.')
+            err = KeyError(f'Missing path parameter(s): {", ".join(missing)}.')
+            err.add_note(error_note)
+            raise err
 
         extra = params_set - expected_path_params
         if extra:
-            raise ValueError(f'Extra path parameter(s) provided, '
-                             f'but never used: {", ".join(extra)}')
+            err = ValueError(
+                f'Extra path parameter(s) provided, but never used: {", ".join(extra)}.'
+            )
+            err.add_note(error_note)
+            raise err
+
+        return True
+
+    def prepare_request_params(self, request_args: dict|None) -> dict:
+        """Prepares parameters for actual API requests and return it as dict
+        of param-value pairs.
+
+        Args:
+            **request_args: key-values pairs for `requests.request` method
+            (headers, cookies, json, etc.)
+
+        Raises:
+            RuntimeError: Path is not defined for request.
+            KeyError: Missing path parameter.
+            ValueError: Extra path parameters given.
+
+        Returns:
+            Self: dict
+        """
+        self.__check_request_initialized()
+
+        self.check_for_missing_path_params()
+
+        request_args['path'] = self.request.path.format(**self.request.path_params) \
+                                if self.request.path_params else \
+                                self.request.path
+
+        request_args['method'] = self.request.method
+        request_args['params'] = self.request.query_params
+        request_args['json'] = self.request.json
+
+        # Ensure that given args will be appended to current requests settings
+        request_args['headers'] = self.request.headers | request_args.get('headers', {}) \
+                                    if self.request.headers else \
+                                    request_args.get('headers')
+
+        request_args['cookies'] = self.request.cookies | request_args.get('cookies', {}) \
+                                    if self.request.cookies else \
+                                    request_args.get('cookies')
+
+        request_args['auth'] = (request_args['auth']
+                                if request_args.get('auth') else
+                                self.request.auth)
+
+        return request_args
 
     def perform(self, override_defaults: bool = False, **request_args) -> ApiResponseHelper:
         """Performs HTTP request with given request parameters (headers, cookies, auth, etc.),
@@ -273,35 +351,17 @@ class ApiRequestHelper:
         Returns:
             Self: instance of class `ApiRequestHelper`
         """
-        self.__check_request_initialized()
-        if self.request.path is None:
-            raise RuntimeError('Path is not defined for request. '
-                               'Make sure to use .by_path() or .by_name() method first!')
-
-        self.check_for_missing_path_params()
-
-        path = (self.request.path.format(**self.request.path_params)
-                if self.request.path_params else
-                self.request.path)
-
-        # Ensure that given args will be appended to current requests settings
-        request_args['headers'] = self.request.headers | request_args.get('headers', {})
-        request_args['cookies'] = self.request.cookies | request_args.get('cookies', {})
-        request_args['auth'] = (request_args['auth']
-                                if request_args.get('auth') else
-                                self.request.auth)
-
-        self.__allure_save_request_params(path, request_args)
+        args = self.prepare_request_params(request_args)
+        self.__allure_save_request_params(args)
 
         request_step_info = f' "{self.name}"' if self.name else ''
         with allure.step(f'Request {self.count}{request_step_info} '
                          f'[method: {self.request.method}, url: {self.request.path}]'):
-            response = self.api_client.request(method = self.request.method,
-                                               path = path,
-                                               params = self.request.query_params,
-                                               override_defaults = override_defaults,
-                                               json = self.request.json,
-                                               **request_args)
+
+            response = self.api_client.request(
+                override_defaults=override_defaults,
+                **args
+            )
 
             allure.dynamic.parameter(f'Request {self.count} completed', response.url)
             self.count += 1
@@ -316,29 +376,30 @@ class ApiRequestHelper:
         Raises:
             RuntimeError: Request is not initialized.
         """
-        if self.request:
+        if self.request and self.request.path is not None:
             return
 
         raise RuntimeError('Request is not initialized. '
-                          'Use .by_name() or .by_path() methods first!')
+            'Make sure to use .by_path() or .by_name() method first!')
 
-    def __allure_save_request_params(self, uri: str, request_args: dict) -> None:
+    def __allure_save_request_params(self, request_args: dict) -> None:
         """Saves request data as Allure parameters.
 
         Args:
             path (str): request URI.
             request_args (dict): request parameters.
         """
-        allure.dynamic.parameter(
-            f'Request {self.count} (pre-configured, "{self.name}")'
-            if self.name else
-            f'Request {self.count}',
-            {
-                'path': uri,
-                'query': self.request.query_params if self.request.query_params else None,
-                'params': request_args if request_args else None
-            }
-        )
+        request_name = f'(pre-configured, "{self.name}")'if self.name else ''
+        param_name = f'Request {self.count}{request_name}'
+        param_value = {
+            'method': request_args['method'],
+            'path': request_args['path'],
+            'query': request_args.get('query_params', ''),
+            'params': {k:v for k,v in request_args.items()
+                       if v is not None and k not in ('method', 'path', 'query_params')}
+        }
+
+        allure.dynamic.parameter(param_name, param_value)
 
         if self.request.json is not None:
             allure.dynamic.parameter(f'Request {self.count} - JSON payload', self.request.json)

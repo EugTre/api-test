@@ -2,9 +2,23 @@
 import re
 import typing
 from dataclasses import dataclass
-from abc import ABC
+from abc import ABC, abstractmethod
+import pytest
+from _pytest.assertion.util import assertrepr_compare
 
 from utils.basic_manager import BasicManager
+
+# TODO: Use short_repr in all matchers
+# TODO: Add Date matcher
+
+def shorten_repr(list_or_dict):
+    """Helper method to shorten object repr in
+    assertrepr_compare_brief method output"""
+    repr_str = repr(list_or_dict)
+    if isinstance(list_or_dict, (list, dict)) and len(repr_str) > 55:
+        repr_str = f'{repr_str[:35]} ...{repr_str[-20:]}'
+    return repr_str
+
 
 @dataclass(frozen=True, slots=True, eq=False)
 class AbstractMatcher(ABC):
@@ -15,16 +29,45 @@ class AbstractMatcher(ABC):
     def __repr__(self):
         return ''
 
+    @staticmethod
+    @abstractmethod
+    def assertrepr_compare(left, right) -> list[str]:
+        """Return full list of string as explanation of why values are not equal"""
+        return []
+
+    @staticmethod
+    @abstractmethod
+    def assertrepr_compare_brief(left, right) -> list[str]:
+        """Return shortened list of string as explanation of why values are not equal"""
+        return []
+
+
 @dataclass(frozen=True, slots=True, eq=False)
 class Anything(AbstractMatcher):
     """Matches to any value"""
     def __eq__(self, other):
-        return True
+        return other is not None
 
     def __repr__(self):
         return '<Any>'
 
+    @staticmethod
+    def assertrepr_compare(left, right) -> list[str]:
+        output = [
+            "Comparing to Anything Matcher:",
+            f"{left} != {right}"
+        ]
+        output.extend(Anything.assertrepr_compare_brief(left, right))
+        return output
 
+    @staticmethod
+    def assertrepr_compare_brief(left, right) -> list[str]:
+        return ['Value is None, but expecte to be anything']
+
+
+# --------
+# Text
+# --------
 @dataclass(slots=True, frozen=True, eq=False)
 class AnyText(AbstractMatcher):
     """Matches to any text (string), including empty string"""
@@ -34,44 +77,134 @@ class AnyText(AbstractMatcher):
     def __repr__(self):
         return '<Any Text>'
 
+    @staticmethod
+    def assertrepr_compare(left, right) -> list[str]:
+        output = [
+            "Comparing to Text Matcher:",
+            f" {left} != {right}"
+        ]
+        output.extend(AnyText.assertrepr_compare_brief(left, right))
+        return output
+
+    @staticmethod
+    def assertrepr_compare_brief(left, right) -> list[str]:
+        return [
+            'Type mismatch:',
+            f'{type(left)} != {type("")}'
+        ]
+
 @dataclass(slots=True, frozen=True, eq=False)
 class AnyTextLike(AnyText):
     """Matches to any text (string) that matches to given regex"""
     pattern: str
+    case_sensitive: bool = False
 
     def __eq__(self, other):
         if isinstance(other, (Anything, AnyText)):
             return True
 
-        return isinstance(other, str) and re.match(self.pattern, other)
+        return isinstance(other, str) and re.match(
+            self.pattern, other, re.NOFLAG if self.case_sensitive else re.IGNORECASE)
 
     def __repr__(self):
-        return f'<Any Text Like {self.pattern}>'
+        return f'<Any Text Like "{self.pattern}", ' \
+               f'case {"" if self.case_sensitive else "in"}sensitive>'
+
+    @staticmethod
+    def assertrepr_compare(left, right) -> list[str]:
+        output = [
+            "Comparing to Text Like Matcher:",
+            f'{left} != {right}'
+        ]
+        output.extend(AnyTextLike.assertrepr_compare_brief(left, right))
+        return output
+
+    @staticmethod
+    def assertrepr_compare_brief(left, right) -> list[str]:
+        if not isinstance(left, str):
+            return [
+                'Type mismatch:',
+                f'Type {type(left)} doesn\'t match to expected {type("")} type.'
+            ]
+
+        return [
+            'Pattern mismatch:',
+            f'"{left}" doesn\'t match case '
+            f'{"" if right.case_sensitive else "in"}sensitive pattern "{right.pattern}"'
+        ]
 
 @dataclass(slots=True, frozen=True, eq=False)
 class AnyTextWith(AnyText):
     """Object that matches to any text (string) that
     contains given substring"""
     substring: str
+    case_sensitive: bool = False
 
     def __eq__(self, other):
         if isinstance(other, (Anything, AnyText)):
             return True
+        if not isinstance(other, str):
+            return False
 
-        return isinstance(other, str) and self.substring in other
+        return (self.substring in other
+                if self.case_sensitive else
+                self.substring.lower() in other.lower())
 
     def __repr__(self):
         return f'<Any Text With "{self.substring}">'
 
+    @staticmethod
+    def assertrepr_compare(left, right) -> list[str]:
+        output = [
+            "Comparing to Text Contains Matcher:",
+            f"{left} != {right}"
+        ]
+        output.extend(AnyTextWith.assertrepr_compare_brief(left, right))
+        return output
 
+    @staticmethod
+    def assertrepr_compare_brief(left, right) -> list[str]:
+        if not isinstance(left, str):
+            return [
+                'Type mismatch:',
+                f'Type {type(left)} doesn\'t match to expected {type("")} type.'
+            ]
+
+        return [
+            'Content mismatch:',
+            f'"{left}" doesn\'t contain case '
+            f'{"" if right.case_sensitive else "in"}sensitive substring "{right.substring}"'
+        ]
+
+
+# --------
+# Number
+# --------
 @dataclass(slots=True, frozen=True, eq=False)
 class AnyNumber(AbstractMatcher):
     """Object that matches to any number (int or float)"""
     def __eq__(self, other):
-        return isinstance(other, (int, float))
+        return isinstance(other, (int, float, Anything, AnyNumber))
 
     def __repr__(self):
         return '<Any Number>'
+
+    @staticmethod
+    def assertrepr_compare(left, right) -> list[str]:
+        left_repr = shorten_repr(left)
+        output = [
+            "Comparing to Number Matcher:",
+            f"{left_repr} != {right}"
+        ]
+        output.extend(AnyNumber.assertrepr_compare_brief(left, right))
+        return output
+
+    @staticmethod
+    def assertrepr_compare_brief(left, right) -> list[str]:
+        return [
+            'Type mismatch:',
+            f'Type {type(left)} doesn\'t match to expected {type(1)} or {type(1.1)} types.'
+        ]
 
 @dataclass(slots=True, frozen=True, eq=False)
 class AnyNumberGreaterThan(AnyNumber):
@@ -81,13 +214,13 @@ class AnyNumberGreaterThan(AnyNumber):
 
     def __eq__(self, other):
         result = False
-        if isinstance(other, AnyNumberGreaterThan):
-            # >16 vs >2 -- definetly in range of other, so ok, but >2 in >16 is not.
-            result = self.number >= other.number
-        elif isinstance(other, AnyNumberLessThan):
-            # >6 vs <10 -- range will always be pretty narrow in scale of +-inf, so not equal
-            result = False
-        elif isinstance(other, (AnyNumber, Anything)):
+        #if isinstance(other, AnyNumberGreaterThan):
+        #    # >16 vs >2 -- definetly in range of other, so ok, but >2 in >16 is not.
+        #    result = self.number >= other.number
+        #elif isinstance(other, AnyNumberLessThan):
+        #    # >6 vs <10 -- range will always be pretty narrow in scale of +-inf, so not equal
+        #    result = False
+        if isinstance(other, (AnyNumber, Anything)):
             result = True
         elif not isinstance(other, (int, float)):
             result = False
@@ -106,6 +239,28 @@ class AnyNumberGreaterThan(AnyNumber):
     def __repr__(self):
         return f'<Any Number Greater Than ({self.number})>'
 
+    @staticmethod
+    def assertrepr_compare(left, right) -> list[str]:
+        output = [
+            "Comparing to Number Greater Than Matcher:",
+            f"{left} != {right}"
+        ]
+        output.extend(AnyNumberGreaterThan.assertrepr_compare_brief(left, right))
+        return output
+
+    @staticmethod
+    def assertrepr_compare_brief(left, right) -> list[str]:
+        if not isinstance(left, (int, float)):
+            return [
+                'Type mismatch:',
+                f'Type {type(left)} doesn\'t match to expected {type(1)} or {type(1.1)} types.'
+            ]
+
+        return [
+            'Number is less than expected:',
+            f'{left} < {right.number}'
+        ]
+
 @dataclass(slots=True, frozen=True, eq=False)
 class AnyNumberLessThan(AnyNumber):
     """Object that matches to any number (int or float) that
@@ -114,16 +269,13 @@ class AnyNumberLessThan(AnyNumber):
 
     def __eq__(self, other):
         result = False
-        if isinstance(other, AnyNumberLessThan):
-            # <6 vs <10 -- definetly in range of other, so ok, but >2 in >16 is not.
-            result = self.number <= other.number
-        elif isinstance(other, AnyNumberGreaterThan):
-            # <16 vs >2 -- range will always be pretty narrow in scale of +-inf, so not equal
-            result = False
-        elif isinstance(other, AnyNumberLessThan):
-            # >6 vs <10 -- range will always be pretty narrow in scale of +-inf, so not equal
-            result = False
-        elif isinstance(other, (AnyNumber, Anything)):
+        # if isinstance(other, AnyNumberLessThan):
+        #     # <6 vs <10 -- definetly in range of other, so ok, but >2 in >16 is not.
+        #     result = self.number <= other.number
+        # elif isinstance(other, AnyNumberGreaterThan):
+        #     # <16 vs >2 -- range will always be pretty narrow in scale of +-inf, so not equal
+        #     result = False
+        if isinstance(other, (AnyNumber, Anything)):
             result = True
         elif not isinstance(other, (int, float)):
             result = False
@@ -142,17 +294,65 @@ class AnyNumberLessThan(AnyNumber):
     def __repr__(self):
         return f'<Any Number Less Than ({self.number})>'
 
+    @staticmethod
+    def assertrepr_compare(left, right) -> list[str]:
+        output = [
+            "Comparing to Number Less Than Matcher:",
+            f"{left} != {right}"
+        ]
+        output.extend(AnyNumberLessThan.assertrepr_compare_brief(left, right))
+        return output
 
+    @staticmethod
+    def assertrepr_compare_brief(left, right) -> list[str]:
+        if not isinstance(left, (int, float)):
+            return [
+                'Type mismatch:',
+                f'Type {type(left)} doesn\'t match to expected {type(1)} or {type(1.1)} types.'
+            ]
+
+        return [
+            'Number is greater than expected:',
+            f'{left} > {right.number}'
+        ]
+
+
+# --------
+# Bool
+# --------
 @dataclass(slots=True, frozen=True, eq=False)
 class AnyBool(AbstractMatcher):
     """Object that matches to any bool"""
     def __eq__(self, other):
-        return isinstance(other, bool)
+        return isinstance(other, (bool, Anything))
 
     def __repr__(self):
         return '<Any Bool>'
 
+    @staticmethod
+    def assertrepr_compare(left, right) -> list[str]:
+        left_repr = repr(left)
+        if isinstance(left, (list, dict)) and len(left_repr) > 30:
+            left_repr = f'{left_repr[:10]} ...{left_repr[-10:]}'
 
+        output = [
+            "Comparing to Bool Matcher:",
+            f"{left_repr} != {right}"
+        ]
+        output.extend(AnyBool.assertrepr_compare_brief(left, right))
+        return output
+
+    @staticmethod
+    def assertrepr_compare_brief(left, right) -> list[str]:
+        return [
+            'Type mismatch:',
+            f'Type {type(left)} doesn\'t match to expected {type(True)} type.'
+        ]
+
+
+# --------
+# Lists
+# --------
 @dataclass(slots=True, frozen=True, eq=False)
 class AnyList(AbstractMatcher):
     """Object that matches to any list"""
@@ -161,6 +361,22 @@ class AnyList(AbstractMatcher):
 
     def __repr__(self):
         return '<Any List>'
+
+    @staticmethod
+    def assertrepr_compare(left, right) -> list[str]:
+        output = [
+            "Comparing to List Matcher:",
+            f"{left} != {right}"
+        ]
+        output.extend(AnyList.assertrepr_compare_brief(left, right))
+        return output
+
+    @staticmethod
+    def assertrepr_compare_brief(left, right) -> list[str]:
+        return [
+            'Type mismatch:',
+            f'Type {type(left)} doesn\'t match to expected {type([])} type.'
+        ]
 
 @dataclass(slots=True, frozen=True, eq=False)
 class AnyListOf(AnyList):
@@ -191,11 +407,16 @@ class AnyListOf(AnyList):
                       any((self.item_type is None,
                            self.item_type == other.item_type)))
         elif isinstance(other, AnyListOf):
-            result = (any((self.size is None or other.size is None,
-                           self.size == other.size))
-                      and
-                      any((self.item_type is None or other.item_type is None,
-                           self.item_type == other.item_type)))
+            result = all((
+                any(
+                    (self.size is None or other.size is None,
+                    self.size == other.size
+                )),
+                any((
+                    self.item_type is None or other.item_type is None,
+                    self.item_type == other.item_type
+                ))
+            ))
         elif isinstance(other, (AnyList, Anything)):
             result = True
         elif not isinstance(other, list):
@@ -223,10 +444,19 @@ class AnyListOf(AnyList):
         return self.REPR_MSG.format(size_desc=size_desc, type_desc=type_desc)
 
     @staticmethod
-    def assert_repr_compare(left, right):
+    def assertrepr_compare(left, right):
         """Method to print detailed comparison fail info"""
-        output = ["Comparing List matcher:", f" {left} != {right}"]
+        output = [
+            "Comparing List Of matcher:",
+            f" {left} != {right}"
+        ]
 
+        output.extend(AnyListOf.assertrepr_compare_brief(left, right))
+        return output
+
+    @staticmethod
+    def assertrepr_compare_brief(left, right) -> list[str]:
+        output = []
         if right.size is not None:
             size_matches = False
             match (right.SIZE_COMPARE_OP):
@@ -276,24 +506,164 @@ class AnyListShorterThan(AnyListOf):
     REPR_MSG = '<Any List Shorter Than{size_desc}{type_desc}>'
     SIZE_COMPARE_OP = '<'
 
+@dataclass(slots=True, frozen=True, eq=False)
+class AnyListOfMatchers(AbstractMatcher):
+    matcher: AbstractMatcher
+    size: int|None = None
 
+    SIZE_COMPARE_OP = '=='
+
+    def __eq__(self, other):
+        result = True
+        if isinstance(other, list):
+            size_test = True
+            if self.size is not None:
+                match self.SIZE_COMPARE_OP:
+                    case '==': size_test = len(other) == self.size
+                    case '>': size_test = len(other) > self.size
+                    case '<': size_test = len(other) < self.size
+
+            type_test = all((
+                item == self.matcher
+                for item in other
+            ))
+
+            result = size_test and type_test
+
+        elif isinstance(other, (AnyList, Anything)):
+            result = True
+        else:
+            result = False
+
+        return result
+
+    def __repr__(self):
+        return f'<Any List Of Matchers ({self.matcher}) '\
+            f'of {self.size if self.size else "any number"} item(s)>'
+
+    @staticmethod
+    def assertrepr_compare(left, right):
+        output = [
+            "Comparing to List Of Matchers matcher:",
+            f" {left} != {right}"
+        ]
+
+        output.extend(AnyListOfMatchers.assertrepr_compare_brief(left, right))
+
+        return output
+
+    @staticmethod
+    def assertrepr_compare_brief(left, right) -> list[str]:
+        output = []
+        if right.size is not None:
+            size_matches = False
+            match (right.SIZE_COMPARE_OP):
+                case "==":
+                    size_matches = len(left) == right.size
+                case "<":
+                    size_matches = len(left) < right.size
+                case ">":
+                    size_matches = len(left) > right.size
+
+            if not size_matches:
+                output.append("Size comparison:")
+                output.append(
+                    f" {len(left)} {right.SIZE_COMPARE_OP} {right.size} -- size mismatch!")
+
+        elements_mismatch_detected = False
+        match_output = [f'Elements that doesn\'t match to "{right.matcher}":']
+
+        for idx, matches in enumerate([v == right.matcher for v in left]):
+            if matches:
+                continue
+
+            match_output.append('')
+            match_output.append(f'{idx}) {left[idx]}')
+            match_output.append('   Reason:')
+            if isinstance(right.matcher, AbstractMatcher):
+                reason = right.matcher.assertrepr_compare_brief(left[idx], right.matcher)
+            else:
+                reason = assertrepr_compare(pytest.current_config, '==', left[idx], right.matcher)
+            match_output.extend([f'   {r}' for r in reason])
+            elements_mismatch_detected = True
+
+        if elements_mismatch_detected:
+            output.extend(match_output)
+
+        return output
+
+@dataclass(slots=True, frozen=True, eq=False)
+class AnyListOfMatchersLongerThan(AnyListOfMatchers):
+    matcher: AbstractMatcher
+    size: int|None = None
+
+    SIZE_COMPARE_OP = '>'
+
+@dataclass(slots=True, frozen=True, eq=False)
+class AnyListOfMatchersShorterThan(AnyListOfMatchers):
+    matcher: AbstractMatcher
+    size: int|None = None
+
+    SIZE_COMPARE_OP = '<'
+
+
+# --------
+# Dicts
+# --------
 @dataclass(slots=True, frozen=True, eq=False)
 class AnyDict(AbstractMatcher):
     """Object that matches to any dict"""
     def __eq__(self, other):
-        return isinstance(other, dict)
+        return isinstance(other, (dict, Anything))
 
     def __repr__(self):
         return '<Any Dict>'
+
+    @staticmethod
+    def assertrepr_compare(left, right) -> list[str]:
+        output = [
+            "Comparing to Dict matcher:",
+            f"{left} != {right}"
+        ]
+        output.extend(AnyDict.assertrepr_compare_brief(left, right))
+        return output
+
+    @staticmethod
+    def assertrepr_compare_brief(left, right) -> list[str]:
+        return [
+            'Type mismatch:',
+            f'Type {type(left)} doesn\'t match to expected {type({})} type.'
+        ]
 
 @dataclass(slots=True, frozen=True, eq=False)
 class AnyNonEmptyDict(AnyDict):
     """Object that matches to any non-empty dict"""
     def __eq__(self, other) -> bool:
-        return isinstance(other, dict) and other
+        return isinstance(other, (dict, Anything)) and other
 
     def __repr__(self):
         return '<Any Non-Empty Dict>'
+
+    @staticmethod
+    def assertrepr_compare(left, right) -> list[str]:
+        output = [
+            "Comparing to Non-empty Dict matcher:",
+            f"{left} != {right}"
+        ]
+        output.extend(AnyDict.assertrepr_compare_brief(left, right))
+        return output
+
+    @staticmethod
+    def assertrepr_compare_brief(left, right) -> list[str]:
+        if not isinstance(left, (dict, Anything)):
+            return [
+                'Type mismatch:',
+                f'Type {type(left)} doesn\'t match to expected {type({})} type.'
+            ]
+
+        return [
+            "Dict is empty!"
+        ]
 
 
 class MatchersManager(BasicManager):
