@@ -2,9 +2,9 @@
 import copy
 from typing import Any, Type
 
-from utils.json_content.pointer import Pointer
-from utils.json_content.json_wrapper import JsonWrapper
-from utils.json_content.composition_handlers import CompositionHandler, CompositionStatus, \
+from .pointer import Pointer
+from .json_wrapper import JsonWrapper
+from .composition_handlers import CompositionHandler, CompositionStatus, \
     DEFAULT_COMPOSITION_HANDLERS_COLLECTION
 
 HANDLER_CONTEXT_KEY = "content_context"

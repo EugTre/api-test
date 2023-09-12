@@ -6,6 +6,7 @@ from requests.models import CaseInsensitiveDict
 
 import allure
 from jsonschema import validate
+from utils.api_client.models import ResponseEntity
 from utils.json_content.json_content import JsonContent, JsonContentBuilder
 from utils.json_content.pointer import ROOT_POINTER
 from utils.matchers import AbstractMatcher
@@ -565,10 +566,12 @@ class ApiResponseHelper:
         self.json = ResponseBodyJsonValidatior(self, json_of_response)
 
     # Setup functions
-    def set_expected(self, status_code: int = None,
+    def set_expected(self,
+                     status_code: int = None,
                      schema: dict = None,
                      headers: dict = None,
-                     json: JsonContent|dict|list = None) -> Self:
+                     json: JsonContent|dict|list = None,
+                     expected_response: ResponseEntity = None) -> Self:
         """Sets expected response data for futher use as defaults in validation methods.
 
         Args:
@@ -576,10 +579,24 @@ class ApiResponseHelper:
             schema (dict, optional): expected JSON schema. Defaults to None.
             headers (JsonContent | dict, optional): expected headers. Defaults to None.
             json (JsonContent | dict | list, optional): expected JSON content. Defaults to None.
+            expected_response (utils.api_client.models.ResponseEntity): expected response params.
+            Defaults to None.
 
         Returns:
             Self: instance of `ApiResponseHelper` class
         """
+
+        # Apply data from response entity (e.g. from pre-configured expected response)
+        # if passed.
+        if expected_response:
+            self.set_expected(
+                status_code=expected_response.status_code,
+                schema=expected_response.schema,
+                headers=expected_response.headers,
+                json=expected_response.json
+            )
+
+        # Then apply specific values
         if status_code is not None:
             self.expected_status_code = status_code
         if schema is not None:
@@ -589,6 +606,7 @@ class ApiResponseHelper:
         if headers is not None:
             self.headers.set_expected(headers)
 
+        print('ApiResponseHelper :: JSON', json)
         return self
 
     # General functions

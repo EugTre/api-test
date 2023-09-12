@@ -4,9 +4,9 @@ pytest -s -vv ./utils/api_client/test_setup_api_client.py
 """
 import pytest
 from utils.conftest import AppendableFilePath
-from utils.api_client.api_configuration_reader import ApiConfigurationReader
-from utils.api_client.setup_api_client import setup_api_client
-from utils.api_client.basic_api_client import DEFAULT_TIMEOUT
+from .api_configuration_reader import ApiConfigurationReader
+from .setup_api_client import setup_api_client
+from .basic_api_client import DEFAULT_TIMEOUT
 
 # Constnats
 API_NAME = "TEST_API"

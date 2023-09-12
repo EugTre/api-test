@@ -3,7 +3,7 @@
 pytest -s -vv ./utils/test_data_reader.py
 """
 import pytest
-from utils.data_reader import DataReader
+from .data_reader import DataReader
 
 @pytest.fixture(name='txt_file')
 def get_txt_file(get_file):

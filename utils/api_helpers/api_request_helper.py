@@ -2,13 +2,12 @@
 import re
 import copy
 from typing import Self
-from dataclasses import asdict
 
 import allure
 from utils.api_client.basic_api_client import BasicApiClient, HTTPMethod
 from utils.api_client.models import RequestEntity, ResponseEntity
 from utils.json_content.json_content import JsonContent
-from utils.api_helpers.api_response_helper import ApiResponseHelper
+from .api_response_helper import ApiResponseHelper
 
 
 class ApiRequestHelper:
@@ -146,7 +145,6 @@ class ApiRequestHelper:
         """
         self.__check_request_initialized()
 
-        print(query_params)
         if self.request.query_params is None:
             self.request.query_params = {}
 
@@ -366,8 +364,8 @@ class ApiRequestHelper:
             allure.dynamic.parameter(f'Request {self.count} completed', response.url)
             self.count += 1
 
-        return ApiResponseHelper(response).set_expected(**asdict(self.expected))\
-                                          .status_code_equals()
+        return ApiResponseHelper(response) \
+            .set_expected(expected_response=self.expected).status_code_equals()
 
     # Private methods
     def __check_request_initialized(self) -> None:

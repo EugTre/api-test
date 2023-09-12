@@ -6,8 +6,8 @@ import copy
 from typing import Any
 
 import pytest
-from utils.json_content.json_wrapper import JsonWrapper
-from utils.json_content.pointer import Pointer
+from .json_wrapper import JsonWrapper
+from .pointer import Pointer
 
 KEY_ERROR_MSG_ON_FAIL_TO_FIND = 'Failed to find value by ".*" JSON Pointer in the document.*'
 INVALID_INDEX_MSG_ON_POINTER_FAIL = 'Invalid list index .*'

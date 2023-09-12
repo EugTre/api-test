@@ -6,9 +6,9 @@ import copy
 import json
 
 import pytest
-from utils.json_content.json_content import JsonContentBuilder
-from utils.json_content.composition_handlers import DEFAULT_COMPOSITION_HANDLERS_COLLECTION
-from utils.json_content.pointer import Pointer
+from .json_content import JsonContentBuilder
+from .composition_handlers import DEFAULT_COMPOSITION_HANDLERS_COLLECTION
+from .pointer import Pointer
 
 CONTENT = {
     'a': 1,

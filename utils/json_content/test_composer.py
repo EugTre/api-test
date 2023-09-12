@@ -7,11 +7,12 @@ import copy
 import re
 
 import pytest
-from utils.json_content.composer import Composer
-from utils.json_content.json_wrapper import JsonWrapper
 from utils.generators import GeneratorsManager
 from utils.matchers import MatchersManager, AnyText, AnyListOf
-from utils.json_content.composition_handlers import ReferenceCompositionHandler, \
+
+from .composer import Composer
+from .json_wrapper import JsonWrapper
+from .composition_handlers import ReferenceCompositionHandler, \
     FileReferenceCompositionHandler, \
     IncludeFileCompositionHandler, \
     GeneratorCompositionHandler, \

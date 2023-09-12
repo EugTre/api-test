@@ -8,8 +8,6 @@ from _pytest.assertion.util import assertrepr_compare
 
 from utils.basic_manager import BasicManager
 
-# TODO: Use short_repr in all matchers
-# TODO: Add Date matcher
 
 def shorten_repr(list_or_dict):
     """Helper method to shorten object repr in
@@ -508,7 +506,10 @@ class AnyListShorterThan(AnyListOf):
 
 @dataclass(slots=True, frozen=True, eq=False)
 class AnyListOfMatchers(AbstractMatcher):
-    matcher: AbstractMatcher
+    """Object that matches to any list of given size and
+    having elements that match to given matcher object
+    (another AbstactMatcher or any other object)"""
+    matcher: AbstractMatcher | typing.Any
     size: int|None = None
 
     SIZE_COMPARE_OP = '=='
@@ -594,6 +595,10 @@ class AnyListOfMatchers(AbstractMatcher):
 
 @dataclass(slots=True, frozen=True, eq=False)
 class AnyListOfMatchersLongerThan(AnyListOfMatchers):
+    """Object that matches to any list with size
+    greater than given 'size' and
+    having elements that match to given matcher object
+    (another AbstactMatcher or any other object)"""
     matcher: AbstractMatcher
     size: int|None = None
 
@@ -601,6 +606,10 @@ class AnyListOfMatchersLongerThan(AnyListOfMatchers):
 
 @dataclass(slots=True, frozen=True, eq=False)
 class AnyListOfMatchersShorterThan(AnyListOfMatchers):
+    """Object that matches to any list with size
+    less than given 'size' and
+    having elements that match to given matcher object
+    (another AbstactMatcher or any other object)"""
     matcher: AbstractMatcher
     size: int|None = None
 

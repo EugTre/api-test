@@ -4,7 +4,7 @@
 import logging
 
 from utils.json_content.json_content import JsonContentBuilder
-from utils.api_client.models import ApiConfiguration, \
+from .models import ApiConfiguration, \
     ApiClientSpecification, ApiClientsSpecificationCollection, \
     RequestEntity, ResponseEntity, RequestCatalogEntity
 

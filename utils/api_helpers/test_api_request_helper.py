@@ -3,12 +3,12 @@
 pytest -s -vv ./utils/api_helpers/test_api_request_helper.py
 """
 import pytest
-from utils.api_helpers.api_request_helper import ApiRequestHelper, ApiResponseHelper
 from utils.api_client.basic_api_client import BasicApiClient
 from utils.api_client.models import RequestCatalogEntity, RequestEntity, \
     ResponseEntity, HTTPMethod
 from utils.matchers import Anything
 from utils.conftest import LOCAL_SERVER_URL
+from .api_request_helper import ApiRequestHelper, ApiResponseHelper
 
 
 REQUEST_NAME_1 = "GetItem"
@@ -292,7 +292,6 @@ class TestApiRequestHelper:
             schema=RESPONSE_CONFIGURED_2.schema
         )
 
-
     def test_prepare_request_params_for_configured_request(self, api: ApiRequestHelper):
         """Prepare request method test for concifugrd request"""
         api.by_path(path='{node}/{id}') \
@@ -342,6 +341,10 @@ class TestApiRequestHelper:
             **params
         }
 
+
+@pytest.mark.xdist_group("localhost_server")
+class TestApiRequestHelperPerform:
+    """Test .perform() method"""
     def test_perform_request_no_params(self, api: ApiRequestHelper, localhost_server):
         """Request may be performed without additional args"""
         response = api.by_path("/items").with_expected(status_code=501).perform()

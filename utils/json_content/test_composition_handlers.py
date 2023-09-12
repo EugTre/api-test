@@ -6,15 +6,16 @@ pytest -s -vv ./utils/json_content/test_composition_handlers.py
 import random
 
 import pytest
-from utils.json_content.composition_handlers import CompositionStatus, \
+from utils import matchers
+import utils.generators as gen
+
+from .json_wrapper import JsonWrapper
+from .composition_handlers import CompositionStatus, \
     ReferenceCompositionHandler, \
     FileReferenceCompositionHandler, \
     IncludeFileCompositionHandler, \
     GeneratorCompositionHandler, \
     MatcherCompositionHandler
-from utils.json_content.json_wrapper import JsonWrapper
-from utils import matchers
-import utils.generators as gen
 
 
 # --- Fixtures

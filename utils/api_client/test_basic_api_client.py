@@ -4,8 +4,8 @@ pytest -s -vv ./utils/api_client/test_basic_api_client.py
 """
 
 import pytest
-from utils.api_client.basic_api_client import BasicApiClient, DEFAULT_TIMEOUT
 from utils.conftest import LOCAL_SERVER_URL
+from .basic_api_client import BasicApiClient, DEFAULT_TIMEOUT
 
 
 ENDPOINT = "v1"
@@ -98,11 +98,13 @@ class TestBasicApiClient:
         """Compose given URL with base url + endpoint test"""
         assert client_no_defaults.compose_url(input_data) == expected
 
+    @pytest.mark.xdist_group("localhost_server")
     def test_request(self, client_localhost, localhost_server):
         """Basic request test"""
         response = client_localhost.request('GET', '')
         assert response.status_code == 501
 
+    @pytest.mark.xdist_group("localhost_server")
     def test_request_with_params(self, client_localhost: BasicApiClient,
                                  localhost_server):
         """Request with params"""

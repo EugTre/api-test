@@ -6,8 +6,8 @@ import json
 from dataclasses import asdict
 
 import pytest
-from utils.api_client.api_configuration_reader import ApiConfigurationReader
 from utils.conftest import AppendableFilePath
+from .api_configuration_reader import ApiConfigurationReader
 
 TEST_API_NAME = 'TEST_API'
 

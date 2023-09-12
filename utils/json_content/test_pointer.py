@@ -4,7 +4,7 @@ pytest -s -vv ./utils/json_content/test_pointer.py
 """
 import pytest
 
-from utils.json_content.pointer import Pointer
+from .pointer import Pointer
 
 
 class TestPointer:

@@ -8,11 +8,12 @@ from typing import Any
 from abc import ABC, abstractmethod
 from enum import Enum
 
-from utils.json_content.json_wrapper import JsonWrapper
-from utils.json_content.pointer import Pointer
 from utils.data_reader import DataReader
 from utils.matchers import MatchersManager, matchers_manager
 from utils.generators import GeneratorsManager, generators_manager
+
+from .json_wrapper import JsonWrapper
+from .pointer import Pointer
 
 
 class CompositionStatus(Enum):

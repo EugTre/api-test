@@ -10,12 +10,12 @@ import jsonschema.exceptions
 from requests.models import Response
 
 import utils.matchers as match
-from utils.api_helpers.api_response_helper import ApiResponseHelper
 from utils.json_content.json_content import JsonContent, JsonContentBuilder
+from .api_response_helper import ApiResponseHelper
 
 
 # --- Constants
-PAYLOAD_SIMPLE = payload = {
+PAYLOAD_SIMPLE = {
     "status": "success",
     "message": "Successfully executed"
 }
@@ -448,6 +448,12 @@ class TestApiResponseHelperJson:
         api_response_detailed \
             .set_expected(json=PAYLOAD_SIMPLE) \
             .json.equals(ignore=("/info",))
+
+    def test_equals_with_matchers(self, api_response_simple: ApiResponseHelper):
+        api_response_simple.set_expected(json={
+            "status": match.AnyText(),
+            "message": match.AnyTextLike(r'success.*exec.*')
+        }).json.equals()
 
     # is_like
     def test_is_like(self, api_response_detailed: ApiResponseHelper):

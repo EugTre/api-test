@@ -1,10 +1,21 @@
 # API Test exercises
 
+# Launch
+Framework tests
+```
+pytest .\utils -n auto --dist loadgroup
+```
+Some tests are using localhost server and should be run as group.
+
+
+
 # TODO:
- - Matchers: Add assertrepr_compare methods and add to conftest.py
- - DB Logger
- - ApiRequest tests
- - Review ApiResponse to use with matchers
+
+ - Support parallel run? E.g. prepare config jsons once?
+ - Matchers: Add date matcher
+ - Matchers: Use short_repr in all matchers
+ - ApiRequest - add @prepared decorator to check request was initialized before using .with_* and perfrom methods
+
 
 ## How to use
 ### Installation

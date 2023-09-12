@@ -1,12 +1,21 @@
 """Basic API Client wrapper"""
+import os
+import uuid
 import logging
 from logging import ERROR, INFO
 from abc import ABC, abstractmethod
+from enum import Enum
 
 import requests
-from utils.api_client.models import HTTPMethod, ApiClientSpecification, RequestCatalogEntity
+from .models import HTTPMethod, RequestCatalogEntity
 
 DEFAULT_TIMEOUT = 60
+
+class RequestLogEventType(Enum):
+    """Type of log event from Api Client"""
+    PREPARED = 0
+    SUCCESS = 1
+    ERROR = -1
 
 
 class AbstractApiClient(ABC):
@@ -27,13 +36,63 @@ class AbstractApiClient(ABC):
     def get_from_catalog(self, name: str):
         """Get RequestCatalogEntity from api's client request catalog"""
 
+    @staticmethod
+    def response_object_to_str(response: requests.Response) -> str:
+        """Converts response object to dict of parameters
+
+        Args:
+            response (requests.Response): response object to convert.
+
+        Returns:
+            str: response object data as string.
+        """
+        if response is None:
+            return None
+
+        fields = {
+            'status_code': response.status_code,
+            'reason': response.reason,
+            'headers': response.headers,
+            'cookies': response.cookies.get_dict(),
+            'latency_ms': response.elapsed.microseconds / 1000,
+            'history': response.history,
+            'encoding': response.encoding,
+            'raw_content': response.content,
+            'text': response.text,
+            'is_redirect': response.is_redirect
+        }
+
+        return str(fields)
+
+    @staticmethod
+    def request_object_to_str(request: requests.PreparedRequest):
+        """Converts request object to dict of parameters
+
+        Args:
+            request (requests.Response): request object to convert.
+
+        Returns:
+            str: request object data as string.
+        """
+        if request is None:
+            return None
+
+        fields = {
+            'method': request.method,
+            'url': request.url,
+            'headers': request.headers,
+            'cookies': request.headers["Cookie"].get_dict()
+                        if "Cookie" in request.headers
+                        else {},
+            'body': request.body
+        }
+        return str(fields)
+
 
 class BasicApiClient(AbstractApiClient):
     """Basic API Client class and base class for inheritence.
     Wraps `requests` module with little custom logic and logging of request & response.
     """
-    instnace_count = 0   # TODO: Remove debug info
-
     def __init__(self, api_spec_as_dict: dict):
         """Creates an instance of `BasicApiClient` class.
 
@@ -54,25 +113,23 @@ class BasicApiClient(AbstractApiClient):
 
         self.request_catalog = api_spec_as_dict.get('request_catalog', None)
         self.request_defaults = api_spec_as_dict.get('request_defaults', {})
+        if not self.request_defaults.get('timeout'):
+            self.request_defaults['timeout'] = DEFAULT_TIMEOUT
+
+        self.name = api_spec_as_dict.get('name', f'{self.get_api_url()} API Client')
+        self.client_id = {
+            'id': f"{self.name}"\
+                f"_{os.getenv('PYTEST_XDIST_WORKER', 'master')}" \
+                f"_{os.getenv('PYTEST_XDIST_TESTRUNUID', uuid.uuid4().hex)}",
+            'api': self.name,
+            'url': self.get_api_url()
+        }
+        self.request_count = 0
 
         self.logger = None
         if api_spec_as_dict.get('logger_name') is not None:
             self.logger = logging.getLogger(api_spec_as_dict['logger_name'])
 
-        self.name = api_spec_as_dict.get('name', f'Client for {self.get_api_url()} API')
-
-        # Apply defaults
-        if not self.request_defaults.get('timeout'):
-            self.request_defaults['timeout'] = DEFAULT_TIMEOUT
-
-        # TODO: Remove debug info
-        self.instance_id = BasicApiClient.instnace_count
-        BasicApiClient.instnace_count += 1
-
-        self.request_count = 0
-
-        self._log(INFO, f'BasicApiClient {self.instance_id} was created!!!')
-        self._log(INFO, self)
 
     def request(self, method: str|HTTPMethod,
                 path: str,
@@ -101,19 +158,20 @@ class BasicApiClient(AbstractApiClient):
             method = method.value
 
         request_params = self.prepare_request_params(method, path,
-                                                      override_defaults,
-                                                      **params)
+                                                    override_defaults,
+                                                    **params)
+
+        self._log_request(request_params)
         response = None
         try:
             response = requests.request(**request_params)
         except Exception:
-            self._log(ERROR, 'Exception', exc_info=True,
-                      extra={'request': request_params, 'response': response})
+            self._log_error(response)
             raise
 
+        self._log_response(response)
         self.request_count += 1
-        self._log(INFO, f'Request {self.request_count} by {self.instance_id} made {response.url}',
-                  extra={'request': request_params, 'response': response})
+
         return response
 
     def get_api_url(self) -> str:
@@ -219,15 +277,45 @@ class BasicApiClient(AbstractApiClient):
             if key not in request_value:
                 request_value[key] = value
 
-    def _log(self, level: int, msg: str, extra: dict = None, exc_info:bool = False) -> None:
-        """Logging request and response data by given logger.
-
-        Args:
-            level (int): log level
-            msg (str): log message
-            extra (dict, optional): extra parameters to log. Defaults to None.
-            exc_info (bool, optional): flag to include exception info to log. Defaults to False.
-        """
+    def _log_request(self, request_params):
+        """Logs prepared request data"""
         if not self.logger:
             return
-        self.logger.log(level, msg, exc_info=exc_info, extra=extra)
+
+        self.logger.log(INFO, msg="", extra={
+            'event_type': 0,
+            'request_id': self.request_count,
+            'request_params': request_params,
+            'client_id': self.client_id
+        })
+
+    def _log_response(self, response):
+        """Logs response data of the successful request"""
+        if not self.logger:
+            return
+
+        self.logger.log(INFO, msg="", extra={
+            'event_type': 1,
+            'request_id': self.request_count,
+            'request': self.request_object_to_str(response.request),
+            'response': self.response_object_to_str(response),
+            'client_id': self.client_id
+        })
+
+    def _log_error(self, response):
+        """Logs error info of the unsuccessful request (exception raised)"""
+        if not self.logger:
+            return
+
+        self.logger.log(
+            ERROR,
+            msg="",
+            exc_info=True,
+            extra={
+                'event_type': -1,
+                'request_id': self.request_count,
+                'request': self.request_object_to_str(response.request) if response else None,
+                'response': self.response_object_to_str(response),
+                'client_id': self.client_id
+            }
+        )

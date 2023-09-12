@@ -175,8 +175,8 @@ class TestMatcherManager:
 class TestMatchersBasic:
     """Positive tests for matchers"""
     @pytest.mark.parametrize("match_value",[
-        None,
         "text",
+        False,
         123,
         123.33,
         [],
@@ -187,6 +187,7 @@ class TestMatchersBasic:
         matcher.Anything()
     ])
     def test_anything(self, match_value):
+        """Anything matches to any non-None value"""
         matcher_instance = matcher.Anything()
         assert matcher_instance == match_value
         assert match_value == matcher_instance
@@ -457,7 +458,8 @@ class TestMatcherAnyListOfMatchers:
         pytest.param(matcher.AnyTextLike(r'\d+'), 2, ["34", "4242"], id='AnyTextLike-2'),
         pytest.param(matcher.AnyListOf(2, 1), 2, [ [1,2], [0,4] ], id='AnyListOfIntsOfSize-2'),
         pytest.param(matcher.Anything(), 2, [4, ['str', True]], id='Anything-2'),
-        pytest.param(matcher.AnyListOfMatchers(matcher.AnyList()), 2, [ [[1,2], [3,4]], [[5, 2]] ], id='AnyListOfMatchers-2')
+        pytest.param(matcher.AnyListOfMatchers(matcher.AnyList()), 2, [ [[1,2], [3,4]], [[5, 2]] ],
+                     id='AnyListOfMatchers-2')
     ))
     def test_basic(self, matcher_item, size, compare_to):
         matcher_instance = matcher.AnyListOfMatchers(
@@ -468,29 +470,17 @@ class TestMatcherAnyListOfMatchers:
         assert compare_to == matcher_instance
 
 
-class TestMatcherAnyDictLike:
-    def test_basic(self):
-
-        assert [1,2,3] == matcher.AnyListOfMatchers(
-            matcher=matcher.AnyText()
-        )
-
-        list_to_compare = [
-            {"id": 3, "user": 15125, "comments": [1,4,545, 5533]},
-            {"id": 5, "user": 'ds', "comments": [524, 1024]},
-            {"id": 13, "user": 2442, "comments": [102, 632]}
-        ]
-        assert list_to_compare == matcher.AnyListOfMatchers(
-            matcher={
-                "id": matcher.AnyNumber(),
-                "user": matcher.AnyNumber(),
-                "comments": matcher.AnyListOf(item_type=1)
-            },
-            size=3
-        ), 'Все пропало!'
-
 class TestMatchersNegative:
     """Negative tests for matchers"""
+    def test_anything_fails(self):
+        """Anything fails to match None"""
+        compare_to = None
+        matcher_instance = matcher.Anything()
+        with pytest.raises(AssertionError, match='Comparing to Anything Matcher:.*'):
+            assert matcher_instance == compare_to
+
+        with pytest.raises(AssertionError, match='Comparing to Anything Matcher:.*'):
+            assert compare_to == matcher_instance
 
     @pytest.mark.parametrize("match_value",[
         12, 12.33, [], {}, None

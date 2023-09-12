@@ -2,8 +2,8 @@
 """
 import importlib
 
-from utils.api_client.models import ApiClientsSpecificationCollection
-from utils.api_client.basic_api_client import AbstractApiClient
+from .models import ApiClientsSpecificationCollection
+from .basic_api_client import AbstractApiClient
 
 def setup_api_client(api_name: str,
                      api_clients_configurations: ApiClientsSpecificationCollection

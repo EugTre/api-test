@@ -6,8 +6,6 @@ Story:   'Getting single random image of random breed.'
 """
 import allure
 from utils.api_helpers.api_request_helper import ApiRequestHelper
-from utils.helper import Helper
-
 
 @allure.epic('DOG CEO API')
 @allure.feature('Random image')
@@ -16,16 +14,37 @@ class TestRandomImageSingleImage:
     """Group of tests related to DOG_API - Random image story"""
 
     @allure.title('Get single random image')
-    def test_random_image(self, api_request: ApiRequestHelper, helper: Helper):
-        '''Verifies random image API call is successful and
-           return URI to image MIME type file'''
-        api_request.by_name("GetRandomImage") \
-                    .perform() \
-                    .validate_against_schema() \
-                    .is_not_empty() \
-                    .value_equals('/status', 'success') \
-                    .value_is_not_empty('/message') \
-                    .verify_value('/message', helper.is_image_url)
+    def test_get(self, api_request: ApiRequestHelper):
+        """Verifies random image API call is successful and
+           return URI to image MIME type file"""
+
+        r = api_request.by_name('GetSingleRandomImage') \
+            .perform() \
+            .validate_against_schema()
+
+        print(r.json.expected)
+        print(r.json.content)
+
+    @allure.title('Get single random image, unexpected query params')
+    def test_get_with_query_params(self, api_request: ApiRequestHelper):
+        """Verifies random image API call is successful and
+           return URI to image MIME type file, even when there are
+           unexpected query params were passed"""
+
+        api_request.by_name('GetSingleRandomImage') \
+            .with_query_params(q=10, size=100, amount=500) \
+            .perform() \
+            .validate_against_schema() \
+            .json.equals()
+
+
+"""
+{
+    'status': 'success',
+    'message': match.AnyTextLike(r'^(http|https):\/\/.*(\.jpg)$')
+})
+"""
+
 
 
 

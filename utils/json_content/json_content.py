@@ -5,11 +5,11 @@ import copy
 
 from typing import Self, Any
 from utils.data_reader import DataReader
-from utils.json_content.json_wrapper import JsonWrapper
-from utils.json_content.composer import Composer
 
-from utils.json_content.pointer import Pointer, ROOT_POINTER
-from utils.json_content.composition_handlers import DEFAULT_COMPOSITION_HANDLERS_COLLECTION
+from .json_wrapper import JsonWrapper
+from .composer import Composer
+from .composition_handlers import DEFAULT_COMPOSITION_HANDLERS_COLLECTION
+from .pointer import Pointer, ROOT_POINTER
 
 class JsonContent:
     """Class to wrap JSON with get/update/delete methods and

@@ -1,16 +1,26 @@
 {
     "$defs": {"!file": "config/DOG.CEO/defines.json"},
 
-    "GetRandomImage": {
+    "GetSingleRandomImage": {
         "request": {
             "method": "GET",
             "path": "breeds/image/random"
         },
         "response": {
             "status_code": 200,
-            "schema": {"!ref": "/$defs/schema/SingleImage"}
+            "schema": {"!ref": "/$defs/schema/SingleImage"},
+            "json": {
+                "status": "success",
+                "message": {
+                    "!match": "AnyTextLike",
+                    "pattern": "^(http|https)://.*(\\.jpg)$"
+                }
+            }
         }
     },
+
+
+
     "GetMultipleRandomImages": {
         "request": {
             "method": "GET",

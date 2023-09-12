@@ -8,8 +8,10 @@ import typing
 import http.server
 import socketserver
 import threading
+import pathlib
 
 import pytest
+from filelock import FileLock
 
 
 LOCAL_HOST = "127.0.0.1"
@@ -22,9 +24,12 @@ def start_server(server):
     with server:
         server.serve_forever()
 
-@pytest.fixture(name='localhost_server', scope='class')
+@pytest.fixture(name='localhost_server', scope='session')
 def handle_local_server():
-    """Creates server in separate thread and stop it afterwards"""
+    """Creates server in separate thread and stop it afterwards
+    In case of xdist launch this fixture fails
+    Tests that using it must be marked as @pytest.mark.xdist_group("localhost_server")
+    """
     server = socketserver.TCPServer(
         (LOCAL_HOST, LOCAL_PORT),
         http.server.BaseHTTPRequestHandler

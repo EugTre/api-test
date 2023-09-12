@@ -1,6 +1,6 @@
 """Wraps JSON content and provide interface for accessing it's properties"""
 from typing import Any
-from utils.json_content.pointer import Pointer, APPEND_CHAR
+from .pointer import Pointer, APPEND_CHAR
 
 
 EXC_MSG__INVALID_POINTER_TYPE = 'Invalid pointer "{pointer_str}". '\
