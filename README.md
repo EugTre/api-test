@@ -10,11 +10,9 @@ Some tests are using localhost server and should be run as group.
 
 
 # TODO:
-
  - Support parallel run? E.g. prepare config jsons once?
  - Matchers: Add date matcher
  - Matchers: Use short_repr in all matchers
- - ApiRequest - add @prepared decorator to check request was initialized before using .with_* and perfrom methods
 
 
 ## How to use

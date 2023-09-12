@@ -388,6 +388,7 @@ class TestApiRequestHelperPerform:
         assert 'Foo' in request_headers
         assert request_headers['Foo'] == new_header_value
 
+
 class TestApiRequestHelperNegative:
     """Negative tests for ApiRequestHelper"""
     def test_get_request_by_unknown_name_fails(self, client_requestless):
@@ -441,3 +442,20 @@ class TestApiRequestHelperNegative:
         """Error occurs if request is not set before performing request"""
         with pytest.raises(RuntimeError, match='Request is not initialized.*'):
             api.perform()
+
+
+    @pytest.mark.parametrize("param, args", (
+        ("with_path_params", {'a': 1, 'b': 2}),
+        ("with_query_params", {'a': 1, 'b': 2}),
+        ("with_headers", {'foo': 'bar'}),
+        ("with_cookies", {'foo': 'bar'}),
+        ("with_json_payload", {'payload': {'foo': 'bar'}}),
+        ("with_expected", {'status_code': 501})
+    ))
+    def test_with_methods_on_unset_request_fails(self, api: ApiRequestHelper,
+                                                 param: str, args: dict):
+        """Exception raised on attempt to setup request params without
+        initializing request with .by_name or .by_path methods"""
+        with pytest.raises(RuntimeError, match='Request is not initialized.*'):
+            method = getattr(api, param)
+            method(**args)
