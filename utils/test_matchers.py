@@ -2,75 +2,78 @@
 
 pytest -s -vv ./utils/test_matchers.py
 """
+import datetime
+import re
+
 import pytest
-import utils.matchers as matcher
+import utils.matchers as match
 
 class TestMatcherManager:
     """Tests for matcher manager"""
     def test_manager_create_with_defaults(self):
-        manager = matcher.MatchersManager()
+        manager = match.MatchersManager()
         assert hasattr(manager, 'collection')
         assert manager.collection is not None
         assert len(manager.collection) > 0
 
     def test_manager_create_with_no_defaults(self):
-        manager = matcher.MatchersManager(False)
+        manager = match.MatchersManager(False)
         assert hasattr(manager, 'collection')
         assert manager.collection is not None
         assert len(manager.collection) == 0
 
     def test_manager_register(self):
-        manager = matcher.MatchersManager(False)
-        manager.add(matcher.Anything)
+        manager = match.MatchersManager(False)
+        manager.add(match.Anything)
 
         assert manager.collection
         assert len(manager.collection) == 1
 
-        manager.add(matcher.AnyText)
+        manager.add(match.AnyText)
         assert len(manager.collection) == 2
 
     def test_manager_register_with_name(self):
         reg_name = "FooBar"
-        manager = matcher.MatchersManager(False)
-        manager.add(matcher.Anything, name=reg_name)
+        manager = match.MatchersManager(False)
+        manager.add(match.Anything, name=reg_name)
 
         assert manager.collection
         assert len(manager.collection) == 1
         assert reg_name in manager
 
     def test_manager_register_override(self):
-        manager = matcher.MatchersManager(False)
-        manager.add(matcher.Anything)
+        manager = match.MatchersManager(False)
+        manager.add(match.Anything)
 
         assert manager.collection
         assert len(manager.collection) == 1
 
-        manager.add(matcher.Anything, override=True)
+        manager.add(match.Anything, override=True)
         assert len(manager.collection) == 1
 
     def test_manager_bulk_registration(self):
-        manager = matcher.MatchersManager(False)
+        manager = match.MatchersManager(False)
         manager.add_all([
-            matcher.Anything,
-            matcher.AnyNumber,
-            matcher.AnyText
+            match.Anything,
+            match.AnyNumber,
+            match.AnyText
         ])
 
         print(manager.collection)
 
         assert manager.collection
         assert len(manager.collection) == 3
-        assert manager.get(matcher.Anything.__name__)
-        assert manager.get(matcher.AnyNumber.__name__)
-        assert manager.get(matcher.AnyText.__name__)
+        assert manager.get(match.Anything.__name__)
+        assert manager.get(match.AnyNumber.__name__)
+        assert manager.get(match.AnyText.__name__)
 
     def test_manager_bulk_registration_with_name(self):
         collection = [
-            (matcher.Anything, 'Foo1'),
-            (matcher.AnyNumber, 'Foo2'),
-            (matcher.AnyText, 'Foo3')
+            (match.Anything, 'Foo1'),
+            (match.AnyNumber, 'Foo2'),
+            (match.AnyText, 'Foo3')
         ]
-        manager = matcher.MatchersManager(False)
+        manager = match.MatchersManager(False)
         manager.add_all(collection)
 
         assert manager.collection
@@ -81,8 +84,8 @@ class TestMatcherManager:
 
     def test_manager_unregister(self):
         reg_name = "FooBar"
-        manager = matcher.MatchersManager(False)
-        manager.add(matcher.Anything, name=reg_name)
+        manager = match.MatchersManager(False)
+        manager.add(match.Anything, name=reg_name)
 
         assert manager.collection
         assert reg_name in manager
@@ -94,29 +97,29 @@ class TestMatcherManager:
 
     def test_manager_get_registered_by_name(self):
         reg_name = "FooBar"
-        manager = matcher.MatchersManager(False)
-        manager.add(matcher.Anything, name=reg_name)
+        manager = match.MatchersManager(False)
+        manager.add(match.Anything, name=reg_name)
 
         assert manager.get(reg_name)
-        assert isinstance(manager.get(reg_name), matcher.Anything)
+        assert isinstance(manager.get(reg_name), match.Anything)
 
     def test_manager_get_registered_by_autoname(self):
-        matcher_kls = matcher.Anything
+        matcher_kls = match.Anything
         kls_name = matcher_kls.__name__
 
-        manager = matcher.MatchersManager(False)
+        manager = match.MatchersManager(False)
         manager.add(matcher_kls)
 
         assert manager.get(kls_name)
-        assert isinstance(manager.get(kls_name), matcher.Anything)
+        assert isinstance(manager.get(kls_name), match.Anything)
 
     def test_manager_contains(self):
         collection = [
-            (matcher.Anything, 'Foo1'),
-            (matcher.AnyNumber, 'Foo2'),
-            (matcher.AnyText, 'Foo3')
+            (match.Anything, 'Foo1'),
+            (match.AnyNumber, 'Foo2'),
+            (match.AnyText, 'Foo3')
         ]
-        manager = matcher.MatchersManager(False)
+        manager = match.MatchersManager(False)
         manager.add_all(collection)
 
         assert collection[0][1] in manager
@@ -125,8 +128,8 @@ class TestMatcherManager:
 
     # --- Negative
     def test_manager_get_by_invalid_name_fails(self):
-        manager = matcher.MatchersManager(False)
-        manager.add(matcher.AnyText)
+        manager = match.MatchersManager(False)
+        manager.add(match.AnyText)
         assert manager.collection
 
         with pytest.raises(ValueError, match='Failed to find matcher with name.*'):
@@ -136,8 +139,8 @@ class TestMatcherManager:
         reg_name = "FooBar"
         invalid_name = "BazBar"
 
-        manager = matcher.MatchersManager(False)
-        manager.add(item=matcher.Anything, name=reg_name)
+        manager = match.MatchersManager(False)
+        manager.add(item=match.Anything, name=reg_name)
         assert reg_name in manager
 
         op_result = not manager.remove(invalid_name)
@@ -146,37 +149,37 @@ class TestMatcherManager:
         assert len(manager.collection) == 1
 
     def test_manager_register_duplicate_fails(self):
-        manager = matcher.MatchersManager(False)
-        manager.add(matcher.Anything)
+        manager = match.MatchersManager(False)
+        manager.add(match.Anything)
 
         assert manager.collection
         assert len(manager.collection) == 1
 
         with pytest.raises(ValueError, match=".* already registered!"):
-            manager.add(matcher.Anything)
+            manager.add(match.Anything)
 
     def test_manager_register_duplicate_name_fails(self):
-        manager = matcher.MatchersManager(False)
-        manager.add(matcher.Anything, "FooBar")
+        manager = match.MatchersManager(False)
+        manager.add(match.Anything, "FooBar")
 
         assert manager.collection
         assert len(manager.collection) == 1
 
         with pytest.raises(ValueError, match=".* already registered!"):
-            manager.add(matcher.AnyText, "FooBar")
+            manager.add(match.AnyText, "FooBar")
 
     def test_manager_register_non_compatible_type_fails(self):
-        manager = matcher.MatchersManager(False)
+        manager = match.MatchersManager(False)
         with pytest.raises(ValueError, match="Registraion failed for item.*"):
             manager.add([].__class__, "Foo")
 
     def test_manager_contains_fails(self):
         collection = [
-            (matcher.Anything, 'Foo1'),
-            (matcher.AnyNumber, 'Foo2'),
-            (matcher.AnyText, 'Foo3')
+            (match.Anything, 'Foo1'),
+            (match.AnyNumber, 'Foo2'),
+            (match.AnyText, 'Foo3')
         ]
-        manager = matcher.MatchersManager(False)
+        manager = match.MatchersManager(False)
         manager.add_all(collection)
 
         assert 'Foo' not in manager
@@ -184,7 +187,7 @@ class TestMatcherManager:
         assert 'Bar1' not in manager
 
 
-class TestMatchersBasic:
+class TestMatchers:
     """Positive tests for matchers"""
     @pytest.mark.parametrize("match_value",[
         "text",
@@ -196,19 +199,116 @@ class TestMatchersBasic:
         ['a','b'],
         {},
         {"a": 10},
-        matcher.Anything()
+        match.Anything()
     ])
     def test_anything(self, match_value):
         """Anything matches to any non-None value"""
-        matcher_instance = matcher.Anything()
+        matcher_instance = match.Anything()
         assert matcher_instance == match_value
         assert match_value == matcher_instance
 
     @pytest.mark.parametrize("match_value",[
+        True,
+        False
+    ])
+    def test_any_bool(self, match_value):
+        matcher_instance = match.AnyBool()
+        assert matcher_instance == match_value
+        assert match_value == matcher_instance
+
+    @pytest.mark.parametrize("match_value",[
+        [],
+        [1,2,3],
+        ['a', 'b'],
+        [ [], [] ]
+    ])
+    def test_any_list(self, match_value):
+        matcher_instance = match.AnyList()
+        assert matcher_instance == match_value
+        assert match_value == matcher_instance
+
+    # --- AnyDict
+    @pytest.mark.parametrize("match_value",[
+        {},
+        {"a": 1, "b": 2}
+    ])
+    def test_any_dict(self, match_value):
+        matcher_instance = match.AnyDict()
+        assert matcher_instance == match_value
+        assert match_value == matcher_instance
+
+    def test_any_non_empty_dict(self):
+        matcher_instance = match.AnyNonEmptyDict()
+        assert matcher_instance == {'a': 1}
+        assert {'a': 1} == matcher_instance
+
+    # Negative test
+    # -------------
+    def test_anything_fails(self):
+        """Anything fails to match None"""
+        compare_to = None
+        matcher_instance = match.Anything()
+        with pytest.raises(AssertionError, match='Comparing to Anything Matcher:.*'):
+            assert matcher_instance == compare_to
+
+        with pytest.raises(AssertionError, match='Comparing to Anything Matcher:.*'):
+            assert compare_to == matcher_instance
+
+    @pytest.mark.parametrize("match_value", [
+        0, 1, 123, 'str', '', None, [], {}, [1,2], {'a': 1}
+    ])
+    def test_any_bool_fails(self, match_value):
+        matcher_instance = match.AnyBool()
+        assert matcher_instance != match_value
+        assert match_value != matcher_instance
+
+    # List negative tests
+    @pytest.mark.parametrize("match_value",[
+        123, 'str', None, {}, False
+    ])
+    def test_any_list_fails(self, match_value):
+        matcher_instance = match.AnyList()
+        assert matcher_instance != match_value
+        assert match_value != matcher_instance
+
+    # Dict negative tests
+    @pytest.mark.parametrize("compare_to", (
+        123,
+        [1,2,3],
+        False,
+        "Str"
+    ))
+    def test_any_dict_fails(self, compare_to):
+        matcher_instance = match.AnyDict()
+        with pytest.raises(AssertionError):
+            assert matcher_instance == compare_to
+
+        with pytest.raises(AssertionError):
+            assert compare_to == matcher_instance
+
+    @pytest.mark.parametrize("compare_to", (
+        {},
+        123,
+        [1,2,3],
+        False,
+        "Str"
+    ))
+    def test_any_non_empty_dict_fails(self, compare_to):
+        matcher_instance = match.AnyNonEmptyDict()
+        with pytest.raises(AssertionError):
+            assert matcher_instance == compare_to
+
+        with pytest.raises(AssertionError):
+            assert compare_to == matcher_instance
+
+
+class TestMatcherAnyText:
+    """Tests for AnyText matchers"""
+    @pytest.mark.parametrize("match_value",[
         "text", "", "23"
     ])
     def test_any_text(self, match_value):
-        matcher_instance = matcher.AnyText()
+        matcher_instance = match.AnyText()
         assert matcher_instance == match_value
         assert match_value == matcher_instance
 
@@ -220,7 +320,7 @@ class TestMatchersBasic:
         ('24', '[0-9]+')
     ])
     def test_any_text_like(self, match_value, matcher_pattern):
-        matcher_instance = matcher.AnyTextLike(matcher_pattern)
+        matcher_instance = match.AnyTextLike(matcher_pattern)
         assert matcher_instance == match_value
         assert match_value == matcher_instance
 
@@ -233,10 +333,47 @@ class TestMatchersBasic:
         ('24', '2')
     ])
     def test_any_text_with(self, match_value, matcher_pattern):
-        matcher_instance = matcher.AnyTextWith(matcher_pattern)
+        matcher_instance = match.AnyTextWith(matcher_pattern)
         assert matcher_instance == match_value
         assert match_value == matcher_instance
 
+    # --- Negative
+    @pytest.mark.parametrize("match_value",[
+        12, 12.33, [], {}, None
+    ])
+    def test_any_text_not_match(self, match_value):
+        matcher_instance = match.AnyText()
+        assert matcher_instance != match_value
+        assert match_value != matcher_instance
+
+    @pytest.mark.parametrize("match_value, matcher_pattern",[
+        ("", ".*e.*"),
+        ("call text", "^te.*"),
+        ("text info", ".*xt$"),
+        ('text', '[0-9]+'),
+        (1234, '[0-9]+'),
+        ([1,2,3], '[0-9]+')
+    ])
+    def test_any_text_like_not_match(self, match_value, matcher_pattern):
+        matcher_instance = match.AnyTextLike(matcher_pattern)
+        assert matcher_instance != match_value
+        assert match_value != matcher_instance
+
+    @pytest.mark.parametrize("match_value, matcher_pattern",[
+        ("", "word"),
+        ("text info", "word"),
+        ('text', 'w'),
+        (1234, '4'),
+        ([1,2,3], '4')
+    ])
+    def test_any_text_with_not_match(self, match_value, matcher_pattern):
+        matcher_instance = match.AnyTextWith(matcher_pattern)
+        assert matcher_instance != match_value
+        assert match_value != matcher_instance
+
+
+class TestMatcherAnyNumber:
+    """Tests for AnyNumber matchers"""
     @pytest.mark.parametrize("match_value",[
         0,
         12,
@@ -245,58 +382,112 @@ class TestMatchersBasic:
         -12.345
     ])
     def test_any_number(self, match_value):
-        matcher_instance = matcher.AnyNumber()
+        matcher_instance = match.AnyNumber()
         assert matcher_instance == match_value
         assert match_value == matcher_instance
 
-    @pytest.mark.parametrize("match_value", [12, 12.22])
-    @pytest.mark.parametrize("match_param", [5, 5.22])
+    @pytest.mark.parametrize("match_value", (5, 5.0))
+    @pytest.mark.parametrize("match_param", (4, 4.99))
     def test_any_number_greater_than(self, match_value, match_param):
-        matcher_instance = matcher.AnyNumberGreaterThan(match_param)
+        matcher_instance = match.AnyNumberGreaterThan(match_param)
         assert matcher_instance == match_value
         assert match_value == matcher_instance
 
-    @pytest.mark.parametrize("match_value", [5, 5.11])
-    @pytest.mark.parametrize("match_param", [12, 12.22])
+    @pytest.mark.parametrize("match_value", (5, 5.0))
+    @pytest.mark.parametrize("match_param", (6, 5.01))
     def test_any_number_less_than(self, match_value, match_param):
-        matcher_instance = matcher.AnyNumberLessThan(match_param)
+        matcher_instance = match.AnyNumberLessThan(match_param)
         assert matcher_instance == match_value
         assert match_value == matcher_instance
 
-    @pytest.mark.parametrize("match_value",[
-        True,
-        False
+    @pytest.mark.parametrize("match_value", (5, 5.0))
+    @pytest.mark.parametrize("match_param", (
+        (-50, 50),
+        (-50.0, 50.0),
+        (4, 6),
+        (4.99, 5.01),
+        (5.0, 10),
+        (-10, 5.0)
+    ))
+    def test_any_number_in_range(self, match_value, match_param):
+        matcher_instance = match.AnyNumberInRange(*match_param)
+        assert matcher_instance == match_value
+        assert match_value == matcher_instance
+
+    # Negative tests
+    # --------------
+    @pytest.mark.parametrize('match_value', [
+        "str", None, [], {}
     ])
-    def test_any_bool(self, match_value):
-        matcher_instance = matcher.AnyBool()
-        assert matcher_instance == match_value
-        assert match_value == matcher_instance
+    def test_any_number_fails(self, match_value):
+        matcher_instance = match.AnyNumber()
+        assert matcher_instance != match_value
+        assert match_value != matcher_instance
 
-    @pytest.mark.parametrize("match_value",[
-        [],
-        [1,2,3],
-        ['a', 'b'],
-        [ [], [] ]
+    @pytest.mark.parametrize("match_value, match_param", [
+        (12, 50),
+        (12, 12)
     ])
-    def test_any_list(self, match_value):
-        matcher_instance = matcher.AnyList()
-        assert matcher_instance == match_value
-        assert match_value == matcher_instance
+    def test_any_number_greater_than_fails(self, match_value, match_param):
+        matcher_instance = match.AnyNumberGreaterThan(match_param)
+        assert matcher_instance != match_value
+        assert match_value != matcher_instance
 
-    # --- AnyDict
-    @pytest.mark.parametrize("match_value",[
-        {},
-        {"a": 1, "b": 2}
+    @pytest.mark.parametrize("match_value, match_param", [
+        (50, 12),
+        (12, 12),
+        ('str', 12),
+        ([1,2], 12),
     ])
-    def test_any_dict(self, match_value):
-        matcher_instance = matcher.AnyDict()
-        assert matcher_instance == match_value
-        assert match_value == matcher_instance
+    def test_any_number_less_than_fails(self, match_value, match_param):
+        matcher_instance = match.AnyNumberLessThan(match_param)
+        assert matcher_instance != match_value
+        assert match_value != matcher_instance
 
-    def test_any_non_empty_dict(self):
-        matcher_instance = matcher.AnyNonEmptyDict()
-        assert matcher_instance == {'a': 1}
-        assert {'a': 1} == matcher_instance
+    @pytest.mark.parametrize(
+        "match_value, match_param, expected_exception, expected_message", (
+        (
+            50,
+            (1, 5),
+            AssertionError,
+            r".*Number In Range.*Value is out of range.*greater.*right limit.*"
+        ),
+        (
+            12,
+            (120, 150),
+            AssertionError,
+            r".*Number In Range.*Value is out of range.*less.*left limit.*"
+        ),
+        (
+            'str',
+            (0, 1),
+            AssertionError,
+            r".*Number In Range.*Type mismatch.*"
+        ),
+        (
+            [1,2],
+            (0, 1),
+            AssertionError,
+            r".*Number In Range.*Type mismatch.*"
+        ),
+        (
+            '',
+            (100, 50),
+            ValueError,
+            r"Invalid matcher range limits!.*"
+        )
+    ))
+    def test_any_number_in_range_fails(self, match_value, match_param,
+                                       expected_exception, expected_message):
+        with pytest.raises(expected_exception,
+                           match=re.compile(expected_message, re.S)):
+            matcher_instance = match.AnyNumberInRange(*match_param)
+            assert matcher_instance == match_value
+
+        with pytest.raises(expected_exception,
+                           match=re.compile(expected_message, re.S)):
+            matcher_instance = match.AnyNumberInRange(*match_param)
+            assert match_value == matcher_instance
 
 
 class TestMatcherAnyListOf:
@@ -317,7 +508,7 @@ class TestMatcherAnyListOf:
         )
     ])
     def test_any_list_of_size(self, match_value, match_param):
-        matcher_instance = matcher.AnyListOf(**match_param)
+        matcher_instance = match.AnyListOf(**match_param)
         assert matcher_instance == match_value
         assert match_value == matcher_instance
 
@@ -340,7 +531,7 @@ class TestMatcherAnyListOf:
         )
     ])
     def test_any_list_of_type(self, match_value, match_param):
-        matcher_instance = matcher.AnyListOf(**match_param)
+        matcher_instance = match.AnyListOf(**match_param)
         assert matcher_instance == match_value
         assert match_value == matcher_instance
 
@@ -363,7 +554,7 @@ class TestMatcherAnyListOf:
         )
     ])
     def test_any_list_of_size_and_type(self, match_value, match_param):
-        matcher_instance = matcher.AnyListOf(**match_param)
+        matcher_instance = match.AnyListOf(**match_param)
         assert matcher_instance == match_value
         assert match_value == matcher_instance
 
@@ -387,7 +578,7 @@ class TestMatcherAnyListOf:
         )
     ])
     def test_any_list_longer_than(self, match_value, match_param):
-        matcher_instance = matcher.AnyListLongerThan(**match_param)
+        matcher_instance = match.AnyListLongerThan(**match_param)
         assert matcher_instance == match_value
         assert match_value == matcher_instance
 
@@ -410,7 +601,7 @@ class TestMatcherAnyListOf:
         )
     ])
     def test_any_list_longer_than_size_and_type(self, match_value, match_param):
-        matcher_instance = matcher.AnyListLongerThan(**match_param)
+        matcher_instance = match.AnyListLongerThan(**match_param)
         assert matcher_instance == match_value
         assert match_value == matcher_instance
 
@@ -434,7 +625,7 @@ class TestMatcherAnyListOf:
         )
     ])
     def test_any_list_shorter_than(self, match_value, match_param):
-        matcher_instance = matcher.AnyListShorterThan(**match_param)
+        matcher_instance = match.AnyListShorterThan(**match_param)
         assert matcher_instance == match_value
         assert match_value == matcher_instance
 
@@ -457,124 +648,17 @@ class TestMatcherAnyListOf:
         )
     ])
     def test_any_list_shorter_than_size_and_type(self, match_value, match_param):
-        matcher_instance = matcher.AnyListShorterThan(**match_param)
+        matcher_instance = match.AnyListShorterThan(**match_param)
         assert matcher_instance == match_value
         assert match_value == matcher_instance
 
-
-class TestMatcherAnyListOfMatchers:
-    """Tests AnyListOfMatchers matcher"""
-    @pytest.mark.parametrize("matcher_item, size, compare_to", (
-        pytest.param(matcher.AnyNumber(), 3, [1,2,3], id='AnyNumber-3'),
-        pytest.param(matcher.AnyNumberGreaterThan(5), 3, [8,12,33], id='AnyNumberGreaterThan5-3'),
-        pytest.param(matcher.AnyNumberLessThan(5), 3, [1,2,3], id='AnyNumberLessThan5-3'),
-        pytest.param(matcher.AnyText(), 2, ["str", "another_str"], id='AnyText-2'),
-        pytest.param(matcher.AnyTextLike(r'\d+'), 2, ["34", "4242"], id='AnyTextLike-2'),
-        pytest.param(matcher.AnyListOf(2, 1), 2, [ [1,2], [0,4] ], id='AnyListOfIntsOfSize-2'),
-        pytest.param(matcher.Anything(), 2, [4, ['str', True]], id='Anything-2'),
-        pytest.param(matcher.AnyListOfMatchers(matcher.AnyList()), 2, [ [[1,2], [3,4]], [[5, 2]] ],
-                     id='AnyListOfMatchers-2')
-    ))
-    def test_basic(self, matcher_item, size, compare_to):
-        matcher_instance = matcher.AnyListOfMatchers(
-            matcher_item, size
-        )
-
-        assert matcher_instance == compare_to
-        assert compare_to == matcher_instance
+    # --- AnyListOfRange(size, size, type)
+    #def test_any_list_of_range(self):
+    #    matcher_instance = match.AnyListOfRange(2, 4)
+    #    assert matcher_instance == [1,2,3,4]
 
 
-class TestMatchersNegative:
-    """Negative tests for matchers"""
-    def test_anything_fails(self):
-        """Anything fails to match None"""
-        compare_to = None
-        matcher_instance = matcher.Anything()
-        with pytest.raises(AssertionError, match='Comparing to Anything Matcher:.*'):
-            assert matcher_instance == compare_to
-
-        with pytest.raises(AssertionError, match='Comparing to Anything Matcher:.*'):
-            assert compare_to == matcher_instance
-
-    @pytest.mark.parametrize("match_value",[
-        12, 12.33, [], {}, None
-    ])
-    def test_any_text_not_match(self, match_value):
-        matcher_instance = matcher.AnyText()
-        assert matcher_instance != match_value
-        assert match_value != matcher_instance
-
-    @pytest.mark.parametrize("match_value, matcher_pattern",[
-        ("", ".*e.*"),
-        ("call text", "^te.*"),
-        ("text info", ".*xt$"),
-        ('text', '[0-9]+'),
-        (1234, '[0-9]+'),
-        ([1,2,3], '[0-9]+')
-    ])
-    def test_any_text_like_not_match(self, match_value, matcher_pattern):
-        matcher_instance = matcher.AnyTextLike(matcher_pattern)
-        assert matcher_instance != match_value
-        assert match_value != matcher_instance
-
-    @pytest.mark.parametrize("match_value, matcher_pattern",[
-        ("", "word"),
-        ("text info", "word"),
-        ('text', 'w'),
-        (1234, '4'),
-        ([1,2,3], '4')
-    ])
-    def test_any_text_with_not_match(self, match_value, matcher_pattern):
-        matcher_instance = matcher.AnyTextWith(matcher_pattern)
-        assert matcher_instance != match_value
-        assert match_value != matcher_instance
-
-    # Number negative tests
-    @pytest.mark.parametrize('match_value', [
-        "str", None, [], {}
-    ])
-    def test_any_number_fails(self, match_value):
-        matcher_instance = matcher.AnyNumber()
-        assert matcher_instance != match_value
-        assert match_value != matcher_instance
-
-    @pytest.mark.parametrize("match_value, match_param", [
-        (12, 50),
-        (12, 12)
-    ])
-    def test_any_number_greater_than_fails(self, match_value, match_param):
-        matcher_instance = matcher.AnyNumberGreaterThan(match_param)
-        assert matcher_instance != match_value
-        assert match_value != matcher_instance
-
-    @pytest.mark.parametrize("match_value, match_param", [
-        (50, 12),
-        (12, 12),
-        ('str', 12),
-        ([1,2], 12),
-    ])
-    def test_any_number_less_than_fails(self, match_value, match_param):
-        matcher_instance = matcher.AnyNumberLessThan(match_param)
-        assert matcher_instance != match_value
-        assert match_value != matcher_instance
-
-    @pytest.mark.parametrize("match_value", [
-        0, 1, 123, 'str', '', None, [], {}, [1,2], {'a': 1}
-    ])
-    def test_any_bool_fails(self, match_value):
-        matcher_instance = matcher.AnyBool()
-        assert matcher_instance != match_value
-        assert match_value != matcher_instance
-
-    # List negative tests
-    @pytest.mark.parametrize("match_value",[
-        123, 'str', None, {}, False
-    ])
-    def test_any_list_fails(self, match_value):
-        matcher_instance = matcher.AnyList()
-        assert matcher_instance != match_value
-        assert match_value != matcher_instance
-
+    # --- Negative tests
     # --- AnyListOf
     @pytest.mark.parametrize("match_value, match_param",[
         (
@@ -591,7 +675,7 @@ class TestMatchersNegative:
         )
     ])
     def test_any_list_of_size_fails(self, match_value, match_param):
-        matcher_instance = matcher.AnyListOf(**match_param)
+        matcher_instance = match.AnyListOf(**match_param)
         assert matcher_instance != match_value
         assert match_value != matcher_instance
 
@@ -610,7 +694,7 @@ class TestMatchersNegative:
         )
     ])
     def test_any_list_of_type_fails(self, match_value, match_param):
-        matcher_instance = matcher.AnyListOf(**match_param)
+        matcher_instance = match.AnyListOf(**match_param)
         assert matcher_instance != match_value
         assert match_value != matcher_instance
 
@@ -632,7 +716,7 @@ class TestMatchersNegative:
         )
     ])
     def test_any_list_of_size_and_type_fails(self, match_value, match_param):
-        matcher_instance = matcher.AnyListOf(**match_param)
+        matcher_instance = match.AnyListOf(**match_param)
         assert matcher_instance != match_value
         assert match_value != matcher_instance
 
@@ -649,7 +733,7 @@ class TestMatchersNegative:
         (False, {'size': 1}),
     ])
     def test_any_list_longer_than_fails(self, match_value, match_param):
-        matcher_instance = matcher.AnyListLongerThan(**match_param)
+        matcher_instance = match.AnyListLongerThan(**match_param)
         assert matcher_instance != match_value
         assert match_value != matcher_instance
 
@@ -671,7 +755,7 @@ class TestMatchersNegative:
         )
     ])
     def test_any_list_longer_than_size_and_type_fails(self, match_value, match_param):
-        matcher_instance = matcher.AnyListLongerThan(**match_param)
+        matcher_instance = match.AnyListLongerThan(**match_param)
         assert matcher_instance != match_value
         assert match_value != matcher_instance
 
@@ -688,7 +772,7 @@ class TestMatchersNegative:
         (False, {'size': 1}),
     ])
     def test_any_list_shorter_than_fails(self, match_value, match_param):
-        matcher_instance = matcher.AnyListShorterThan(**match_param)
+        matcher_instance = match.AnyListShorterThan(**match_param)
         assert matcher_instance != match_value
         assert match_value != matcher_instance
 
@@ -710,34 +794,227 @@ class TestMatchersNegative:
         )
     ])
     def test_any_list_shorter_than_size_and_type_fails(self, match_value, match_param):
-        matcher_instance = matcher.AnyListShorterThan(**match_param)
+        matcher_instance = match.AnyListShorterThan(**match_param)
         assert matcher_instance != match_value
         assert match_value != matcher_instance
 
-    # Dict negative tests
-    @pytest.mark.parametrize("compare_to", (
-        123,
-        [1,2,3],
-        False,
-        "Str"
+
+class TestMatcherAnyListOfMatchers:
+    """Tests AnyListOfMatchers matcher"""
+    @pytest.mark.parametrize("matcher_item, size, compare_to", (
+        pytest.param(match.AnyNumber(), 3, [1,2,3], id='AnyNumber-3'),
+        pytest.param(match.AnyNumberGreaterThan(5), 3, [8,12,33], id='AnyNumberGreaterThan5-3'),
+        pytest.param(match.AnyNumberLessThan(5), 3, [1,2,3], id='AnyNumberLessThan5-3'),
+        pytest.param(match.AnyText(), 2, ["str", "another_str"], id='AnyText-2'),
+        pytest.param(match.AnyTextLike(r'\d+'), 2, ["34", "4242"], id='AnyTextLike-2'),
+        pytest.param(match.AnyListOf(2, 1), 2, [ [1,2], [0,4] ], id='AnyListOfIntsOfSize-2'),
+        pytest.param(match.Anything(), 2, [4, ['str', True]], id='Anything-2'),
+        pytest.param(match.AnyListOfMatchers(match.AnyList()), 2, [ [[1,2], [3,4]], [[5, 2]] ],
+                     id='AnyListOfMatchers-2')
     ))
-    def test_any_dict_fails(self, compare_to):
-        matcher_instance = matcher.AnyDict()
+    def test_basic(self, matcher_item, size, compare_to):
+        matcher_instance = match.AnyListOfMatchers(
+            matcher_item, size
+        )
+
+        assert matcher_instance == compare_to
+        assert compare_to == matcher_instance
+
+
+class TestMatcherDate:
+    PAST_DATES = (
+        '2020-03-04',
+        '20111104',
+        '2011-11-04T00:05:23',
+        '2011-11-04T00:05:23Z',
+        '20111104T000523',
+        '2011-11-04 00:05:23.283',
+        '2011-11-04 00:05:23.283+00:00',
+        '2011-11-04T00:05:23+04:00'
+    )
+    FUTURE_DATES = (
+        '2040-03-04',
+        '20411104',
+        '2041-11-04T00:05:23',
+        '2041-11-04T00:05:23Z',
+        '20411104T000523',
+        '2040-11-04 00:05:23.283',
+        '2040-11-04 00:05:23.283+00:00',
+        '2040-11-04T00:05:23+04:00'
+    )
+
+    """Tests date matchers"""
+    @pytest.mark.parametrize("compare_to", PAST_DATES)
+    def test_any_date(self, compare_to):
+        matcher_instance = match.AnyDate()
+        assert matcher_instance == compare_to
+        assert compare_to == matcher_instance
+
+    # Any Date Before
+    @pytest.mark.parametrize('date', (
+        'now',
+        '+5s', '-5s',
+        '+5m', '-5m',
+        '+5h', '-5h',
+        '+1d', '-1d',
+        '+1y', '-1y',
+        "2022-01-01T00:40:00Z"
+    ))
+    @pytest.mark.parametrize("compare_to", PAST_DATES)
+    def test_any_date_before(self, date, compare_to):
+        matcher_instance = match.AnyDateBefore(date)
+        assert matcher_instance == compare_to
+        assert compare_to == matcher_instance
+
+    @pytest.mark.parametrize("before_date, compare_to", (
+        (
+            datetime.datetime(2023, 10, 15, 12, 30, 55, 556124).isoformat(),
+            datetime.datetime(2023, 10, 15, 12, 30, 55, 556123).isoformat()
+        ),
+        (
+            datetime.datetime(2023, 10, 15, 12, 30, 55, 556123).isoformat(),
+            datetime.datetime(2023, 10, 15, 12, 30, 54, 556123).isoformat()
+        ),
+    ), ids=["milliseconds", "seconds"])
+    def test_any_date_before_precise(self, before_date, compare_to):
+        matcher_instance = match.AnyDateBefore(before_date)
+        assert matcher_instance == compare_to
+        assert compare_to == matcher_instance
+
+    @pytest.mark.parametrize("offset", (
+        '+500ms',
+        '+1s',
+        '+1.5s',
+        '+1m',
+        '+1.5m',
+        '+1.23h',
+        '+2d',
+        '+1y',
+    ))
+    def test_any_date_before_by_offset_to_now(self, offset):
+        utc = datetime.timezone.utc
+        matcher_instance = match.AnyDateBefore(offset)
+        assert matcher_instance == datetime.datetime.now(utc).isoformat()
+        assert datetime.datetime.now(utc).isoformat() == matcher_instance
+
+    # Any Date After
+    @pytest.mark.parametrize('date', (
+        'now',
+        '+5s', '-5s',
+        '+5m', '-5m',
+        '+5h', '-5h',
+        '+1d', '-1d',
+        '+1y', '-1y',
+        "2023-01-01T00:40:00Z"
+    ))
+    @pytest.mark.parametrize("compare_to", FUTURE_DATES)
+    def test_any_date_after(self, date, compare_to):
+        matcher_instance = match.AnyDateAfter(date)
+        assert matcher_instance == compare_to
+        assert compare_to == matcher_instance
+
+    @pytest.mark.parametrize("after_date, compare_to", (
+        (
+            datetime.datetime(2023, 10, 15, 12, 30, 55, 556123).isoformat(),
+            datetime.datetime(2023, 10, 15, 12, 30, 55, 556124).isoformat()
+        ),
+        (
+            datetime.datetime(2023, 10, 15, 12, 30, 54, 556123).isoformat(),
+            datetime.datetime(2023, 10, 15, 12, 30, 55, 556123).isoformat()
+        ),
+    ), ids=["milliseconds", "seconds"])
+    def test_any_date_after_precise(self, after_date, compare_to):
+        matcher_instance = match.AnyDateAfter(after_date)
+        assert matcher_instance == compare_to
+        assert compare_to == matcher_instance
+
+    @pytest.mark.parametrize("offset", (
+        '-500ms',
+        '-1s',
+        '-1.5s',
+        '-1m',
+        '-1.5m',
+        '-1.23h',
+        '-2d',
+        '-1y',
+    ))
+    def test_any_date_after_by_offset_to_now(self, offset):
+        utc = datetime.timezone.utc
+        matcher_instance = match.AnyDateAfter(offset)
+        assert matcher_instance == datetime.datetime.now(utc).isoformat()
+        assert datetime.datetime.now(utc).isoformat() == matcher_instance
+
+    # Any Date In Range
+    @pytest.mark.parametrize("left, right", (
+        ('-1d', '+1d'),
+        ('-1y', '+1y'),
+        ('-1s', '+1s'),
+        ('now', '+1d'),
+        ('-1d', 'now')
+    ))
+    def test_any_date_in_range(self, left, right):
+        matcher_instance = match.AnyDateInRange(left, right)
+        assert matcher_instance == datetime.datetime.now().isoformat()
+
+    @pytest.mark.parametrize("left, right, exception, match_pattern", (
+        ('+1d', '+2d', AssertionError, r'.*Date In Range.*earlier than.*left limit'),
+        ('+100ms', '+500ms', AssertionError, r'.*Date In Range.*earlier than.*left limit'),
+        ('-2d', '-1d', AssertionError,r'.*Date In Range.*later than.*right limit'),
+        ('-500ms', '-100ms', AssertionError,r'.*Date In Range.*later than.*right limit'),
+        ('+100ms', '-100ms', ValueError,
+            r'Invalid matcher range limits!.*')
+    ))
+    def test_any_date_in_range_fails(self, left, right, exception, match_pattern):
+        with pytest.raises(exception, match=re.compile(match_pattern, re.S)):
+            matcher_instance = match.AnyDateInRange(left, right)
+            assert matcher_instance == datetime.datetime.now().isoformat()
+
+    # --- Negative
+    @pytest.mark.parametrize("compare_to", (
+        12412,
+        [1,2,3],
+        'kkk',
+        -414.424,
+        True
+    ))
+    def test_any_date_fails(self, compare_to):
+        matcher_instance = match.AnyDate()
         with pytest.raises(AssertionError):
             assert matcher_instance == compare_to
 
         with pytest.raises(AssertionError):
             assert compare_to == matcher_instance
 
-    @pytest.mark.parametrize("compare_to", (
-        {},
-        123,
-        [1,2,3],
-        False,
-        "Str"
+    @pytest.mark.parametrize('date', (
+        'now',
+        '+5s', '-5s',
+        '+5m', '-5m',
+        '+5h', '-5h',
+        '+1d', '-1d',
+        '+1y', '-1y',
+        "2022-01-01T00:40:00Z"
     ))
-    def test_any_non_empty_dict_fails(self, compare_to):
-        matcher_instance = matcher.AnyNonEmptyDict()
+    @pytest.mark.parametrize("compare_to", FUTURE_DATES)
+    def test_any_date_before_fails(self, date, compare_to):
+        matcher_instance = match.AnyDateBefore(date)
+        with pytest.raises(AssertionError):
+            assert matcher_instance == compare_to
+
+        with pytest.raises(AssertionError):
+            assert compare_to == matcher_instance
+
+    @pytest.mark.parametrize('date', (
+        'now',
+        '+5s', '-5s',
+        '+5m', '-5m',
+        '+5h', '-5h',
+        '+1d', '-1d',
+        '+1y', '-1y',
+        "2023-01-01T00:40:00Z"
+    ))
+    @pytest.mark.parametrize("compare_to", PAST_DATES)
+    def test_any_date_after_fails(self, date, compare_to):
+        matcher_instance = match.AnyDateAfter(date)
         with pytest.raises(AssertionError):
             assert matcher_instance == compare_to
 

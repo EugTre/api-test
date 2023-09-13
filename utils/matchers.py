@@ -1,8 +1,10 @@
 """Module provides matche object of various kinds"""
 import re
 import typing
+import datetime
 from dataclasses import dataclass
 from abc import ABC, abstractmethod
+
 import pytest
 from _pytest.assertion.util import assertrepr_compare
 
@@ -90,7 +92,7 @@ def shorten_repr(list_or_dict):
     return repr_str
 
 
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, repr=False)
 class BaseMatcher(ABC):
     """Abstract Matcher to any value"""
 
@@ -119,7 +121,7 @@ class BaseMatcher(ABC):
         return []
 
 
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, repr=False)
 class Anything(BaseMatcher):
     """Matches to any value"""
     def __eq__(self, other):
@@ -145,7 +147,7 @@ class Anything(BaseMatcher):
 # --------
 # Text
 # --------
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, repr=False)
 class AnyText(BaseMatcher):
     """Matches to any text (string), including empty string"""
     def __eq__(self, other):
@@ -170,7 +172,7 @@ class AnyText(BaseMatcher):
             f'{type(left)} != {type("")}'
         ]
 
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, repr=False)
 class AnyTextLike(AnyText):
     """Matches to any text (string) that matches to given regex"""
     pattern: str
@@ -210,7 +212,7 @@ class AnyTextLike(AnyText):
             f'{"" if right.case_sensitive else "in"}sensitive pattern "{right.pattern}"'
         ]
 
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, repr=False)
 class AnyTextWith(AnyText):
     """Object that matches to any text (string) that
     contains given substring"""
@@ -257,7 +259,7 @@ class AnyTextWith(AnyText):
 # --------
 # Number
 # --------
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, repr=False)
 class AnyNumber(BaseMatcher):
     """Object that matches to any number (int or float)"""
     def __eq__(self, other):
@@ -283,7 +285,7 @@ class AnyNumber(BaseMatcher):
             f'Type {type(left)} doesn\'t match to expected {type(1)} or {type(1.1)} types.'
         ]
 
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, repr=False)
 class AnyNumberGreaterThan(AnyNumber):
     """Object that matches to any number (int or float) that
     is greater than given 'number'"""
@@ -302,14 +304,7 @@ class AnyNumberGreaterThan(AnyNumber):
         elif not isinstance(other, (int, float)):
             result = False
         else:
-            # Chompare with given int/float
-            num = self.number
-            if not isinstance(num, float) and isinstance(other, float):
-                num = float(num)
-            elif isinstance(num, float) and not isinstance(other, float):
-                other = float(other)
-
-            result = other > num
+            result = other > self.number
 
         return result
 
@@ -338,7 +333,7 @@ class AnyNumberGreaterThan(AnyNumber):
             f'{left} < {right.number}'
         ]
 
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, repr=False)
 class AnyNumberLessThan(AnyNumber):
     """Object that matches to any number (int or float) that
     is less than given 'number'"""
@@ -357,14 +352,7 @@ class AnyNumberLessThan(AnyNumber):
         elif not isinstance(other, (int, float)):
             result = False
         else:
-            # Chompare with given int/float
-            num = self.number
-            if not isinstance(num, float) and isinstance(other, float):
-                num = float(num)
-            elif isinstance(num, float) and not isinstance(other, float):
-                other = float(other)
-
-            result = other < num
+            result = other < self.number
 
         return result
 
@@ -393,11 +381,67 @@ class AnyNumberLessThan(AnyNumber):
             f'{left} > {right.number}'
         ]
 
+@dataclass(frozen=True, eq=False, repr=False)
+class AnyNumberInRange(AnyNumber):
+    """Object that matches to any number (int or float) that
+    is less than given 'number'"""
+    min_number: int|float
+    max_number: int|float
+
+    def __post_init__(self):
+        if self.min_number > self.max_number:
+            raise ValueError('Invalid matcher range limits! '
+                '"min_number" must be less than "max_number", '
+                f'but given {self.min_number} > {self.max_number}')
+
+    def __eq__(self, other):
+        if isinstance(other, (AnyNumber, Anything)):
+            return True
+
+        if not isinstance(other, (int, float)):
+            return False
+
+        print(f'{self.min_number=} <= {other=} <= {self.max_number=}')
+        return self.min_number <= other <= self.max_number
+
+    def __repr__(self):
+        return f'<Any Number In Range from {self.min_number} to {self.max_number}>'
+
+    @staticmethod
+    def assertrepr_compare(left, right) -> list[str]:
+        output = [
+            "Comparing with Number In Range Matcher:",
+            f"{left} != {right}"
+        ]
+        output.extend(AnyNumberInRange.assertrepr_compare_brief(left, right))
+        return output
+
+    @staticmethod
+    def assertrepr_compare_brief(left, right) -> list[str]:
+        if not isinstance(left, (int, float)):
+            return [
+                'Type mismatch:',
+                f'Type {type(left)} doesn\'t match to expected {type(1)} or {type(1.1)} types.'
+            ]
+
+        if left > right.max_number:
+            output = [
+                "Value is out of range:",
+                f"{left} is greater than {right.max_number} (right limit)"
+            ]
+        else:
+            output = [
+                "Value is out of range:",
+                f"{left} is less than {right.min_number} (left limit)"
+            ]
+
+        return output
+
 
 # --------
 # Bool
 # --------
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, repr=False)
 class AnyBool(BaseMatcher):
     """Object that matches to any bool"""
     def __eq__(self, other):
@@ -430,7 +474,7 @@ class AnyBool(BaseMatcher):
 # --------
 # Lists
 # --------
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, repr=False)
 class AnyList(BaseMatcher):
     """Object that matches to any list"""
     def __eq__(self, other):
@@ -455,7 +499,7 @@ class AnyList(BaseMatcher):
             f'Type {type(left)} doesn\'t match to expected {type([])} type.'
         ]
 
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, repr=False)
 class AnyListOf(AnyList):
     """Object that matches to any list of given size and/or
     having elements of given type"""
@@ -565,7 +609,7 @@ class AnyListOf(AnyList):
 
         return output
 
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, repr=False)
 class AnyListLongerThan(AnyListOf):
     """Object that matches to any list with size
     greater than given 'size' and, optionally,
@@ -574,7 +618,7 @@ class AnyListLongerThan(AnyListOf):
     REPR_MSG = '<Any List Longer Than{size_desc}{type_desc}>'
     SIZE_COMPARE_OP = '>'
 
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, repr=False)
 class AnyListShorterThan(AnyListOf):
     """Object that matches to any list with size
     less than given 'size' and, optionally,
@@ -583,7 +627,15 @@ class AnyListShorterThan(AnyListOf):
     REPR_MSG = '<Any List Shorter Than{size_desc}{type_desc}>'
     SIZE_COMPARE_OP = '<'
 
-@dataclass(frozen=True, eq=False)
+# @dataclass(frozen=True, eq=False, repr=False)
+# class AnyListOfRange(BaseMatcher):
+#     min_size: int
+#     max_size: int
+
+#     def __eq__(self, other):
+
+
+@dataclass(frozen=True, eq=False, repr=False)
 class AnyListOfMatchers(BaseMatcher):
     """Object that matches to any list of given size and
     having elements that match to given matcher object
@@ -672,7 +724,7 @@ class AnyListOfMatchers(BaseMatcher):
 
         return output
 
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, repr=False)
 class AnyListOfMatchersLongerThan(AnyListOfMatchers):
     """Object that matches to any list with size
     greater than given 'size' and
@@ -683,7 +735,7 @@ class AnyListOfMatchersLongerThan(AnyListOfMatchers):
 
     SIZE_COMPARE_OP = '>'
 
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, repr=False)
 class AnyListOfMatchersShorterThan(AnyListOfMatchers):
     """Object that matches to any list with size
     less than given 'size' and
@@ -698,7 +750,7 @@ class AnyListOfMatchersShorterThan(AnyListOfMatchers):
 # --------
 # Dicts
 # --------
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, repr=False)
 class AnyDict(BaseMatcher):
     """Object that matches to any dict"""
     def __eq__(self, other):
@@ -723,7 +775,7 @@ class AnyDict(BaseMatcher):
             f'Type {type(left)} doesn\'t match to expected {type({})} type.'
         ]
 
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, repr=False)
 class AnyNonEmptyDict(AnyDict):
     """Object that matches to any non-empty dict"""
     def __eq__(self, other) -> bool:
@@ -757,7 +809,294 @@ class AnyNonEmptyDict(AnyDict):
 # --------
 # Date
 # --------
-#@dataclass(frozen=True, eq=False)
-#class AnyDate(BaseMatcher):
-#    format: str
-#    # 1996-04-30T19:26:49.610Z
+DATE_OFFSET_PATTERN = re.compile(r'^(\+|-)(\d+\.?\d*)(y|w|d|h|m|s|ms|us)$')
+OFFSET_UNITS = {
+    'w': 'weeks', 'd': 'days',
+    'h': 'hours', 'm': 'minutes', 's': 'seconds',
+    'us': 'microseconds'
+}
+
+def get_offset_date(date_str: str) -> datetime.datetime:
+    """Parses date and return parsed date, or date defined using
+    offset expression (e.g. 'now', '+2d', etc.)"""
+    utc = datetime.timezone.utc
+    if date_str == 'now':
+        return datetime.datetime.now(utc)
+
+    re_result = DATE_OFFSET_PATTERN.match(date_str)
+    if not re_result:
+        # Date_str not in offset format - try parse from iso
+        # If we fail - than user should see error and change input
+        return datetime.datetime.fromisoformat(date_str).astimezone(utc)
+
+    # Parse offset experession
+    direction, amount, unit = re_result.groups()
+    amount = float(amount)
+    unit_name = OFFSET_UNITS.get(unit)
+    if unit_name is None:
+        if unit == 'y':
+            # 'y' is not supported by datetime.timedelta, so manually convert
+            unit_name = OFFSET_UNITS['d']
+            amount *= 365
+        elif unit == 'ms':
+            unit_name = OFFSET_UNITS['us']
+            amount *= 1000
+
+    if direction == '-':
+        amount *= -1
+
+    # Return Now() with offset
+    return datetime.datetime.now(utc) + datetime.timedelta(**{unit_name: amount})
+
+
+@dataclass(frozen=True, eq=False, repr=False)
+class AnyDate(BaseMatcher):
+    """Object that matches to any date parsable by datetime module"""
+    def __eq__(self, other) -> bool:
+        if isinstance(other, Anything):
+            return True
+
+        if not isinstance(other, str):
+            return False
+
+        try:
+            datetime.datetime.fromisoformat(other)
+        except (ValueError, OverflowError):
+            # Failed to parse means not equal
+            return False
+
+        return True
+
+    def __repr__(self) -> str:
+        return '<Any Date>'
+
+    @staticmethod
+    def assertrepr_compare(left, right) -> list[str]:
+        """Return full list of string as explanation of why values are not equal"""
+        return []
+
+    @staticmethod
+    def assertrepr_compare_brief(left, right) -> list[str]:
+        """Return shortened list of string as explanation of why values are not equal"""
+        return []
+
+@dataclass(frozen=True, eq=False, repr=False)
+class AnyDateBefore(BaseMatcher):
+    """Object that matches to any parsable date in the past
+    relative to given date"""
+    date: str = 'now'
+    eq_cache = None
+
+    def __post_init__(self):
+        object.__setattr__(self, 'eq_cache', {})
+
+    def __eq__(self, other) -> bool:
+        self.eq_cache.clear()
+        if isinstance(other, (Anything, AnyDate)):
+            return True
+
+        if not isinstance(other, str):
+            return False
+
+        try:
+            other_date = datetime.datetime.fromisoformat(other)\
+                            .astimezone(datetime.timezone.utc)
+        except (ValueError, OverflowError):
+            # Failed to parse means not equal
+            return False
+
+        self_date = get_offset_date(self.date)
+        self.eq_cache.update({
+            "self_date": self_date,
+            "other_date": other_date
+        })
+
+        return other_date < self_date
+
+    def __repr__(self) -> str:
+        cur_date = self.date
+        try:
+            cur_date = datetime.datetime.fromisoformat(self.date)\
+                .astimezone(datetime.timezone.utc).isoformat()
+        except (ValueError, OverflowError):
+            pass
+
+        return f'<Any Date Before {cur_date}>'
+
+    @staticmethod
+    def assertrepr_compare(left, right) -> list[str]:
+        """Return full list of string as explanation of why values are not equal"""
+        output = [
+            "Comparing to Date Before matcher:",
+            f"{left} != {right}"
+        ]
+        output.extend(AnyDateBefore.assertrepr_compare_brief(left, right))
+        return output
+
+    @staticmethod
+    def assertrepr_compare_brief(left, right) -> list[str]:
+        """Return shortened list of string as explanation of why values are not equal"""
+        eq_cache = right.eq_cache
+        if not eq_cache:
+            return [f"Unexpected data type of {left} (type: {type(left)}). "
+                    "Only ISO formatted string is allowed."]
+
+        diff = eq_cache['other_date'] - eq_cache['self_date']
+        return [
+            'Date comparison failed:',
+            f"{eq_cache['other_date']} is <{diff}> later than {eq_cache['self_date']} "
+        ]
+
+@dataclass(frozen=True, eq=False, repr=False)
+class AnyDateAfter(BaseMatcher):
+    """Object that matches to any parsable date in the future
+    relative to given date"""
+    date: str = 'now'
+    eq_cache = None
+
+    def __post_init__(self):
+        object.__setattr__(self, 'eq_cache', {})
+
+    def __eq__(self, other) -> bool:
+        self.eq_cache.clear()
+        if isinstance(other, (Anything, AnyDate)):
+            return True
+
+        if not isinstance(other, str):
+            return False
+
+        try:
+            other_date = datetime.datetime.fromisoformat(other)\
+                            .astimezone(datetime.timezone.utc)
+        except (ValueError, OverflowError):
+            # Failed to parse means not equal
+            return False
+
+        self_date = get_offset_date(self.date)
+
+        self.eq_cache.update({
+            "self_date": self_date,
+            "other_date": other_date,
+        })
+
+        return other_date > self_date
+
+    def __repr__(self) -> str:
+        cur_date = self.date
+        try:
+            cur_date = datetime.datetime.fromisoformat(self.date)\
+                .astimezone(datetime.timezone.utc).isoformat()
+        except (ValueError, OverflowError):
+            pass
+
+        return f'<Any Date After {cur_date}>'
+
+    @staticmethod
+    def assertrepr_compare(left, right) -> list[str]:
+        """Return full list of string as explanation of why values are not equal"""
+        output = [
+            "Comparing to Date After matcher:",
+            f"{left} != {right}"
+        ]
+        output.extend(AnyDateAfter.assertrepr_compare_brief(left, right))
+        return output
+
+    @staticmethod
+    def assertrepr_compare_brief(left, right: 'AnyDateAfter') -> list[str]:
+        """Return shortened list of string as explanation of why values are not equal"""
+        eq_cache = right.eq_cache
+        if not eq_cache:
+            return [f"Unexpected data type of {left} (type: {type(left)}). "
+                    "Only ISO formatted string is allowed."]
+
+        diff = eq_cache['self_date'] - eq_cache['other_date']
+        return [
+            'Date comparison failed:',
+            f"{eq_cache['other_date']} is <{diff}> earlier than {eq_cache['self_date']} "
+        ]
+
+@dataclass(frozen=True, eq=False, repr=False)
+class AnyDateInRange(BaseMatcher):
+    """Object that matches to any parsable date in given period"""
+    date_from: str
+    date_to: str
+    eq_cache = None
+
+    def __post_init__(self):
+        left_limit = get_offset_date(self.date_from)
+        right_limit = get_offset_date(self.date_to)
+        if left_limit > right_limit:
+            raise ValueError(
+                'Invalid matcher range limits! '
+                '"date_from" must be less than "date_to", '
+                f'but given {self.date_from} > {self.date_to}!')
+
+        object.__setattr__(self, 'eq_cache', {})
+
+    def __eq__(self, other) -> bool:
+        self.eq_cache.clear()
+        if isinstance(other, (Anything, AnyDate)):
+            return True
+
+        if not isinstance(other, str):
+            return False
+
+        try:
+            other_date = datetime.datetime.fromisoformat(other)\
+                            .astimezone(datetime.timezone.utc)
+        except (ValueError, OverflowError):
+            # Failed to parse means not equal
+            return False
+
+        self_date_from = get_offset_date(self.date_from)
+        self_date_to = get_offset_date(self.date_to)
+
+        self.eq_cache.update({
+            "self_date_from": self_date_from,
+            "self_date_to": self_date_to,
+            "other_date": other_date
+        })
+        return self_date_from <= other_date <= self_date_to
+
+    def __repr__(self) -> str:
+        date_from = self.date_from
+        date_to = self.date_to
+        try:
+            date_from = datetime.datetime.fromisoformat(self.date_from)\
+                .astimezone(datetime.timezone.utc).isoformat()
+            date_to = datetime.datetime.fromisoformat(self.date_to)\
+                .astimezone(datetime.timezone.utc).isoformat()
+        except (ValueError, OverflowError):
+            pass
+
+        return f'<Any Date In Range between {date_from} and {date_to}>'
+
+    @staticmethod
+    def assertrepr_compare(left, right) -> list[str]:
+        """Return full list of string as explanation of why values are not equal"""
+        output = [
+            "Comparing to Date In Range matcher:",
+            f"{left} != {right}"
+        ]
+        output.extend(AnyDateInRange.assertrepr_compare_brief(left, right))
+        return output
+
+    @staticmethod
+    def assertrepr_compare_brief(left, right) -> list[str]:
+        """Return shortened list of string as explanation of why values are not equal"""
+        eq_cache = right.eq_cache
+        if not eq_cache:
+            return [f"Unexpected data type of {left} (type: {type(left)}). "
+                    "Only ISO formatted string is allowed."]
+
+        output = ['Date comparison failed:']
+        if eq_cache['self_date_from'] > eq_cache['other_date']:
+            diff = eq_cache['self_date_from'] - eq_cache['other_date']
+            output.append(f"{eq_cache['other_date']} (UTC) is <{diff}> earlier than "
+                          f"{eq_cache['self_date_from']} (UTC, left limit)")
+        else:
+            diff = eq_cache['other_date'] - eq_cache['self_date_to']
+            output.append(f"{eq_cache['other_date']} (UTC) is <{diff}> later than "
+                          f"{eq_cache['self_date_to']} (UTC, right limit)")
+
+        return output
