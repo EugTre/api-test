@@ -9,7 +9,7 @@ from abc import ABC, abstractmethod
 from enum import Enum
 
 from utils.data_reader import DataReader
-from utils.matchers import MatchersManager, matchers_manager
+from utils.matchers import MatchersManager
 from utils.generators import GeneratorsManager, generators_manager
 
 from .json_wrapper import JsonWrapper
@@ -276,7 +276,11 @@ class MatcherCompositionHandler(CompositionHandler):
     DEFINITION_KEY = "!match"
     ARGS_KEY = "!args"
 
-    def __init__(self, manager: MatchersManager):
+    def __init__(self, manager: MatchersManager = None):
+        if manager is None:
+            # If not - create manager with default list
+            # of automatically registered matchers
+            manager = MatchersManager()
         self.manager = manager
 
     def compose(self, obj: dict) -> tuple[bool, Any]:
@@ -306,5 +310,5 @@ DEFAULT_COMPOSITION_HANDLERS_COLLECTION: dict[CompositionHandler, dict[str, Any]
     FileReferenceCompositionHandler: {"use_cache": False},
     IncludeFileCompositionHandler: {"use_cache": False},
     GeneratorCompositionHandler: {"manager": generators_manager},
-    MatcherCompositionHandler: {"manager": matchers_manager}
+    MatcherCompositionHandler: {}
 }

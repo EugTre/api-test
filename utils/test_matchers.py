@@ -7,8 +7,20 @@ import utils.matchers as matcher
 
 class TestMatcherManager:
     """Tests for matcher manager"""
-    def test_manager_register(self):
+    def test_manager_create_with_defaults(self):
         manager = matcher.MatchersManager()
+        assert hasattr(manager, 'collection')
+        assert manager.collection is not None
+        assert len(manager.collection) > 0
+
+    def test_manager_create_with_no_defaults(self):
+        manager = matcher.MatchersManager(False)
+        assert hasattr(manager, 'collection')
+        assert manager.collection is not None
+        assert len(manager.collection) == 0
+
+    def test_manager_register(self):
+        manager = matcher.MatchersManager(False)
         manager.add(matcher.Anything)
 
         assert manager.collection
@@ -19,7 +31,7 @@ class TestMatcherManager:
 
     def test_manager_register_with_name(self):
         reg_name = "FooBar"
-        manager = matcher.MatchersManager()
+        manager = matcher.MatchersManager(False)
         manager.add(matcher.Anything, name=reg_name)
 
         assert manager.collection
@@ -27,7 +39,7 @@ class TestMatcherManager:
         assert reg_name in manager
 
     def test_manager_register_override(self):
-        manager = matcher.MatchersManager()
+        manager = matcher.MatchersManager(False)
         manager.add(matcher.Anything)
 
         assert manager.collection
@@ -37,7 +49,7 @@ class TestMatcherManager:
         assert len(manager.collection) == 1
 
     def test_manager_bulk_registration(self):
-        manager = matcher.MatchersManager()
+        manager = matcher.MatchersManager(False)
         manager.add_all([
             matcher.Anything,
             matcher.AnyNumber,
@@ -58,7 +70,7 @@ class TestMatcherManager:
             (matcher.AnyNumber, 'Foo2'),
             (matcher.AnyText, 'Foo3')
         ]
-        manager = matcher.MatchersManager()
+        manager = matcher.MatchersManager(False)
         manager.add_all(collection)
 
         assert manager.collection
@@ -69,7 +81,7 @@ class TestMatcherManager:
 
     def test_manager_unregister(self):
         reg_name = "FooBar"
-        manager = matcher.MatchersManager()
+        manager = matcher.MatchersManager(False)
         manager.add(matcher.Anything, name=reg_name)
 
         assert manager.collection
@@ -82,7 +94,7 @@ class TestMatcherManager:
 
     def test_manager_get_registered_by_name(self):
         reg_name = "FooBar"
-        manager = matcher.MatchersManager()
+        manager = matcher.MatchersManager(False)
         manager.add(matcher.Anything, name=reg_name)
 
         assert manager.get(reg_name)
@@ -92,7 +104,7 @@ class TestMatcherManager:
         matcher_kls = matcher.Anything
         kls_name = matcher_kls.__name__
 
-        manager = matcher.MatchersManager()
+        manager = matcher.MatchersManager(False)
         manager.add(matcher_kls)
 
         assert manager.get(kls_name)
@@ -104,7 +116,7 @@ class TestMatcherManager:
             (matcher.AnyNumber, 'Foo2'),
             (matcher.AnyText, 'Foo3')
         ]
-        manager = matcher.MatchersManager()
+        manager = matcher.MatchersManager(False)
         manager.add_all(collection)
 
         assert collection[0][1] in manager
@@ -113,7 +125,7 @@ class TestMatcherManager:
 
     # --- Negative
     def test_manager_get_by_invalid_name_fails(self):
-        manager = matcher.MatchersManager()
+        manager = matcher.MatchersManager(False)
         manager.add(matcher.AnyText)
         assert manager.collection
 
@@ -124,7 +136,7 @@ class TestMatcherManager:
         reg_name = "FooBar"
         invalid_name = "BazBar"
 
-        manager = matcher.MatchersManager()
+        manager = matcher.MatchersManager(False)
         manager.add(item=matcher.Anything, name=reg_name)
         assert reg_name in manager
 
@@ -134,7 +146,7 @@ class TestMatcherManager:
         assert len(manager.collection) == 1
 
     def test_manager_register_duplicate_fails(self):
-        manager = matcher.MatchersManager()
+        manager = matcher.MatchersManager(False)
         manager.add(matcher.Anything)
 
         assert manager.collection
@@ -144,7 +156,7 @@ class TestMatcherManager:
             manager.add(matcher.Anything)
 
     def test_manager_register_duplicate_name_fails(self):
-        manager = matcher.MatchersManager()
+        manager = matcher.MatchersManager(False)
         manager.add(matcher.Anything, "FooBar")
 
         assert manager.collection
@@ -154,7 +166,7 @@ class TestMatcherManager:
             manager.add(matcher.AnyText, "FooBar")
 
     def test_manager_register_non_compatible_type_fails(self):
-        manager = matcher.MatchersManager()
+        manager = matcher.MatchersManager(False)
         with pytest.raises(ValueError, match="Registraion failed for item.*"):
             manager.add([].__class__, "Foo")
 
@@ -164,7 +176,7 @@ class TestMatcherManager:
             (matcher.AnyNumber, 'Foo2'),
             (matcher.AnyText, 'Foo3')
         ]
-        manager = matcher.MatchersManager()
+        manager = matcher.MatchersManager(False)
         manager.add_all(collection)
 
         assert 'Foo' not in manager
@@ -288,6 +300,7 @@ class TestMatchersBasic:
 
 
 class TestMatcherAnyListOf:
+    """Tests AnyListOf matchers"""
     # --- AnyListOf
     @pytest.mark.parametrize("match_value, match_param",[
         (
@@ -450,6 +463,7 @@ class TestMatcherAnyListOf:
 
 
 class TestMatcherAnyListOfMatchers:
+    """Tests AnyListOfMatchers matcher"""
     @pytest.mark.parametrize("matcher_item, size, compare_to", (
         pytest.param(matcher.AnyNumber(), 3, [1,2,3], id='AnyNumber-3'),
         pytest.param(matcher.AnyNumberGreaterThan(5), 3, [8,12,33], id='AnyNumberGreaterThan5-3'),
@@ -701,16 +715,31 @@ class TestMatchersNegative:
         assert match_value != matcher_instance
 
     # Dict negative tests
-    def test_any_dict_fails(self):
+    @pytest.mark.parametrize("compare_to", (
+        123,
+        [1,2,3],
+        False,
+        "Str"
+    ))
+    def test_any_dict_fails(self, compare_to):
         matcher_instance = matcher.AnyDict()
-        assert matcher_instance != 123
-        assert 123 != matcher_instance
-        assert matcher_instance != 'asfs'
-        assert matcher_instance != [1,2,3]
+        with pytest.raises(AssertionError):
+            assert matcher_instance == compare_to
 
-    def test_any_non_empty_dict_fails(self):
+        with pytest.raises(AssertionError):
+            assert compare_to == matcher_instance
+
+    @pytest.mark.parametrize("compare_to", (
+        {},
+        123,
+        [1,2,3],
+        False,
+        "Str"
+    ))
+    def test_any_non_empty_dict_fails(self, compare_to):
         matcher_instance = matcher.AnyNonEmptyDict()
-        assert matcher_instance != {}
-        assert {} != matcher_instance
-        assert matcher_instance != 'asfs'
-        assert matcher_instance != [1,2,3]
+        with pytest.raises(AssertionError):
+            assert matcher_instance == compare_to
+
+        with pytest.raises(AssertionError):
+            assert compare_to == matcher_instance

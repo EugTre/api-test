@@ -9,7 +9,7 @@ from jsonschema import validate
 from utils.api_client.models import ResponseEntity
 from utils.json_content.json_content import JsonContent, JsonContentBuilder
 from utils.json_content.pointer import ROOT_POINTER
-from utils.matchers import AbstractMatcher
+from utils.matchers import BaseMatcher
 
 class ResponseHeadersValidator:
     """Provide methods to validate reponse's headers"""
@@ -34,7 +34,7 @@ class ResponseHeadersValidator:
         return self.response_helper
 
     @allure.step('Check that headers are like given')
-    def are_like(self, headers: dict[str, str|AbstractMatcher]|None = None) -> 'ApiResponseHelper':
+    def are_like(self, headers: dict[str, str|BaseMatcher]|None = None) -> 'ApiResponseHelper':
         """Check that response headers are like given.
         If 'headers' not passed as parameter - headers
         from response section of Request Catalog entity will be used.

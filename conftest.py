@@ -10,13 +10,13 @@ def pytest_configure(config):
 
 def pytest_assertrepr_compare(op, left, right):
     if op != "==" and (
-        not isinstance(right, match.AbstractMatcher) \
-        and not isinstance(left, match.AbstractMatcher)
+        not isinstance(right, match.BaseMatcher) \
+        and not isinstance(left, match.BaseMatcher)
     ):
         return None
 
-    if isinstance(right, match.AbstractMatcher):
+    if isinstance(right, match.BaseMatcher):
         return right.assertrepr_compare(left, right)
 
-    if isinstance(left, match.AbstractMatcher):
+    if isinstance(left, match.BaseMatcher):
         return left.assertrepr_compare(right, left)

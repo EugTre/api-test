@@ -22,7 +22,7 @@ from .composition_handlers import ReferenceCompositionHandler, \
 @pytest.fixture(name='handlers', scope='session')
 def get_handlers():
     """Returns handlers config for tests"""
-    matcher_manager = MatchersManager()
+    matcher_manager = MatchersManager(False)
     matcher_manager.add(AnyText)
     matcher_manager.add(AnyListOf)
 
@@ -174,7 +174,7 @@ class TestComposer:
         }
         content_wrapper = JsonWrapper(copy.deepcopy(content))
 
-        matcher_manager = MatchersManager()
+        matcher_manager = MatchersManager(False)
         matcher_manager.add(AnyText)
 
         composer = Composer(content_wrapper, handlers={
@@ -210,7 +210,7 @@ class TestComposer:
 
         wrapper = JsonWrapper(content)
 
-        matcher_manager = MatchersManager()
+        matcher_manager = MatchersManager(False)
         matcher_manager.add(AnyText)
 
         generator_manager = GeneratorsManager()

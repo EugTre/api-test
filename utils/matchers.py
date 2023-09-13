@@ -8,6 +8,78 @@ from _pytest.assertion.util import assertrepr_compare
 
 from utils.basic_manager import BasicManager
 
+# --- Manager
+class MatchersManager(BasicManager):
+    """Class to register and provide access to matcher objects from various points
+    in the framework (e.g. for compiler procedures).
+    """
+    matchers = []
+
+    def __init__(self, include_known_matchers: bool = True):
+        super().__init__()
+        if not include_known_matchers:
+            return
+        self.add_all(MatchersManager.matchers)
+
+    def add(self, item: 'BaseMatcher', name: str | None = None, override: bool = False):
+        """Registers given matcher under given name.
+
+        Args:
+            matcher (AbstractMatcher): matcher class.
+            name (str, optional): registration name. Defaults to class.__name__.
+
+        Raises:
+            ValueError: when name already occupied.
+        """
+        return super().add(item, name, override)
+
+    def add_all(self, items: tuple['BaseMatcher', str] | list['BaseMatcher'],
+                override: bool = False):
+        """Registers given collection of matchers.
+
+        Args:
+            matchers (list | tuple): collection of matchers where each element is
+            'class<cls>' or ('class<cls>', 'name<str>').
+        """
+        return super().add_all(items, override)
+
+    def get(self, name: str, args:tuple=(), kwargs:dict=None) -> 'BaseMatcher':
+        """Creates an instance of registerd matcher object by it's name and
+        with given args/kwargs.
+
+        Args:
+            name (str): registered name of the matcher.
+            args (tuple, optional): matcher's constructor arguments. Defaults to ().
+            kwargs (dict, optional): matcher's constructor keyword arguments.
+            Defaults to None.
+
+        Raises:
+            ValueError: when given name is not found.
+
+        Returns:
+            AbstractMatcher: instance of `AbstractMatcher` class implementation
+        """
+        if name not in self.collection:
+            raise ValueError(f'Failed to find matcher with name "{name}"!')
+
+        if kwargs is None:
+            kwargs = {}
+        matcher_cls = self.collection[name]
+        matcher = matcher_cls(*args, **kwargs)
+        return matcher
+
+    def _check_type_on_add(self, item: typing.Any):
+        """Raises exception, if given item have unexpected type."""
+        if issubclass(item, BaseMatcher):
+            return
+
+        raise ValueError(f'Registraion failed for item "{item}" at {self.__class__.__name__}. '
+                         f'Only subclass items of class "{BaseMatcher.__name__}" '
+                         f'are allowed!')
+
+# --------
+# Matcher classes
+# --------
 
 def shorten_repr(list_or_dict):
     """Helper method to shorten object repr in
@@ -18,12 +90,19 @@ def shorten_repr(list_or_dict):
     return repr_str
 
 
-@dataclass(frozen=True, slots=True, eq=False)
-class AbstractMatcher(ABC):
+@dataclass(frozen=True, eq=False)
+class BaseMatcher(ABC):
     """Abstract Matcher to any value"""
+
+    def __init_subclass__(cls, **kwargs) -> None:
+        super().__init_subclass__(**kwargs)
+        MatchersManager.matchers.append(cls)
+
+    @abstractmethod
     def __eq__(self, other):
         return True
 
+    @abstractmethod
     def __repr__(self):
         return ''
 
@@ -40,8 +119,8 @@ class AbstractMatcher(ABC):
         return []
 
 
-@dataclass(frozen=True, slots=True, eq=False)
-class Anything(AbstractMatcher):
+@dataclass(frozen=True, eq=False)
+class Anything(BaseMatcher):
     """Matches to any value"""
     def __eq__(self, other):
         return other is not None
@@ -66,8 +145,8 @@ class Anything(AbstractMatcher):
 # --------
 # Text
 # --------
-@dataclass(slots=True, frozen=True, eq=False)
-class AnyText(AbstractMatcher):
+@dataclass(frozen=True, eq=False)
+class AnyText(BaseMatcher):
     """Matches to any text (string), including empty string"""
     def __eq__(self, other):
         return isinstance(other, (str, Anything, AnyText))
@@ -91,7 +170,7 @@ class AnyText(AbstractMatcher):
             f'{type(left)} != {type("")}'
         ]
 
-@dataclass(slots=True, frozen=True, eq=False)
+@dataclass(frozen=True, eq=False)
 class AnyTextLike(AnyText):
     """Matches to any text (string) that matches to given regex"""
     pattern: str
@@ -131,7 +210,7 @@ class AnyTextLike(AnyText):
             f'{"" if right.case_sensitive else "in"}sensitive pattern "{right.pattern}"'
         ]
 
-@dataclass(slots=True, frozen=True, eq=False)
+@dataclass(frozen=True, eq=False)
 class AnyTextWith(AnyText):
     """Object that matches to any text (string) that
     contains given substring"""
@@ -178,8 +257,8 @@ class AnyTextWith(AnyText):
 # --------
 # Number
 # --------
-@dataclass(slots=True, frozen=True, eq=False)
-class AnyNumber(AbstractMatcher):
+@dataclass(frozen=True, eq=False)
+class AnyNumber(BaseMatcher):
     """Object that matches to any number (int or float)"""
     def __eq__(self, other):
         return isinstance(other, (int, float, Anything, AnyNumber))
@@ -204,7 +283,7 @@ class AnyNumber(AbstractMatcher):
             f'Type {type(left)} doesn\'t match to expected {type(1)} or {type(1.1)} types.'
         ]
 
-@dataclass(slots=True, frozen=True, eq=False)
+@dataclass(frozen=True, eq=False)
 class AnyNumberGreaterThan(AnyNumber):
     """Object that matches to any number (int or float) that
     is greater than given 'number'"""
@@ -259,7 +338,7 @@ class AnyNumberGreaterThan(AnyNumber):
             f'{left} < {right.number}'
         ]
 
-@dataclass(slots=True, frozen=True, eq=False)
+@dataclass(frozen=True, eq=False)
 class AnyNumberLessThan(AnyNumber):
     """Object that matches to any number (int or float) that
     is less than given 'number'"""
@@ -318,8 +397,8 @@ class AnyNumberLessThan(AnyNumber):
 # --------
 # Bool
 # --------
-@dataclass(slots=True, frozen=True, eq=False)
-class AnyBool(AbstractMatcher):
+@dataclass(frozen=True, eq=False)
+class AnyBool(BaseMatcher):
     """Object that matches to any bool"""
     def __eq__(self, other):
         return isinstance(other, (bool, Anything))
@@ -351,8 +430,8 @@ class AnyBool(AbstractMatcher):
 # --------
 # Lists
 # --------
-@dataclass(slots=True, frozen=True, eq=False)
-class AnyList(AbstractMatcher):
+@dataclass(frozen=True, eq=False)
+class AnyList(BaseMatcher):
     """Object that matches to any list"""
     def __eq__(self, other):
         return isinstance(other, (list, Anything, AnyList))
@@ -376,7 +455,7 @@ class AnyList(AbstractMatcher):
             f'Type {type(left)} doesn\'t match to expected {type([])} type.'
         ]
 
-@dataclass(slots=True, frozen=True, eq=False)
+@dataclass(frozen=True, eq=False)
 class AnyListOf(AnyList):
     """Object that matches to any list of given size and/or
     having elements of given type"""
@@ -486,7 +565,7 @@ class AnyListOf(AnyList):
 
         return output
 
-@dataclass(slots=True, frozen=True, eq=False)
+@dataclass(frozen=True, eq=False)
 class AnyListLongerThan(AnyListOf):
     """Object that matches to any list with size
     greater than given 'size' and, optionally,
@@ -495,7 +574,7 @@ class AnyListLongerThan(AnyListOf):
     REPR_MSG = '<Any List Longer Than{size_desc}{type_desc}>'
     SIZE_COMPARE_OP = '>'
 
-@dataclass(slots=True, frozen=True, eq=False)
+@dataclass(frozen=True, eq=False)
 class AnyListShorterThan(AnyListOf):
     """Object that matches to any list with size
     less than given 'size' and, optionally,
@@ -504,12 +583,12 @@ class AnyListShorterThan(AnyListOf):
     REPR_MSG = '<Any List Shorter Than{size_desc}{type_desc}>'
     SIZE_COMPARE_OP = '<'
 
-@dataclass(slots=True, frozen=True, eq=False)
-class AnyListOfMatchers(AbstractMatcher):
+@dataclass(frozen=True, eq=False)
+class AnyListOfMatchers(BaseMatcher):
     """Object that matches to any list of given size and
     having elements that match to given matcher object
     (another AbstactMatcher or any other object)"""
-    matcher: AbstractMatcher | typing.Any
+    matcher: BaseMatcher | typing.Any
     size: int|None = None
 
     SIZE_COMPARE_OP = '=='
@@ -581,7 +660,7 @@ class AnyListOfMatchers(AbstractMatcher):
             match_output.append('')
             match_output.append(f'{idx}) {left[idx]}')
             match_output.append('   Reason:')
-            if isinstance(right.matcher, AbstractMatcher):
+            if isinstance(right.matcher, BaseMatcher):
                 reason = right.matcher.assertrepr_compare_brief(left[idx], right.matcher)
             else:
                 reason = assertrepr_compare(pytest.current_config, '==', left[idx], right.matcher)
@@ -593,24 +672,24 @@ class AnyListOfMatchers(AbstractMatcher):
 
         return output
 
-@dataclass(slots=True, frozen=True, eq=False)
+@dataclass(frozen=True, eq=False)
 class AnyListOfMatchersLongerThan(AnyListOfMatchers):
     """Object that matches to any list with size
     greater than given 'size' and
     having elements that match to given matcher object
     (another AbstactMatcher or any other object)"""
-    matcher: AbstractMatcher
+    matcher: BaseMatcher
     size: int|None = None
 
     SIZE_COMPARE_OP = '>'
 
-@dataclass(slots=True, frozen=True, eq=False)
+@dataclass(frozen=True, eq=False)
 class AnyListOfMatchersShorterThan(AnyListOfMatchers):
     """Object that matches to any list with size
     less than given 'size' and
     having elements that match to given matcher object
     (another AbstactMatcher or any other object)"""
-    matcher: AbstractMatcher
+    matcher: BaseMatcher
     size: int|None = None
 
     SIZE_COMPARE_OP = '<'
@@ -619,8 +698,8 @@ class AnyListOfMatchersShorterThan(AnyListOfMatchers):
 # --------
 # Dicts
 # --------
-@dataclass(slots=True, frozen=True, eq=False)
-class AnyDict(AbstractMatcher):
+@dataclass(frozen=True, eq=False)
+class AnyDict(BaseMatcher):
     """Object that matches to any dict"""
     def __eq__(self, other):
         return isinstance(other, (dict, Anything))
@@ -644,7 +723,7 @@ class AnyDict(AbstractMatcher):
             f'Type {type(left)} doesn\'t match to expected {type({})} type.'
         ]
 
-@dataclass(slots=True, frozen=True, eq=False)
+@dataclass(frozen=True, eq=False)
 class AnyNonEmptyDict(AnyDict):
     """Object that matches to any non-empty dict"""
     def __eq__(self, other) -> bool:
@@ -675,82 +754,10 @@ class AnyNonEmptyDict(AnyDict):
         ]
 
 
-class MatchersManager(BasicManager):
-    """Class to register and provide access to matcher objects from various points
-    in the framework (e.g. for compiler procedures).
-    """
-    def add(self, item: AbstractMatcher, name: str | None = None, override: bool = False):
-        """Registers given matcher under given name.
-
-        Args:
-            matcher (AbstractMatcher): matcher class.
-            name (str, optional): registration name. Defaults to class.__name__.
-
-        Raises:
-            ValueError: when name already occupied.
-        """
-        return super().add(item, name, override)
-
-    def add_all(self, items: tuple[AbstractMatcher, str] | list[AbstractMatcher],
-                override: bool = False):
-        """Registers given collection of matchers.
-
-        Args:
-            matchers (list | tuple): collection of matchers where each element is
-            'class<cls>' or ('class<cls>', 'name<str>').
-        """
-        return super().add_all(items, override)
-
-    def get(self, name: str, args:tuple=(), kwargs:dict=None) -> AbstractMatcher:
-        """Creates an instance of registerd matcher object by it's name and
-        with given args/kwargs.
-
-        Args:
-            name (str): registered name of the matcher.
-            args (tuple, optional): matcher's constructor arguments. Defaults to ().
-            kwargs (dict, optional): matcher's constructor keyword arguments.
-            Defaults to None.
-
-        Raises:
-            ValueError: when given name is not found.
-
-        Returns:
-            AbstractMatcher: instance of `AbstractMatcher` class implementation
-        """
-        if name not in self.collection:
-            raise ValueError(f'Failed to find matcher with name "{name}"!')
-
-        if kwargs is None:
-            kwargs = {}
-        matcher_cls = self.collection[name]
-        matcher = matcher_cls(*args, **kwargs)
-        return matcher
-
-    def _check_type_on_add(self, item: typing.Any):
-        """Raises exception, if given item have unexpected type."""
-        if issubclass(item, AbstractMatcher):
-            return
-
-        raise ValueError(f'Registraion failed for item "{item}" at {self.__class__.__name__}. '
-                         f'Only subclass items of class "{AbstractMatcher.__name__}" '
-                         f'are allowed!')
-
-
-# Default collection of matchers.
-matchers_manager = MatchersManager()
-matchers_manager.add_all((
-    Anything,
-    AnyText,
-    AnyTextLike,
-    AnyTextWith,
-    AnyNumber,
-    AnyNumberGreaterThan,
-    AnyNumberLessThan,
-    AnyBool,
-    AnyList,
-    AnyListOf,
-    AnyListLongerThan,
-    AnyListShorterThan,
-    AnyDict,
-    AnyNonEmptyDict
-))
+# --------
+# Date
+# --------
+#@dataclass(frozen=True, eq=False)
+#class AnyDate(BaseMatcher):
+#    format: str
+#    # 1996-04-30T19:26:49.610Z

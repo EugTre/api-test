@@ -269,8 +269,8 @@ class TestGeneratorCompositionHandler:
         return random.randint(0, 100)
 
     @staticmethod
-    def gen_random_in_range(min=0, max=100):
-        return random.randrange(min, max)
+    def gen_random_in_range(minimum=0, maximum=100):
+        return random.randrange(minimum, maximum)
 
     def test_create(self):
         assert GeneratorCompositionHandler(gen.generators_manager)
@@ -286,7 +286,7 @@ class TestGeneratorCompositionHandler:
         ({"!gen": "RandomNumber"}, int),
         ({"!gen": "FirstName"}, str),
         ({"!gen": "RandomInRange", "!args": [50, 100]}, int),
-        ({"!gen": "RandomInRange", "min": 50, "max": 55}, int)
+        ({"!gen": "RandomInRange", "minimum": 50, "maximum": 55}, int)
     ])
     def test_compose(self, input_value, expected, generator_handler):
         composition_result, composed_value = generator_handler.compose(input_value)
@@ -336,11 +336,13 @@ class TestGeneratorCompositionHandler:
 
 class TestMatcherCompositionHandler:
     """Tests for MatcherCompositionHandler"""
+    manager = matchers.MatchersManager()
+
     def test_create(self):
-        assert MatcherCompositionHandler(matchers.matchers_manager)
+        assert MatcherCompositionHandler(self.manager)
 
     def test_matches(self):
-        handler = MatcherCompositionHandler(matchers.matchers_manager)
+        handler = MatcherCompositionHandler(self.manager)
         assert handler.match({
             "!match": "Anything",
             "!args": [1,2,3],
@@ -358,7 +360,7 @@ class TestMatcherCompositionHandler:
          matchers.AnyListOf(size=5, item_type=3))
     ])
     def test_compose(self, input_value, expected):
-        handler = MatcherCompositionHandler(matchers.matchers_manager)
+        handler = MatcherCompositionHandler(self.manager)
         composition_result, composed_value = handler.compose(input_value)
 
         assert composition_result == CompositionStatus.SUCCESS
@@ -370,11 +372,11 @@ class TestMatcherCompositionHandler:
         {"match": "Anything"}
     ])
     def test_match_fails(self, input_value):
-        handler = MatcherCompositionHandler(matchers.matchers_manager)
+        handler = MatcherCompositionHandler(self.manager)
         assert not handler.match(input_value)
 
     def test_compose_by_unknown_matcher_fails(self):
-        handler = MatcherCompositionHandler(matchers.matchers_manager)
+        handler = MatcherCompositionHandler(self.manager)
         with pytest.raises(ValueError, match='Failed to find matcher with name .*'):
             handler.compose({
                 "!match": "UnknownMatcher",
