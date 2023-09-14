@@ -91,7 +91,6 @@ def shorten_repr(list_or_dict):
         repr_str = f'{repr_str[:35]} ...{repr_str[-20:]}'
     return repr_str
 
-
 @dataclass(frozen=True, eq=False, repr=False)
 class BaseMatcher(ABC):
     """Abstract Matcher to any value"""
@@ -99,6 +98,40 @@ class BaseMatcher(ABC):
     def __init_subclass__(cls, **kwargs) -> None:
         super().__init_subclass__(**kwargs)
         MatchersManager.matchers.append(cls)
+
+    def __post_init__(self):
+        # Validates values against fields typing
+        # pylint: disable=no-member, protected-access
+        not_matching_fields = []
+        for field in self.__dataclass_fields__.values():
+            if isinstance(field.type, (typing._SpecialForm, type(typing.Any))):
+                # Ignore Any and typing of SpecialForm (parameterless Union, ClassVar)
+                continue
+
+            field_type = field.type
+            origin = typing.get_origin(field_type)
+            if origin:
+                # Skip stuff like classvar
+                if isinstance(origin, (typing._SpecialForm, type(typing.Any))):
+                    continue
+                # For unions - type is a tuple
+                field_type = typing.get_args(field_type)
+                if typing.Any in field_type:
+                    continue
+
+            value = getattr(self, field.name)
+            if not isinstance(value, field_type):
+                value_repr = f'"{value}"' if isinstance(value, str) else str(value)
+                not_matching_fields.append(
+                    f'"{field.name}" = {value_repr} ({type(value)}) doesn\'t '
+                    f'match expected type(s) {field_type}'
+                )
+
+        # pylint: enable=no-member, protected-access
+        if not_matching_fields:
+            details = ',\n - '.join(not_matching_fields)
+            raise TypeError("Matcher initialized with invalid types of parameters:\n - "
+                            f"{details}")
 
     @abstractmethod
     def __eq__(self, other):
@@ -133,8 +166,8 @@ class Anything(BaseMatcher):
     @staticmethod
     def assertrepr_compare(left, right) -> list[str]:
         output = [
-            "Comparing to Anything Matcher:",
-            f"{left} != {right}"
+            "Comparing to Anything matcher:",
+            f"{shorten_repr(left)} != {right}"
         ]
         output.extend(Anything.assertrepr_compare_brief(left, right))
         return output
@@ -159,8 +192,8 @@ class AnyText(BaseMatcher):
     @staticmethod
     def assertrepr_compare(left, right) -> list[str]:
         output = [
-            "Comparing to Text Matcher:",
-            f" {left} != {right}"
+            "Comparing to Text matcher:",
+            f"{shorten_repr(left)} != {right}"
         ]
         output.extend(AnyText.assertrepr_compare_brief(left, right))
         return output
@@ -192,8 +225,8 @@ class AnyTextLike(AnyText):
     @staticmethod
     def assertrepr_compare(left, right) -> list[str]:
         output = [
-            "Comparing to Text Like Matcher:",
-            f'{left} != {right}'
+            "Comparing to Text Like matcher:",
+            f'{shorten_repr(left)} != {right}'
         ]
         output.extend(AnyTextLike.assertrepr_compare_brief(left, right))
         return output
@@ -208,7 +241,7 @@ class AnyTextLike(AnyText):
 
         return [
             'Pattern mismatch:',
-            f'"{left}" doesn\'t match case '
+            f'"{shorten_repr(left)}" doesn\'t match case '
             f'{"" if right.case_sensitive else "in"}sensitive pattern "{right.pattern}"'
         ]
 
@@ -235,8 +268,8 @@ class AnyTextWith(AnyText):
     @staticmethod
     def assertrepr_compare(left, right) -> list[str]:
         output = [
-            "Comparing to Text Contains Matcher:",
-            f"{left} != {right}"
+            "Comparing to Text Contains matcher:",
+            f"{shorten_repr(left)} != {right}"
         ]
         output.extend(AnyTextWith.assertrepr_compare_brief(left, right))
         return output
@@ -251,7 +284,7 @@ class AnyTextWith(AnyText):
 
         return [
             'Content mismatch:',
-            f'"{left}" doesn\'t contain case '
+            f'"{shorten_repr(left)}" doesn\'t contain case '
             f'{"" if right.case_sensitive else "in"}sensitive substring "{right.substring}"'
         ]
 
@@ -270,10 +303,9 @@ class AnyNumber(BaseMatcher):
 
     @staticmethod
     def assertrepr_compare(left, right) -> list[str]:
-        left_repr = shorten_repr(left)
         output = [
-            "Comparing to Number Matcher:",
-            f"{left_repr} != {right}"
+            "Comparing to Number matcher:",
+            f"{shorten_repr(left)} != {right}"
         ]
         output.extend(AnyNumber.assertrepr_compare_brief(left, right))
         return output
@@ -314,8 +346,8 @@ class AnyNumberGreaterThan(AnyNumber):
     @staticmethod
     def assertrepr_compare(left, right) -> list[str]:
         output = [
-            "Comparing to Number Greater Than Matcher:",
-            f"{left} != {right}"
+            "Comparing to Number Greater Than matcher:",
+            f"{shorten_repr(left)} != {right}"
         ]
         output.extend(AnyNumberGreaterThan.assertrepr_compare_brief(left, right))
         return output
@@ -362,8 +394,8 @@ class AnyNumberLessThan(AnyNumber):
     @staticmethod
     def assertrepr_compare(left, right) -> list[str]:
         output = [
-            "Comparing to Number Less Than Matcher:",
-            f"{left} != {right}"
+            "Comparing to Number Less Than matcher:",
+            f"{shorten_repr(left)} != {right}"
         ]
         output.extend(AnyNumberLessThan.assertrepr_compare_brief(left, right))
         return output
@@ -389,10 +421,11 @@ class AnyNumberInRange(AnyNumber):
     max_number: int|float
 
     def __post_init__(self):
+        super().__post_init__()
         if self.min_number > self.max_number:
             raise ValueError('Invalid matcher range limits! '
                 '"min_number" must be less than "max_number", '
-                f'but given {self.min_number} > {self.max_number}')
+                f'but {self.min_number} > {self.max_number} was given.')
 
     def __eq__(self, other):
         if isinstance(other, (AnyNumber, Anything)):
@@ -401,7 +434,6 @@ class AnyNumberInRange(AnyNumber):
         if not isinstance(other, (int, float)):
             return False
 
-        print(f'{self.min_number=} <= {other=} <= {self.max_number=}')
         return self.min_number <= other <= self.max_number
 
     def __repr__(self):
@@ -410,8 +442,8 @@ class AnyNumberInRange(AnyNumber):
     @staticmethod
     def assertrepr_compare(left, right) -> list[str]:
         output = [
-            "Comparing with Number In Range Matcher:",
-            f"{left} != {right}"
+            "Comparing to Number In Range matcher:",
+            f"{shorten_repr(left)} != {right}"
         ]
         output.extend(AnyNumberInRange.assertrepr_compare_brief(left, right))
         return output
@@ -452,13 +484,9 @@ class AnyBool(BaseMatcher):
 
     @staticmethod
     def assertrepr_compare(left, right) -> list[str]:
-        left_repr = repr(left)
-        if isinstance(left, (list, dict)) and len(left_repr) > 30:
-            left_repr = f'{left_repr[:10]} ...{left_repr[-10:]}'
-
         output = [
-            "Comparing to Bool Matcher:",
-            f"{left_repr} != {right}"
+            "Comparing to Bool matcher:",
+            f"{shorten_repr(left)} != {right}"
         ]
         output.extend(AnyBool.assertrepr_compare_brief(left, right))
         return output
@@ -486,8 +514,8 @@ class AnyList(BaseMatcher):
     @staticmethod
     def assertrepr_compare(left, right) -> list[str]:
         output = [
-            "Comparing to List Matcher:",
-            f"{left} != {right}"
+            "Comparing to List matcher:",
+            f"{shorten_repr(left)} != {right}"
         ]
         output.extend(AnyList.assertrepr_compare_brief(left, right))
         return output
@@ -503,13 +531,14 @@ class AnyList(BaseMatcher):
 class AnyListOf(AnyList):
     """Object that matches to any list of given size and/or
     having elements of given type"""
-    size: int = None
-    item_type: str|int|float|bool|dict|list = None
+    size: int|None = None
+    item_type: str|int|float|bool|dict|list|None = None
 
     REPR_MSG = '<Any List Of{size_desc}{type_desc}>'
     SIZE_COMPARE_OP = '=='
 
     def __post_init__(self):
+        super().__post_init__()
         if self.item_type is not None:
             object.__setattr__(self, 'item_type', type(self.item_type))
 
@@ -568,8 +597,8 @@ class AnyListOf(AnyList):
     def assertrepr_compare(left, right):
         """Method to print detailed comparison fail info"""
         output = [
-            "Comparing List Of matcher:",
-            f" {left} != {right}"
+            "Comparing to List Of matcher:",
+            f"{shorten_repr(left)} != {right}"
         ]
 
         output.extend(AnyListOf.assertrepr_compare_brief(left, right))
@@ -577,6 +606,12 @@ class AnyListOf(AnyList):
 
     @staticmethod
     def assertrepr_compare_brief(left, right) -> list[str]:
+        if not isinstance(left, list):
+            return [
+                'Type mismatch:',
+                f'Type {type(left)} doesn\'t match to expected {type([])} type.'
+            ]
+
         output = []
         if right.size is not None:
             size_matches = False
@@ -589,23 +624,27 @@ class AnyListOf(AnyList):
                     size_matches = len(left) > right.size
 
             if not size_matches:
-                output.append("Size comparison:")
+                output.append("Size mismatch:")
                 output.append(
-                    f" {len(left)} {right.SIZE_COMPARE_OP} {right.size} -- size mismatch!")
+                    f"{len(left)} {right.SIZE_COMPARE_OP} {right.size} is not true.")
 
-        type_mismatch_detected = False
-        if right.type is not None:
-            type_output = ["Type comparison:"]
-            type_output.append(f'Expected type of elements is "{right.type.__name__}":')
-            for idx, type_matches in enumerate([isinstance(v, right.type) for v in left]):
+        type_mismatch_info = []
+        if right.item_type is not None:
+            for idx, type_matches in enumerate([isinstance(v, right.item_type) for v in left]):
                 if type_matches:
                     continue
-                type_output.append(
-                    f'   {idx}) {left[idx]} (of unexpected type "{type(left[idx]).__name__}")')
-                type_mismatch_detected = True
 
-        if type_mismatch_detected:
-            output.extend(type_output)
+                type_mismatch_info.append(
+                    f'   {idx}) {shorten_repr(left[idx])} '
+                    f'(of unexpected type "{type(left[idx]).__name__}")'
+                )
+
+        if type_mismatch_info:
+            output.extend([
+                "Element type mismatch:",
+                f'Expected type of elements is "{right.item_type.__name__}":',
+                *type_mismatch_info
+            ])
 
         return output
 
@@ -627,12 +666,90 @@ class AnyListShorterThan(AnyListOf):
     REPR_MSG = '<Any List Shorter Than{size_desc}{type_desc}>'
     SIZE_COMPARE_OP = '<'
 
-# @dataclass(frozen=True, eq=False, repr=False)
-# class AnyListOfRange(BaseMatcher):
-#     min_size: int
-#     max_size: int
+@dataclass(frozen=True, eq=False, repr=False)
+class AnyListOfRange(BaseMatcher):
+    """Object that matches to any list of size in given range and/or
+    having elements of given type"""
+    min_size: int
+    max_size: int
+    item_type: str|int|float|bool|dict|list|None = None
 
-#     def __eq__(self, other):
+    def __post_init__(self):
+        super().__post_init__()
+        if self.min_size >= self.max_size:
+            raise ValueError('Invalid matcher range limits! '
+                '"min_size" must be less than "max_size", '
+                f'but {self.min_size} > {self.max_size} was given.')
+
+        if self.item_type is not None:
+            object.__setattr__(self, 'item_type', type(self.item_type))
+
+    def __eq__(self, other) -> bool:
+        if isinstance(other, (Anything, AnyList)):
+            return True
+        if not isinstance(other, list):
+            return False
+
+        size_test = self.min_size <= len(other) <= self.max_size
+        type_test = True if self.item_type is None else \
+            all((isinstance(itm, self.item_type) for itm in other))
+
+        return size_test and type_test
+
+    def __repr__(self):
+        range_desc = f'of {self.min_size} to {self.max_size} items'
+        type_desc = "" if self.item_type is None else f' of type "{self.item_type.__name__}"'
+        return f'<Any List Of Range {range_desc}{type_desc}>'
+
+    @staticmethod
+    def assertrepr_compare(left, right):
+        """Method to print detailed comparison fail info"""
+        output = [
+            "Comparing to List Of Range matcher:",
+            f"{shorten_repr(left)} != {right}"
+        ]
+
+        output.extend(AnyListOfRange.assertrepr_compare_brief(left, right))
+        return output
+
+    @staticmethod
+    def assertrepr_compare_brief(left, right) -> list[str]:
+        if not isinstance(left, list):
+            return [
+                'Type mismatch:',
+                f'Type {type(left)} doesn\'t match to expected {type([])} type.'
+            ]
+
+        output = []
+        other_size = len(left)
+        if right.min_size > other_size:
+            output.append('Size mismatch:')
+            output.append(f'Given list\'s size {other_size} is shorter than '
+                          f'expected minimum of {right.min_size} elements!')
+
+        elif right.max_size < other_size:
+            output.append('Size mismatch:')
+            output.append(f'Given list\' size {other_size} is longer than '
+                          f'expected maximum of {right.max_size} elements!')
+
+        type_mismatch_info = []
+        if right.item_type is not None:
+            for idx, type_matches in enumerate([isinstance(v, right.item_type) for v in left]):
+                if type_matches:
+                    continue
+                type_mismatch_info.append(
+                    f'   {idx}) {shorten_repr(left[idx])} '
+                    f'(of unexpected type "{type(left[idx]).__name__}")'
+                )
+
+        if type_mismatch_info:
+            output.extend([
+                "Element type mismatch:",
+                f'Expected type of elements is "{right.item_type.__name__}":',
+                *type_mismatch_info
+            ])
+
+        return output
 
 
 @dataclass(frozen=True, eq=False, repr=False)
@@ -677,7 +794,7 @@ class AnyListOfMatchers(BaseMatcher):
     def assertrepr_compare(left, right):
         output = [
             "Comparing to List Of Matchers matcher:",
-            f" {left} != {right}"
+            f"{shorten_repr(left)} != {right}"
         ]
 
         output.extend(AnyListOfMatchers.assertrepr_compare_brief(left, right))
@@ -698,7 +815,7 @@ class AnyListOfMatchers(BaseMatcher):
                     size_matches = len(left) > right.size
 
             if not size_matches:
-                output.append("Size comparison:")
+                output.append("Size mismatch:")
                 output.append(
                     f" {len(left)} {right.SIZE_COMPARE_OP} {right.size} -- size mismatch!")
 
@@ -711,7 +828,6 @@ class AnyListOfMatchers(BaseMatcher):
 
             match_output.append('')
             match_output.append(f'{idx}) {left[idx]}')
-            match_output.append('   Reason:')
             if isinstance(right.matcher, BaseMatcher):
                 reason = right.matcher.assertrepr_compare_brief(left[idx], right.matcher)
             else:
@@ -730,7 +846,7 @@ class AnyListOfMatchersLongerThan(AnyListOfMatchers):
     greater than given 'size' and
     having elements that match to given matcher object
     (another AbstactMatcher or any other object)"""
-    matcher: BaseMatcher
+    matcher: BaseMatcher | typing.Any
     size: int|None = None
 
     SIZE_COMPARE_OP = '>'
@@ -741,7 +857,7 @@ class AnyListOfMatchersShorterThan(AnyListOfMatchers):
     less than given 'size' and
     having elements that match to given matcher object
     (another AbstactMatcher or any other object)"""
-    matcher: BaseMatcher
+    matcher: BaseMatcher | typing.Any
     size: int|None = None
 
     SIZE_COMPARE_OP = '<'
@@ -763,7 +879,7 @@ class AnyDict(BaseMatcher):
     def assertrepr_compare(left, right) -> list[str]:
         output = [
             "Comparing to Dict matcher:",
-            f"{left} != {right}"
+            f"{shorten_repr(left)} != {right}"
         ]
         output.extend(AnyDict.assertrepr_compare_brief(left, right))
         return output
@@ -788,7 +904,7 @@ class AnyNonEmptyDict(AnyDict):
     def assertrepr_compare(left, right) -> list[str]:
         output = [
             "Comparing to Non-empty Dict matcher:",
-            f"{left} != {right}"
+            f"{shorten_repr(left)} != {right}"
         ]
         output.extend(AnyDict.assertrepr_compare_brief(left, right))
         return output
@@ -873,12 +989,21 @@ class AnyDate(BaseMatcher):
     @staticmethod
     def assertrepr_compare(left, right) -> list[str]:
         """Return full list of string as explanation of why values are not equal"""
-        return []
+        output = [
+            "Comparing to Any Date matcher:",
+            f"{shorten_repr(left)} != {right}"
+        ]
+        output.extend(AnyDate.assertrepr_compare_brief(left, right))
+        return output
 
     @staticmethod
     def assertrepr_compare_brief(left, right) -> list[str]:
         """Return shortened list of string as explanation of why values are not equal"""
-        return []
+        return [
+            "Type mismatch:",
+            f"Unexpected data type of {shorten_repr(left)} (type: {type(left)}). "
+                "Only ISO formatted string is allowed."
+        ]
 
 @dataclass(frozen=True, eq=False, repr=False)
 class AnyDateBefore(BaseMatcher):
@@ -888,6 +1013,7 @@ class AnyDateBefore(BaseMatcher):
     eq_cache = None
 
     def __post_init__(self):
+        super().__post_init__()
         object.__setattr__(self, 'eq_cache', {})
 
     def __eq__(self, other) -> bool:
@@ -928,7 +1054,7 @@ class AnyDateBefore(BaseMatcher):
         """Return full list of string as explanation of why values are not equal"""
         output = [
             "Comparing to Date Before matcher:",
-            f"{left} != {right}"
+            f"{shorten_repr(left)} != {right}"
         ]
         output.extend(AnyDateBefore.assertrepr_compare_brief(left, right))
         return output
@@ -938,12 +1064,15 @@ class AnyDateBefore(BaseMatcher):
         """Return shortened list of string as explanation of why values are not equal"""
         eq_cache = right.eq_cache
         if not eq_cache:
-            return [f"Unexpected data type of {left} (type: {type(left)}). "
-                    "Only ISO formatted string is allowed."]
+            return [
+                "Type mismatch:",
+                f"Unexpected data type of {shorten_repr(left)} (type: {type(left)}). "
+                    "Only ISO formatted string is allowed."
+            ]
 
         diff = eq_cache['other_date'] - eq_cache['self_date']
         return [
-            'Date comparison failed:',
+            'Date mismatch:',
             f"{eq_cache['other_date']} is <{diff}> later than {eq_cache['self_date']} "
         ]
 
@@ -955,6 +1084,7 @@ class AnyDateAfter(BaseMatcher):
     eq_cache = None
 
     def __post_init__(self):
+        super().__post_init__()
         object.__setattr__(self, 'eq_cache', {})
 
     def __eq__(self, other) -> bool:
@@ -996,7 +1126,7 @@ class AnyDateAfter(BaseMatcher):
         """Return full list of string as explanation of why values are not equal"""
         output = [
             "Comparing to Date After matcher:",
-            f"{left} != {right}"
+            f"{shorten_repr(left)} != {right}"
         ]
         output.extend(AnyDateAfter.assertrepr_compare_brief(left, right))
         return output
@@ -1006,12 +1136,15 @@ class AnyDateAfter(BaseMatcher):
         """Return shortened list of string as explanation of why values are not equal"""
         eq_cache = right.eq_cache
         if not eq_cache:
-            return [f"Unexpected data type of {left} (type: {type(left)}). "
-                    "Only ISO formatted string is allowed."]
+            return [
+                "Type mismatch:",
+                f"Unexpected data type of {shorten_repr(left)} (type: {type(left)}). "
+                    "Only ISO formatted string is allowed."
+            ]
 
         diff = eq_cache['self_date'] - eq_cache['other_date']
         return [
-            'Date comparison failed:',
+            'Date mismatch:',
             f"{eq_cache['other_date']} is <{diff}> earlier than {eq_cache['self_date']} "
         ]
 
@@ -1023,6 +1156,8 @@ class AnyDateInRange(BaseMatcher):
     eq_cache = None
 
     def __post_init__(self):
+        super().__post_init__()
+
         left_limit = get_offset_date(self.date_from)
         right_limit = get_offset_date(self.date_to)
         if left_limit > right_limit:
@@ -1076,7 +1211,7 @@ class AnyDateInRange(BaseMatcher):
         """Return full list of string as explanation of why values are not equal"""
         output = [
             "Comparing to Date In Range matcher:",
-            f"{left} != {right}"
+            f"{shorten_repr(left)} != {right}"
         ]
         output.extend(AnyDateInRange.assertrepr_compare_brief(left, right))
         return output
@@ -1086,10 +1221,13 @@ class AnyDateInRange(BaseMatcher):
         """Return shortened list of string as explanation of why values are not equal"""
         eq_cache = right.eq_cache
         if not eq_cache:
-            return [f"Unexpected data type of {left} (type: {type(left)}). "
-                    "Only ISO formatted string is allowed."]
+            return [
+                "Type mismatch:",
+                f"Unexpected data type of {shorten_repr(left)} (type: {type(left)}). "
+                    "Only ISO formatted string is allowed."
+            ]
 
-        output = ['Date comparison failed:']
+        output = ['Date mismatch:']
         if eq_cache['self_date_from'] > eq_cache['other_date']:
             diff = eq_cache['self_date_from'] - eq_cache['other_date']
             output.append(f"{eq_cache['other_date']} (UTC) is <{diff}> earlier than "

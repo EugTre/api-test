@@ -187,7 +187,7 @@ class TestMatcherManager:
         assert 'Bar1' not in manager
 
 
-class TestMatchers:
+class TestSimpleMatchers:
     """Positive tests for matchers"""
     @pytest.mark.parametrize("match_value",[
         "text",
@@ -248,10 +248,11 @@ class TestMatchers:
         """Anything fails to match None"""
         compare_to = None
         matcher_instance = match.Anything()
-        with pytest.raises(AssertionError, match='Comparing to Anything Matcher:.*'):
+        pattern = re.compile(r'Comparing to Anything matcher:.*', re.S)
+        with pytest.raises(AssertionError, match=pattern):
             assert matcher_instance == compare_to
 
-        with pytest.raises(AssertionError, match='Comparing to Anything Matcher:.*'):
+        with pytest.raises(AssertionError, match=pattern):
             assert compare_to == matcher_instance
 
     @pytest.mark.parametrize("match_value", [
@@ -338,6 +339,7 @@ class TestMatcherAnyText:
         assert match_value == matcher_instance
 
     # --- Negative
+    # ----------------
     @pytest.mark.parametrize("match_value",[
         12, 12.33, [], {}, None
     ])
@@ -370,6 +372,33 @@ class TestMatcherAnyText:
         matcher_instance = match.AnyTextWith(matcher_pattern)
         assert matcher_instance != match_value
         assert match_value != matcher_instance
+
+    # --- Negative on initialization
+    @pytest.mark.parametrize("params", (
+        (123, 123),
+        ([], 'str'),
+        (None, None),
+        (False, []),
+    ))
+    def test_any_text_like_init_fails(self, params):
+        with pytest.raises(TypeError, match=re.compile(
+            'Matcher initialized with invalid types of parameters.*pattern.*case_sensitive.*',
+            re.S
+        )):
+            match.AnyTextLike(*params)
+
+    @pytest.mark.parametrize("params", (
+        (123, 123),
+        ([], 'str'),
+        (None, None),
+        (False, []),
+    ))
+    def test_any_text_with_init_fails(self, params):
+        with pytest.raises(TypeError, match=re.compile(
+            'Matcher initialized with invalid types of parameters.*substring.*case_sensitive.*',
+            re.S
+        )):
+            match.AnyTextWith(*params)
 
 
 class TestMatcherAnyNumber:
@@ -489,6 +518,35 @@ class TestMatcherAnyNumber:
             matcher_instance = match.AnyNumberInRange(*match_param)
             assert match_value == matcher_instance
 
+    # --- Negative on initialization
+    @pytest.mark.parametrize("params", ('str', [], None, {}))
+    def test_any_number_greater_than_init_fails(self, params):
+        with pytest.raises(TypeError, match=re.compile(
+            'Matcher initialized with invalid types of parameters.*number.*',
+            re.S
+        )):
+            match.AnyNumberGreaterThan(params)
+
+    @pytest.mark.parametrize("params", ('str', [], None, {}))
+    def test_any_number_less_than_init_fails(self, params):
+        with pytest.raises(TypeError, match=re.compile(
+            'Matcher initialized with invalid types of parameters.*number.*',
+            re.S
+        )):
+            match.AnyNumberLessThan(params)
+
+    @pytest.mark.parametrize("params", ('str', [], None, {}))
+    def test_any_number_in_range_init_fails(self, params):
+        with pytest.raises(TypeError, match=re.compile(
+            'Matcher initialized with invalid types of parameters.*min_number.*max_number.*',
+            re.S
+        )):
+            match.AnyNumberInRange(params, params)
+
+def generate_test_id_for_any_list_of_range(val):
+    if isinstance(val, tuple):
+        return f'{val[0]}_{val[1]}'
+    return str(val)
 
 class TestMatcherAnyListOf:
     """Tests AnyListOf matchers"""
@@ -653,13 +711,99 @@ class TestMatcherAnyListOf:
         assert match_value == matcher_instance
 
     # --- AnyListOfRange(size, size, type)
-    #def test_any_list_of_range(self):
-    #    matcher_instance = match.AnyListOfRange(2, 4)
-    #    assert matcher_instance == [1,2,3,4]
+    @pytest.mark.parametrize("size_range, value", (
+        ((2, 4), list(range(3))),
+        ((2, 4), list(range(4))),
+        ((2, 4),  list(range(2)))
+    ), ids=generate_test_id_for_any_list_of_range)
+    def test_any_list_of_range(self, size_range, value):
+        matcher_instance = match.AnyListOfRange(*size_range)
+        assert value == matcher_instance
+        assert matcher_instance == value
 
+    @pytest.mark.parametrize("size_range, item_type, value", (
+        ((0,3), 2, [1,2]),
+        ((0,3), '', ['a','b']),
+        ((0,3), [], [ [1,2], [3,4]])
+    ))
+    def test_any_list_of_range_and_type(self, size_range, item_type, value):
+        matcher_instance = match.AnyListOfRange(*size_range, item_type=item_type)
+        assert value == matcher_instance
+        assert matcher_instance == value
+
+    @pytest.mark.parametrize("size_range, value, expected_error, expected_msg", (
+        ((2, 4), list(range(1)),
+         AssertionError,
+         r'Comparing to List Of Range matcher.*Size mismatch.*size 1.*shorter.*2 el.*'),
+        ((2, 4), list(range(8)),
+         AssertionError,
+         r'Comparing to List Of Range matcher.*Size mismatch.*size 8.*longer.*4 el.*'),
+        ((2, 4), list(range(5)),
+         AssertionError,
+         r'Comparing to List Of Range matcher.*Size mismatch.*size 5.*longer.*4 el.*'),
+        ((2, 4), [],
+         AssertionError,
+         r'Comparing to List Of Range matcher.*Size mismatch.*size 0.*shorter.*2 el.*'),
+        ((2, 4), True,
+         AssertionError, r'Comparing to List Of Range matcher.*Type mismatch.*'),
+        ((2, 4), 'text',
+         AssertionError, r'Comparing to List Of Range matcher.*Type mismatch.*'),
+        ((2, 4), {'a': 3},
+         AssertionError, r'Comparing to List Of Range matcher.*Type mismatch.*'),
+        ((2, 4), 555,
+         AssertionError, r'Comparing to List Of Range matcher.*Type mismatch.*'),
+    ))
+    def test_any_list_of_range_fails(self, size_range, value, expected_error, expected_msg):
+        with pytest.raises(expected_error, match=re.compile(expected_msg, re.S)):
+            matcher_instance = match.AnyListOfRange(*size_range)
+            assert matcher_instance == value
+
+        with pytest.raises(expected_error, match=re.compile(expected_msg, re.S)):
+            matcher_instance = match.AnyListOfRange(*size_range)
+            assert value == matcher_instance
+
+    @pytest.mark.parametrize("size_range, item_type, value", (
+        ((0,3), 1, [1, 2, 'str']),
+        ((0,3), False, [1, 2]),
+        ((0,3), 'str', [1, 2]),
+    ))
+    def test_any_list_of_range_invalid_elements_type_asserts(self, size_range,
+                                                             item_type, value):
+        matcher_instance = match.AnyListOfRange(*size_range, item_type=item_type)
+        pattern = re.compile(
+            'Element type mismatch.*',
+            re.S
+        )
+        with pytest.raises(AssertionError, match=pattern):
+            assert value == matcher_instance
+
+        with pytest.raises(AssertionError, match=pattern):
+            assert matcher_instance == value
+
+    @pytest.mark.parametrize("size_range, expected_error, expected_msg", (
+        ((4, 2), ValueError, 'Invalid matcher range limits!.*'),
+        ((2, 2), ValueError, 'Invalid matcher range limits!.*'),
+    ))
+    def test_any_list_of_range_incorrect_params_fails(self, size_range, expected_error,
+                                                      expected_msg):
+        with pytest.raises(expected_error, match=re.compile(expected_msg, re.S)):
+            match.AnyListOfRange(*size_range)
 
     # --- Negative tests
     # --- AnyListOf
+    @pytest.mark.parametrize("match_value", (12, True, 'str', None, {}))
+    def test_any_list_of_type_mismatch_asserts(self, match_value):
+        matcher_instance = match.AnyListOf(3)
+        pattern = re.compile(
+            'Comparing to List Of matcher.*Type mismatch:.*',
+            re.S
+        )
+        with pytest.raises(AssertionError, match=pattern):
+            assert match_value == matcher_instance
+
+        with pytest.raises(AssertionError, match=pattern):
+            assert matcher_instance == match_value
+
     @pytest.mark.parametrize("match_value, match_param",[
         (
             [],
@@ -674,10 +818,17 @@ class TestMatcherAnyListOf:
             {'size': 1}
         )
     ])
-    def test_any_list_of_size_fails(self, match_value, match_param):
+    def test_any_list_of_size_asserts(self, match_value, match_param):
         matcher_instance = match.AnyListOf(**match_param)
-        assert matcher_instance != match_value
-        assert match_value != matcher_instance
+        pattern = re.compile(
+            'Comparing to List Of matcher.*Size mismatch.*==.*',
+            re.S
+        )
+        with pytest.raises(AssertionError, match=pattern):
+            assert match_value == matcher_instance
+
+        with pytest.raises(AssertionError, match=pattern):
+            assert matcher_instance == match_value
 
     @pytest.mark.parametrize("match_value, match_param",[
         (
@@ -693,111 +844,160 @@ class TestMatcherAnyListOf:
             {'item_type': []}
         )
     ])
-    def test_any_list_of_type_fails(self, match_value, match_param):
+    def test_any_list_of_type_asserts(self, match_value, match_param):
         matcher_instance = match.AnyListOf(**match_param)
-        assert matcher_instance != match_value
-        assert match_value != matcher_instance
+        pattern = re.compile(
+            'Comparing to List Of matcher.*Element type mismatch.*',
+            re.S
+        )
+        with pytest.raises(AssertionError, match=pattern):
+            assert match_value == matcher_instance
 
-    @pytest.mark.parametrize("match_value, match_param",[
+        with pytest.raises(AssertionError, match=pattern):
+            assert matcher_instance == match_value
+
+    @pytest.mark.parametrize("match_value, match_param, expected_msg",[
         (
             # Type mismatch
             [1,2,3],
-            {'size': 3, 'item_type': 'str'}
+            {'size': 3, 'item_type': 'str'},
+            'Comparing to List Of matcher.*Element type mismatch.*'
         ),
         (
             # Size mismatch
             [ [], [] ],
-            {'size': 5, 'item_type': []}
+            {'size': 5, 'item_type': []},
+            'Comparing to List Of matcher.*Size mismatch.*==.*'
         ),
         (
             # Not matching size and type
             [ 'a', 'b' ],
-            {'size': 55, 'item_type': 1}
+            {'size': 55, 'item_type': 1},
+            'Comparing to List Of matcher.*Size mismatch.*==.*Element type mismatch.*'
         )
     ])
-    def test_any_list_of_size_and_type_fails(self, match_value, match_param):
+    def test_any_list_of_size_and_type_asserts(self, match_value, match_param, expected_msg):
         matcher_instance = match.AnyListOf(**match_param)
-        assert matcher_instance != match_value
-        assert match_value != matcher_instance
+        pattern = re.compile(expected_msg, re.S)
+        with pytest.raises(AssertionError, match=pattern):
+            assert match_value == matcher_instance
+
+        with pytest.raises(AssertionError, match=pattern):
+            assert matcher_instance == match_value
 
     # --- AnyListLongerThan(size, type)
     @pytest.mark.parametrize("match_value, match_param",[
-        (
-            [1,2,3],
-            {'size': 3}
-        ),
-        # Value is not a list:
         (123, {'size': 1}),
         ('str', {'size': 1}),
         ({}, {'size': 1}),
         (False, {'size': 1}),
     ])
-    def test_any_list_longer_than_fails(self, match_value, match_param):
+    def test_any_list_longer_than_type_mismatch_asserts(self, match_value, match_param):
         matcher_instance = match.AnyListLongerThan(**match_param)
-        assert matcher_instance != match_value
-        assert match_value != matcher_instance
+        pattern = re.compile('Comparing to List Of matcher.*Type mismatch:.*', re.S)
+        with pytest.raises(AssertionError, match=pattern):
+            assert match_value == matcher_instance
 
-    @pytest.mark.parametrize("match_value, match_param",[
-        (
-            # Size mismatch
-            [1,2,3],
-            {'size': 22, 'item_type': 1}
-        ),
+        with pytest.raises(AssertionError, match=pattern):
+            assert matcher_instance == match_value
+
+    @pytest.mark.parametrize("match_value, match_param, expected_msg",[
         (
             # Type mismatch
-            [ [], [] ],
-            {'size': 1, 'item_type': 1}
+            [1,2,3],
+            {'size': 3, 'item_type': 'str'},
+            'Comparing to List Of matcher.*Element type mismatch.*'
         ),
         (
-            # Size and type mismatch
+            # Size mismatch
+            [ [], [] ],
+            {'size': 5, 'item_type': []},
+            'Comparing to List Of matcher.*Size mismatch.*>.*'
+        ),
+        (
+            # Not matching size and type
             [ 'a', 'b' ],
-            {'size': 10, 'item_type': False}
+            {'size': 55, 'item_type': 1},
+            'Comparing to List Of matcher.*Size mismatch.*>.*Element type mismatch.*'
         )
     ])
-    def test_any_list_longer_than_size_and_type_fails(self, match_value, match_param):
+    def test_any_list_longer_than_size_and_type_asserts(self, match_value, match_param,
+                                                        expected_msg):
         matcher_instance = match.AnyListLongerThan(**match_param)
-        assert matcher_instance != match_value
-        assert match_value != matcher_instance
+        pattern = re.compile(expected_msg, re.S)
+        with pytest.raises(AssertionError, match=pattern):
+            assert match_value == matcher_instance
+
+        with pytest.raises(AssertionError, match=pattern):
+            assert matcher_instance == match_value
 
     # --- AnyListShorterThan(size, type)
     @pytest.mark.parametrize("match_value, match_param",[
-        (
-            [1,2,3],
-            {'size': 1}
-        ),
-        # Value is not a list:
         (123, {'size': 1}),
         ('str', {'size': 1}),
         ({}, {'size': 1}),
         (False, {'size': 1}),
     ])
-    def test_any_list_shorter_than_fails(self, match_value, match_param):
+    def test_any_list_shorter_than_type_mismatch_asserts(self, match_value, match_param):
         matcher_instance = match.AnyListShorterThan(**match_param)
-        assert matcher_instance != match_value
-        assert match_value != matcher_instance
+        pattern = re.compile('Comparing to List Of matcher.*Type mismatch:.*', re.S)
+        with pytest.raises(AssertionError, match=pattern):
+            assert match_value == matcher_instance
 
-    @pytest.mark.parametrize("match_value, match_param",[
-         (
-            # Size mismatch
-            [1,2,3],
-            {'size': 1, 'item_type': 1}
-        ),
+        with pytest.raises(AssertionError, match=pattern):
+            assert matcher_instance == match_value
+
+    @pytest.mark.parametrize("match_value, match_param, expected_msg",[
         (
             # Type mismatch
-            [ [], [] ],
-            {'size': 1, 'item_type': 1}
+            [1,2,3],
+            {'size': 5, 'item_type': 'str'},
+            'Comparing to List Of matcher.*Element type mismatch.*'
         ),
         (
-            # Size and type mismatch
+            # Size mismatch
+            [ [], [] ],
+            {'size': 1, 'item_type': []},
+            'Comparing to List Of matcher.*Size mismatch.*<.*'
+        ),
+        (
+            # Not matching size and type
             [ 'a', 'b' ],
-            {'size': 2, 'item_type': False}
+            {'size': 1, 'item_type': 1},
+            'Comparing to List Of matcher.*Size mismatch.*<.*Element type mismatch.*'
         )
     ])
-    def test_any_list_shorter_than_size_and_type_fails(self, match_value, match_param):
+    def test_any_list_shorter_than_size_and_type_asserts(self, match_value, match_param,
+                                                        expected_msg):
         matcher_instance = match.AnyListShorterThan(**match_param)
-        assert matcher_instance != match_value
-        assert match_value != matcher_instance
+        pattern = re.compile(expected_msg, re.S)
+        with pytest.raises(AssertionError, match=pattern):
+            assert match_value == matcher_instance
 
+        with pytest.raises(AssertionError, match=pattern):
+            assert matcher_instance == match_value
+
+    # --- Negative on initialization
+    @pytest.mark.parametrize("params", ('str', 2.23, [], {}, type))
+    @pytest.mark.parametrize("kls", (
+        match.AnyListOf,
+        match.AnyListLongerThan,
+        match.AnyListShorterThan
+    ))
+    def test_any_list_of_init_fails(self, params, kls):
+        with pytest.raises(TypeError, match=re.compile(
+            'Matcher initialized with invalid types of parameters.*size.*item_type.*',
+            re.S
+        )):
+            kls(params, type)
+
+    @pytest.mark.parametrize("params", ('str', 2.23, [], {}, type, None))
+    def test_any_list_longer_than_init_fails(self, params):
+        with pytest.raises(TypeError, match=re.compile(
+            'Matcher initialized with invalid types of parameters.*min_size.*max_size.*item_type.*',
+            re.S
+        )):
+            match.AnyListOfRange(params, params, type)
 
 class TestMatcherAnyListOfMatchers:
     """Tests AnyListOfMatchers matcher"""
@@ -820,8 +1020,25 @@ class TestMatcherAnyListOfMatchers:
         assert matcher_instance == compare_to
         assert compare_to == matcher_instance
 
+    # --- Negative tests
+    # ------------------
+
+    # --- Negative on initialization
+    @pytest.mark.parametrize("params", ('str', 2.23, [], {}, type))
+    @pytest.mark.parametrize("kls", (
+        match.AnyListOfMatchers,
+        match.AnyListOfMatchersLongerThan,
+        match.AnyListOfMatchersShorterThan
+    ))
+    def test_any_list_of_matchers_init_fails(self, params, kls):
+        with pytest.raises(TypeError, match=re.compile(
+            'Matcher initialized with invalid types of parameters.*size.*',
+            re.S
+        )):
+            kls(5, params)
 
 class TestMatcherDate:
+    """Test for Date Matchers"""
     PAST_DATES = (
         '2020-03-04',
         '20111104',
@@ -969,7 +1186,8 @@ class TestMatcherDate:
             matcher_instance = match.AnyDateInRange(left, right)
             assert matcher_instance == datetime.datetime.now().isoformat()
 
-    # --- Negative
+    # --- Negative tests
+    # ------------------
     @pytest.mark.parametrize("compare_to", (
         12412,
         [1,2,3],
@@ -1020,3 +1238,24 @@ class TestMatcherDate:
 
         with pytest.raises(AssertionError):
             assert compare_to == matcher_instance
+
+    # --- Negative on initialization
+    @pytest.mark.parametrize("params", (12, 2.23, [], {}, type, False, None))
+    @pytest.mark.parametrize("kls", (
+        match.AnyDateAfter,
+        match.AnyDateBefore
+    ))
+    def test_any_date_before_after_init_fails(self, params, kls):
+        with pytest.raises(TypeError, match=re.compile(
+            'Matcher initialized with invalid types of parameters.*date.*',
+            re.S
+        )):
+            kls(params)
+
+    @pytest.mark.parametrize("params", (12, 2.23, [], {}, type, False, None))
+    def test_any_date_in_range_init_fails(self, params):
+        with pytest.raises(TypeError, match=re.compile(
+            'Matcher initialized with invalid types of parameters.*date_from.*date_to.*',
+            re.S
+        )):
+            match.AnyDateInRange(params, params)
