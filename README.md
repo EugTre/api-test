@@ -10,11 +10,11 @@ Repository contains:
 # <a name='toc'></a>Table of content
 1. [How to use](#howto)
 2. [Framework Overview](#overview)
-    - [Framework Configuration](#overview.config)
-    - [API Client](#overview.client)
-    - [Request and Response Helpers](#overview.helpers)
-    - [Matchers](#overview.matchers)
-    - [Framework Unit Tests](#overview.unittest)
+    - [Framework Configuration](#overview_config)
+    - [API Client](#overview_client)
+    - [Request and Response Helpers](#overview_helpers)
+    - [Matchers](#overview_matchers)
+    - [Framework Unit Tests](#overview_unittest)
 
 ## <a name='howto'></a>How to use
 ### Installation
@@ -57,7 +57,7 @@ Check **Allure** report:
 allure serve .\tmp\
 ```
 
-# <a name='overwiew'></a>Framework Overview [↑](#toc)
+# <a name='overview'></a>Framework Overview [↑](#toc)
 
 Framework contains of:
 1. Configuration system that allows to prepare requests and set expectation for response, setup API client class and logging.
@@ -71,7 +71,7 @@ Configuration system helps to compose data from various sources: by referencing 
 Framework and it's unit tests are located in `utils` directory.
 
 
-## <a name='overwiew.config'></a>Framework Configuration [↑](#toc)
+## <a name='overview_config'></a>Framework Configuration [↑](#toc)
 
 ### Implementation note
 Core part of configuration system is the `utisl.json_content` sub-module and a content wrapper class `JsonContent`. This class wraps pythonic dict/list and provide number of features critical to building configuration system:
@@ -289,7 +289,7 @@ Path to logging configuration file should be passed as CLI argument `--logging-c
 See https://docs.python.org/3/library/logging.config.html#configuration-file-format
 
 
-## <a name='overwiew.client'></a>API Client [↑](#toc)
+## <a name='overview_client'></a>API Client [↑](#toc)
 
 Class: `utils.api_client.basic_api_client.BasicApiClent`
 
@@ -302,7 +302,7 @@ Client may be configured using framework's configuration system.
 
 In order to log request data a specific log handler was implements at `utils/log_database_handler.py`. This handler is designed to write data to SQLite database for history and to avoid over bloating Allure reports. Handler may be configured using `configs/logging.ini` (to specify database name).
 
-## <a name='overwiew.helpers'></a>Request and Response Helpers [↑](#toc)
+## <a name='overview_helpers'></a>Request and Response Helpers [↑](#toc)
 Classes:
 - `utils.api_helpers.api_request_helper.ApiRequestHelper`
 - `utils.api_helpers.api_response_helper.ApiResponseHelper`
@@ -454,7 +454,7 @@ Methods that tests for equals are assumed to be used with Matcher objects for sp
 `.header_equals()` - check that given header is present and it's value is equal to given.
 
 
-## <a name='overwiew.matchers'></a>Matchers [↑](#toc)
+## <a name='overview_matchers'></a>Matchers [↑](#toc)
 Class: `utils.matchers.matcher`
 Matchers are special classes that implements specific equality check methods and provide user with ability to make rough comparison with some data.
 
@@ -468,7 +468,7 @@ Matchers also implements **pytest's**  assertion explanation, providing detailed
 
 One may add custom matchers by inheriting from `utils.matchers.base_matcher.BaseMatcher` class and implementing all abstract methods.
 
-## <a name='overwiew.unittest'></a>Framework Unit Tests [↑](#toc)
+## <a name='overview_unittest'></a>Framework Unit Tests [↑](#toc)
 Framework is covered with plenty of unit tests to ensure it's stability and suitability.
 
 Tests are using **pytest** and supports parallel run using **xdist**.
