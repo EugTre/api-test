@@ -130,7 +130,6 @@ class BasicApiClient(AbstractApiClient):
         if api_spec_as_dict.get('logger_name') is not None:
             self.logger = logging.getLogger(api_spec_as_dict['logger_name'])
 
-
     def request(self, method: str|HTTPMethod,
                 path: str,
                 override_defaults: bool = False,
