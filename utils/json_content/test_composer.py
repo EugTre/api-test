@@ -8,7 +8,7 @@ import re
 
 import pytest
 from utils.generators import GeneratorsManager
-from utils.matchers import MatchersManager, AnyText, AnyListOf
+from utils.matchers.matcher import MatchersManager, AnyText, AnyListOf
 
 from .composer import Composer
 from .json_wrapper import JsonWrapper

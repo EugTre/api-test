@@ -1,5 +1,5 @@
 import pytest
-import utils.matchers as match
+from utils.matchers.matcher import BaseMatcher
 
 def pytest_configure(config):
     # Store ref to Pytest config object.
@@ -10,13 +10,14 @@ def pytest_configure(config):
 
 def pytest_assertrepr_compare(op, left, right):
     if op != "==" and (
-        not isinstance(right, match.BaseMatcher) \
-        and not isinstance(left, match.BaseMatcher)
+        not isinstance(right, BaseMatcher) \
+        and not isinstance(left, BaseMatcher)
     ):
         return None
 
-    if isinstance(right, match.BaseMatcher):
+    if isinstance(right, BaseMatcher):
         return right.assertrepr_compare(left, right)
 
-    if isinstance(left, match.BaseMatcher):
+    # Flip to place matcher on right part for proper details reporting
+    if isinstance(left, BaseMatcher):
         return left.assertrepr_compare(right, left)

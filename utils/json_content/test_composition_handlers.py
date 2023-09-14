@@ -6,7 +6,7 @@ pytest -s -vv ./utils/json_content/test_composition_handlers.py
 import random
 
 import pytest
-from utils import matchers
+import utils.matchers.matcher as match
 import utils.generators as gen
 
 from .json_wrapper import JsonWrapper
@@ -336,7 +336,7 @@ class TestGeneratorCompositionHandler:
 
 class TestMatcherCompositionHandler:
     """Tests for MatcherCompositionHandler"""
-    manager = matchers.MatchersManager()
+    manager = match.MatchersManager()
 
     def test_create(self):
         assert MatcherCompositionHandler(self.manager)
@@ -350,14 +350,14 @@ class TestMatcherCompositionHandler:
         })
 
     @pytest.mark.parametrize("input_value, expected", [
-        ({"!match": "Anything"}, matchers.Anything()),
-        ({"!match": "AnyText"}, matchers.AnyText()),
-        ({"!match": "AnyTextLike", "!args": [".*"]}, matchers.AnyTextLike('.*')),
-        ({"!match": "AnyNumberGreaterThan", "!args": [10]}, matchers.AnyNumberGreaterThan(10)),
-        ({"!match": "AnyNumberGreaterThan", "number": 10}, matchers.AnyNumberGreaterThan(10)),
-        ({"!match": "AnyListOf", "!args": [5, "str"]}, matchers.AnyListOf(5, '')),
+        ({"!match": "Anything"}, match.Anything()),
+        ({"!match": "AnyText"}, match.AnyText()),
+        ({"!match": "AnyTextLike", "!args": [".*"]}, match.AnyTextLike('.*')),
+        ({"!match": "AnyNumberGreaterThan", "!args": [10]}, match.AnyNumberGreaterThan(10)),
+        ({"!match": "AnyNumberGreaterThan", "number": 10}, match.AnyNumberGreaterThan(10)),
+        ({"!match": "AnyListOf", "!args": [5, "str"]}, match.AnyListOf(5, '')),
         ({"!match": "AnyListOf", "size": 5, "item_type": 3},
-         matchers.AnyListOf(size=5, item_type=3))
+         match.AnyListOf(size=5, item_type=3))
     ])
     def test_compose(self, input_value, expected):
         handler = MatcherCompositionHandler(self.manager)

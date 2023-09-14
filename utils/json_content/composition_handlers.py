@@ -9,7 +9,7 @@ from abc import ABC, abstractmethod
 from enum import Enum
 
 from utils.data_reader import DataReader
-from utils.matchers import MatchersManager
+from utils.matchers.matcher import MatchersManager
 from utils.generators import GeneratorsManager, generators_manager
 
 from .json_wrapper import JsonWrapper

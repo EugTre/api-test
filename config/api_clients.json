@@ -10,7 +10,7 @@
         "url": "https://dog.ceo/",
         "endpoint": "/api",
         "client": {"!ref": "/$defs/basic_client"},
-        "logger": {"!ref": "/$defs/api_logger"},
+        //"logger": {"!ref": "/$defs/api_logger"},
         "timeout": 30,
         "requests": {
             "!include": "config/DOG.CEO/requests.json",

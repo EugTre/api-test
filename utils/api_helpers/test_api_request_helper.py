@@ -6,7 +6,7 @@ import pytest
 from utils.api_client.basic_api_client import BasicApiClient
 from utils.api_client.models import RequestCatalogEntity, RequestEntity, \
     ResponseEntity, HTTPMethod
-from utils.matchers import Anything
+from utils.matchers.matcher import Anything
 from utils.conftest import LOCAL_SERVER_URL
 from .api_request_helper import ApiRequestHelper, ApiResponseHelper
 

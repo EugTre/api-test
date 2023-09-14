@@ -9,7 +9,7 @@ from jsonschema import validate
 from utils.api_client.models import ResponseEntity
 from utils.json_content.json_content import JsonContent, JsonContentBuilder
 from utils.json_content.pointer import ROOT_POINTER
-from utils.matchers import BaseMatcher
+from utils.matchers.matcher import BaseMatcher
 
 class ResponseHeadersValidator:
     """Provide methods to validate reponse's headers"""

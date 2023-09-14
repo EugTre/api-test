@@ -9,7 +9,7 @@ import pytest
 import jsonschema.exceptions
 from requests.models import Response
 
-import utils.matchers as match
+import utils.matchers.matcher as match
 from utils.json_content.json_content import JsonContent, JsonContentBuilder
 from .api_response_helper import ApiResponseHelper
 
