@@ -7,7 +7,6 @@ def pytest_configure(config):
     # valid setup to provide detailed assertions for matchers.
     pytest.current_config = config
 
-
 def pytest_assertrepr_compare(op, left, right):
     if op != "==" and (
         not isinstance(right, BaseMatcher) \
