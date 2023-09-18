@@ -10,7 +10,7 @@ from enum import Enum
 
 from utils.data_reader import DataReader
 from utils.matchers.matcher import MatchersManager
-from utils.generators import GeneratorsManager, generators_manager
+from utils.generators import GeneratorsManager
 
 from .json_wrapper import JsonWrapper
 from .pointer import Pointer
@@ -229,7 +229,11 @@ class GeneratorCompositionHandler(CompositionHandler):
     ARGS_KEY = "!args"
     ID_KEY = "!id"
 
-    def __init__(self, manager: GeneratorsManager) -> None:
+    def __init__(self, manager: GeneratorsManager = None) -> None:
+        if manager is None:
+            # If not - create manager with default list
+            # of automatically registered generators
+            manager = GeneratorsManager()
         self.manager = manager
 
     def compose(self, obj: dict) -> tuple[bool, Any]:
@@ -309,6 +313,6 @@ DEFAULT_COMPOSITION_HANDLERS_COLLECTION: dict[CompositionHandler, dict[str, Any]
 	ReferenceCompositionHandler: {"content_context": None},
     FileReferenceCompositionHandler: {"use_cache": False},
     IncludeFileCompositionHandler: {"use_cache": False},
-    GeneratorCompositionHandler: {"manager": generators_manager},
+    GeneratorCompositionHandler: {},
     MatcherCompositionHandler: {}
 }

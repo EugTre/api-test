@@ -41,11 +41,11 @@ def get_include_file_handler() -> IncludeFileCompositionHandler:
 
 @pytest.fixture(name='generator_handler', scope='session')
 def get_generator_handler() -> GeneratorCompositionHandler:
-    manager = gen.GeneratorsManager()
+    manager = gen.GeneratorsManager(False)
     manager.add_all([
         (TestGeneratorCompositionHandler.gen_random_number, 'RandomNumber'),
         (TestGeneratorCompositionHandler.gen_random_in_range, "RandomInRange"),
-        (gen.NamesGenerator.generate_first_name, "FirstName")
+        (TestGeneratorCompositionHandler.gen_random_name, "FirstName")
     ])
     return GeneratorCompositionHandler(manager)
 
@@ -272,8 +272,15 @@ class TestGeneratorCompositionHandler:
     def gen_random_in_range(minimum=0, maximum=100):
         return random.randrange(minimum, maximum)
 
-    def test_create(self):
-        assert GeneratorCompositionHandler(gen.generators_manager)
+    @staticmethod
+    def gen_random_name(minimum=0, maximum=100):
+        return random.choice(['Alex', 'John', 'Casey'])
+
+    def test_create_no_manager(self):
+        assert GeneratorCompositionHandler()
+
+    def test_create_with_manager(self):
+        assert GeneratorCompositionHandler(gen.GeneratorsManager())
 
     def test_matches(self, generator_handler):
         assert generator_handler.match({

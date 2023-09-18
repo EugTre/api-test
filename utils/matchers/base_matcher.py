@@ -1,3 +1,4 @@
+"""Basic classes for matchers"""
 import typing
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
@@ -14,10 +15,16 @@ class MatchersManager(BasicManager):
     matchers = []
 
     def __init__(self, include_known_matchers: bool = True):
+        """Creates instance of Matchers Manager class.
+
+        Args:
+            include_known_matchers (bool, optional): Flag to automatically register all
+            known matchers to collection. Known matchers are matchers inherited from
+            BaseMatcher. Defaults to True.
+        """
         super().__init__()
-        if not include_known_matchers:
-            return
-        self.add_all(MatchersManager.matchers)
+        if include_known_matchers:
+            self.add_all(MatchersManager.matchers)
 
     def add(self, item: 'BaseMatcher', name: str | None = None, override: bool = False):
         """Registers given matcher under given name.
