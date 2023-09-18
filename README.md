@@ -183,8 +183,8 @@ Each API client should be configured under it's own section, where section name 
         "url": "https://dummyapi.io/data/",
         // Endpoint of the APU
         "endpoint": "/v1",
-        // Class for API Client to be used (optional, defaults to BasicApiClient)
-        "client": "utils.api_client.basic_api_client.BasicApiClient",
+        // Class for API Client to be used (optional, defaults to SimpleApiClient)
+        "client": "utils.api_client.simple_api_client.SimpleApiClient",
         // Logger for API Client (optional), logger name from 'logging.ini'
         "logger": "api_test",
         // Defaults for API Client:
@@ -291,7 +291,7 @@ See https://docs.python.org/3/library/logging.config.html#configuration-file-for
 
 ## <a name='overview_client'></a>API Client [↑](#toc)
 
-Class: `utils.api_client.basic_api_client.BasicApiClent`
+Class: `utils.api_client.simple_api_client.SimpleApiClient`
 
 API client class is a wrapper for `requests` lib, which provide next features:
 - default request parameters that applies to every request (appending, but not overriding user-specified values; defaults may be overwritten with empty values to disable specific values)
@@ -319,12 +319,12 @@ In order to access instance of `ApiRequestHelper` configured for a needed API on
 ```python
 import pytest
 from utils.api_client.setup_api_client import setup_api_client
-from utils.api_client.basic_api_client import BasicApiClient
+from utils.api_client.simple_api_client import SimpleApiClient
 
 API_NAME = 'MyAPI'  # Define your API name from api_config.ini
 
 @pytest.fixture(scope='package')
-def api_client(setup_loggers, api_clients_configurations) -> BasicApiClient:
+def api_client(setup_loggers, api_clients_configurations) -> SimpleApiClient:
     return setup_api_client(API_NAME, api_clients_configurations)
 
 ```

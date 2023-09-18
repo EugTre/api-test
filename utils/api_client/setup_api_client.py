@@ -1,13 +1,14 @@
 """Creates API client by given API name, using specific configuration
 """
 import importlib
+import logging
 
 from .models import ApiClientsSpecificationCollection
-from .basic_api_client import AbstractApiClient
+from .simple_api_client import BaseApiClient
 
 def setup_api_client(api_name: str,
                      api_clients_configurations: ApiClientsSpecificationCollection
-) -> AbstractApiClient:
+) -> BaseApiClient:
     """Creates and configures API Client object with config file data.
 
     Args:
@@ -15,7 +16,7 @@ def setup_api_client(api_name: str,
         api_configurations (ApiClientsConfigurationCollection): collection of API configurations
 
     Returns:
-        BasicApiClient: object of `BasicApiClient` class
+        BaseApiClient: object of `BaseApiClient` class
     """
     if api_name not in api_clients_configurations.configs:
         raise ValueError(f'There is no config for API "{api_name}" '
@@ -36,23 +37,24 @@ def setup_api_client(api_name: str,
                                   f'\'{module_name}\' for "{api_spec.name}" API.')
     client_class = getattr(module, klass_name)
 
-    print('-' * 100)
-    spec = api_spec.as_dict()
-    print('\nAPI Specification:')
-    for name in ('name', 'base_url', 'endpoint', 'logger_name'):
-        print(f'{name:>15}: {spec[name]}')
+    if logging.getLogger().handlers[0].level < logging.INFO:
+        logging.debug('-' * 100)
+        spec = api_spec.as_dict()
+        logging.debug('API Specification:')
+        for name in ('name', 'base_url', 'endpoint', 'logger_name'):
+            logging.debug(f'{name:>15}: {spec[name]}')
 
-    print('\nRequest Defaults:')
-    for name in ('headers', 'cookies', 'auth', 'timeout'):
-        print(f'{name:>15}: {spec["request_defaults"][name]}')
+        logging.debug('\nRequest Defaults:')
+        for name in ('headers', 'cookies', 'auth', 'timeout'):
+            logging.debug(f'{name:>15}: {spec["request_defaults"][name]}')
 
-    print('\nRequest Catalogue:')
-    if spec['request_catalog'] is None:
-        print(f'{"- Empty -":>15}')
-    else:
-        for entity_name, entity in spec['request_catalog'].items():
-            print(f'  Entity: {entity_name}')
-            print(entity)
-    print('-' * 100)
+        logging.debug('\nRequest Catalogue:')
+        if spec['request_catalog'] is None:
+            logging.debug(f'{"- Empty -":>15}')
+        else:
+            for entity_name, entity in spec['request_catalog'].items():
+                logging.debug(f'  Entity: {entity_name}')
+                logging.debug(entity)
+        logging.debug('-' * 100)
 
     return client_class(api_spec.as_dict())

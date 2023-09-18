@@ -2,7 +2,7 @@
     // $defs section may be used as storage of common elements
     // for referencing from other nodes
     "$defs": {
-        "basic_client": "utils.api_client.basic_api_client.BasicApiClient",
+        "basic_client": "utils.api_client.simple_api_client.SimpleApiClient",
         "api_logger": "api_test"
     },
 
@@ -10,7 +10,7 @@
         "url": "https://dog.ceo/",
         "endpoint": "/api",
         "client": {"!ref": "/$defs/basic_client"},
-        //"logger": {"!ref": "/$defs/api_logger"},
+        "logger": {"!ref": "/$defs/api_logger"},
         "timeout": 30,
         "requests": {
             "!include": "config/DOG.CEO/requests.json",

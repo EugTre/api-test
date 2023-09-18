@@ -8,10 +8,8 @@ import typing
 import http.server
 import socketserver
 import threading
-import pathlib
 
 import pytest
-from filelock import FileLock
 
 
 LOCAL_HOST = "127.0.0.1"

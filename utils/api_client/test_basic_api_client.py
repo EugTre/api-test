@@ -5,7 +5,7 @@ pytest -s -vv ./utils/api_client/test_basic_api_client.py
 
 import pytest
 from utils.conftest import LOCAL_SERVER_URL
-from .basic_api_client import BasicApiClient, DEFAULT_TIMEOUT
+from .simple_api_client import SimpleApiClient, DEFAULT_TIMEOUT
 
 
 ENDPOINT = "v1"
@@ -18,8 +18,8 @@ CLIENT_DEFAULTS = {
 
 # --- Fixtures
 @pytest.fixture(name='client_localhost', scope='session')
-def get_local_api_client() -> BasicApiClient:
-    return BasicApiClient({
+def get_local_api_client() -> SimpleApiClient:
+    return SimpleApiClient({
         'base_url': LOCAL_SERVER_URL,
         'endpoint': ENDPOINT,
         'name': 'LocalAPI',
@@ -29,23 +29,23 @@ def get_local_api_client() -> BasicApiClient:
     })
 
 @pytest.fixture(name='client_no_defaults', scope='session')
-def get_api_client() -> BasicApiClient:
-    return BasicApiClient({
+def get_api_client() -> SimpleApiClient:
+    return SimpleApiClient({
         'base_url': LOCAL_SERVER_URL, 'endpoint': ENDPOINT,
         'name': 'TestAPI'
     })
 
 @pytest.fixture(name='client_all_defaults', scope='session')
-def get_api_client_with_all_defaults() -> BasicApiClient:
-    return BasicApiClient({
+def get_api_client_with_all_defaults() -> SimpleApiClient:
+    return SimpleApiClient({
         'base_url': LOCAL_SERVER_URL, 'endpoint': ENDPOINT,
         'name': 'TestAPI',
         'request_defaults': CLIENT_DEFAULTS
     })
 
 @pytest.fixture(name='client_default_headers', scope='session')
-def get_api_client_with_default_headers() -> BasicApiClient:
-    return BasicApiClient({
+def get_api_client_with_default_headers() -> SimpleApiClient:
+    return SimpleApiClient({
         'base_url': LOCAL_SERVER_URL, 'endpoint': ENDPOINT,
         'name': 'TestAPI',
         'request_defaults': {
@@ -55,8 +55,8 @@ def get_api_client_with_default_headers() -> BasicApiClient:
     })
 
 @pytest.fixture(name='client_default_auth', scope='session')
-def get_api_client_with_default_auth() -> BasicApiClient:
-    return BasicApiClient({
+def get_api_client_with_default_auth() -> SimpleApiClient:
+    return SimpleApiClient({
         'base_url': LOCAL_SERVER_URL, 'endpoint': ENDPOINT,
         'name': 'TestAPI',
         'request_defaults': {
@@ -80,7 +80,7 @@ class TestBasicApiClient:
     ])
     def test_get_api_url(self, input_data):
         """Should return base url + endpoint"""
-        client = BasicApiClient({
+        client = SimpleApiClient({
             'base_url': input_data[0],
             'endpoint': input_data[1]
         })
@@ -94,7 +94,7 @@ class TestBasicApiClient:
         ('', f'{LOCAL_SERVER_URL}/{ENDPOINT}')
     ])
     def test_compose_url(self, input_data, expected,
-                         client_no_defaults: BasicApiClient):
+                         client_no_defaults: SimpleApiClient):
         """Compose given URL with base url + endpoint test"""
         assert client_no_defaults.compose_url(input_data) == expected
 
@@ -105,7 +105,7 @@ class TestBasicApiClient:
         assert response.status_code == 501
 
     @pytest.mark.xdist_group("localhost_server")
-    def test_request_with_params(self, client_localhost: BasicApiClient,
+    def test_request_with_params(self, client_localhost: SimpleApiClient,
                                  localhost_server):
         """Request with params"""
         user_agent = 'Mozilla/5.0 (Android; Mobile; rv:27.0) Gecko/27.0 Firefox/27.0'
@@ -218,7 +218,7 @@ class TestBasicApiClient:
             ]
     ])
     def test_prepare_request_param_no_defaults(self,
-            client_no_defaults: BasicApiClient, request_data, expected):
+            client_no_defaults: SimpleApiClient, request_data, expected):
         """Prepare on no defaults configured"""
         prepared = client_no_defaults.prepare_request_params(**request_data)
 
@@ -315,7 +315,7 @@ class TestBasicApiClient:
             ]
         ])
     def test_prepare_request_param_all_defaults(self,
-            client_all_defaults: BasicApiClient, request_data, expected):
+            client_all_defaults: SimpleApiClient, request_data, expected):
         """Prepare on all defaults configured"""
         prepared = client_all_defaults.prepare_request_params(**request_data)
 
@@ -413,7 +413,7 @@ class TestBasicApiClient:
             ]
         ])
     def test_prepare_request_param_default_headers(self,
-            client_default_headers: BasicApiClient, request_data, expected):
+            client_default_headers: SimpleApiClient, request_data, expected):
         """Prepare on specific defaults configured (headers)"""
         prepared = client_default_headers.prepare_request_params(**request_data)
 
@@ -511,7 +511,7 @@ class TestBasicApiClient:
             ]
     ])
     def test_prepare_request_param_default_auth(self,
-            client_default_auth: BasicApiClient, request_data, expected):
+            client_default_auth: SimpleApiClient, request_data, expected):
         """Prepare on specific defaults configured (auth)"""
         prepared = client_default_auth.prepare_request_params(**request_data)
 

@@ -58,8 +58,6 @@ class TestMatcherManager:
             match.AnyText
         ])
 
-        print(manager.collection)
-
         assert manager.collection
         assert len(manager.collection) == 3
         assert manager.get(match.Anything.__name__)

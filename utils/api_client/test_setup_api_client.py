@@ -6,7 +6,7 @@ import pytest
 from utils.conftest import AppendableFilePath
 from .api_configuration_reader import ApiConfigurationReader
 from .setup_api_client import setup_api_client
-from .basic_api_client import DEFAULT_TIMEOUT
+from .simple_api_client import DEFAULT_TIMEOUT
 
 # Constnats
 API_NAME = "TEST_API"
@@ -19,7 +19,7 @@ def test_setup_api_client_no_requests(json_file: AppendableFilePath):
     content = {
         "url": 'http://some.com/',
         "endpoint": 'api',
-        "client": 'utils.api_client.basic_api_client.BasicApiClient'
+        "client": 'utils.api_client.simple_api_client.SimpleApiClient'
     }
 
     json_file.write_as_json({  API_NAME: content })
@@ -48,7 +48,7 @@ def test_setup_api_clint_request_defaults_applied(json_file: AppendableFilePath)
     content = {
         'url': 'http://some.com/',
         'endpoint': '/api',
-        'client': 'utils.api_client.basic_api_client.BasicApiClient',
+        'client': 'utils.api_client.simple_api_client.SimpleApiClient',
         'headers': headers,
         'cookies': cookies,
         'auth': auth,
@@ -73,7 +73,7 @@ def test_setup_api_client_with_request_catalog(get_file):
     content = {
         'url': 'http://some.com/',
         'endpoint': '/api',
-        'client': 'utils.api_client.basic_api_client.BasicApiClient',
+        'client': 'utils.api_client.simple_api_client.SimpleApiClient',
         'requests': {"!include": str(req_cat_file)}
     }
     req_catalog = {
@@ -110,7 +110,7 @@ def test_setup_api_client_no_config_fails(json_file: AppendableFilePath):
         API_NAME: {
             'url': 'http://some.com/',
             'endpoint': '/api',
-            'client': 'utils.api_client.basic_api_client.BasicApiClient'
+            'client': 'utils.api_client.simple_api_client.SimpleApiClient'
         }
     })
 
@@ -139,12 +139,12 @@ def test_setup_api_client_invalid_client_class_fails(json_file: AppendableFilePa
         API_NAME: {
             'url': 'http://some.com/',
             'endpoint': '/api',
-            'client': 'utils.api_client.basic_api_client.BasicApiClient3'
+            'client': 'utils.api_client.simple_api_client.SimpleApiClient3'
         }
     })
 
     configs = ApiConfigurationReader(str(json_file)).read_configurations()
     with pytest.raises(ModuleNotFoundError,
-                       match='Failed to find API client class "BasicApiClient3" in '
-                              "module 'utils.api_client.basic_api_client'.*"):
+                       match='Failed to find API client class "SimpleApiClient3" in '
+                              "module 'utils.api_client.simple_api_client'.*"):
         setup_api_client(API_NAME, configs)

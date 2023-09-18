@@ -1,11 +1,11 @@
 import pytest
 from utils.api_client.setup_api_client import setup_api_client
-from utils.api_client.basic_api_client import BasicApiClient
+from utils.api_client.simple_api_client import SimpleApiClient
 
 API_NAME = 'DOG.CEO'
 
 @pytest.fixture(scope='package')
-def api_client(setup_loggers, api_clients_configurations) -> BasicApiClient:
+def api_client(api_clients_configurations) -> SimpleApiClient:
     '''Returns object inherited from `BasicApiClient` class.
 
        Actual class and options are selected by given name

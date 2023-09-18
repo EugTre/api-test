@@ -4,7 +4,7 @@ import copy
 from typing import Self
 
 import allure
-from utils.api_client.basic_api_client import BasicApiClient, HTTPMethod
+from utils.api_client.simple_api_client import SimpleApiClient, HTTPMethod
 from utils.api_client.models import RequestEntity, ResponseEntity
 from utils.json_content.json_content import JsonContent
 from .api_response_helper import ApiResponseHelper
@@ -26,7 +26,7 @@ class ApiRequestHelper:
     count = 1
     PATH_PATTERN = re.compile(r'{([a-zA-Z0-9_]*)}')
 
-    def __init__(self, api_client: BasicApiClient):
+    def __init__(self, api_client: SimpleApiClient):
         """Creates instance of `ApiRequestHelper` class.
 
         Args:

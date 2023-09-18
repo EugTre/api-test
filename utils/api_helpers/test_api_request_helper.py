@@ -3,7 +3,7 @@
 pytest -s -vv ./utils/api_helpers/test_api_request_helper.py
 """
 import pytest
-from utils.api_client.basic_api_client import BasicApiClient
+from utils.api_client.simple_api_client import SimpleApiClient
 from utils.api_client.models import RequestCatalogEntity, RequestEntity, \
     ResponseEntity, HTTPMethod
 from utils.matchers.matcher import Anything
@@ -84,14 +84,14 @@ API_CLIENT_CONFIG = {
 }
 
 @pytest.fixture(name='client', scope='session')
-def get_api_client() -> BasicApiClient:
+def get_api_client() -> SimpleApiClient:
     '''Returns api client instance'''
-    return BasicApiClient(API_CLIENT_CONFIG)
+    return SimpleApiClient(API_CLIENT_CONFIG)
 
 @pytest.fixture(name='client_requestless', scope='session')
-def get_api_client_no_requests() -> BasicApiClient:
+def get_api_client_no_requests() -> SimpleApiClient:
     '''Returns api client instnace without request catalog'''
-    return BasicApiClient({
+    return SimpleApiClient({
         'base_url': "http://example.com",
         'endpoint': "v1",
         'name': 'TestAPI',

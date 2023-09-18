@@ -49,8 +49,6 @@ class GeneratorsManager(BasicManager):
             override (bool, optional): flag to override already registered names.
             Defaults to False.
         """
-
-        print(items)
         return super().add_all(items, override)
 
     def generate(self, name: str, args: tuple|list = (), kwargs: dict = None,

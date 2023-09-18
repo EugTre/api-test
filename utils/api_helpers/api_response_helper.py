@@ -106,8 +106,6 @@ class ResponseHeadersValidator:
                             for k, v in self.headers.items()
                             if k.lower() not in ignore}
 
-        print(response_headers)
-        print(expected_headers)
         assert response_headers == expected_headers, \
             'Headers are not equal to expected.'
 
@@ -606,7 +604,6 @@ class ApiResponseHelper:
         if headers is not None:
             self.headers.set_expected(headers)
 
-        print('ApiResponseHelper :: JSON', json)
         return self
 
     # General functions

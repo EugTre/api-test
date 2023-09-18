@@ -28,7 +28,7 @@ def test_api_config_reader_required_fields_only(json_file: AppendableFilePath):
     assert api_specs.configs[TEST_API_NAME].base_url == 'http://foo.bar'
     assert api_specs.configs[TEST_API_NAME].endpoint == ''
     assert api_specs.configs[TEST_API_NAME].client_class == \
-        'utils.api_client.basic_api_client.BasicApiClient'
+        'utils.api_client.simple_api_client.SimpleApiClient'
     assert api_specs.configs[TEST_API_NAME].logger_name == None
 
     assert api_specs.configs[TEST_API_NAME].request_defaults == {

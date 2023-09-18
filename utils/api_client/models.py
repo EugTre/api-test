@@ -2,6 +2,24 @@
 from dataclasses import dataclass
 from enum import Enum
 
+class HTTPMethod(Enum):
+    """Enumerations of supported HTTP methods"""
+    GET = 'get'
+    POST = 'post'
+    PUT = 'put'
+    PATCH = 'patch'
+    DELETE = 'delete'
+
+    def __repr__(self):
+        return self.value.upper()
+
+
+class RequestLogEventType(Enum):
+    """Type of log event from Api Client"""
+    PREPARED = 0
+    SUCCESS = 1
+    ERROR = -1
+
 @dataclass(slots=True)
 class ApiConfiguration:
     """Model for API configuration from
@@ -9,7 +27,7 @@ class ApiConfiguration:
     """
     url: str
     endpoint: str = ''
-    client: str = 'utils.api_client.basic_api_client.BasicApiClient'
+    client: str = 'utils.api_client.simple_api_client.SimpleApiClient'
     logger: str = None
     timeout: str|int = None
     requests: str|dict = None
@@ -92,14 +110,3 @@ class RequestCatalogEntity:
     name: str
     request: RequestEntity
     response: ResponseEntity
-
-class HTTPMethod(Enum):
-    """Enumerations of supported HTTP methods"""
-    GET = 'get'
-    POST = 'post'
-    PUT = 'put'
-    PATCH = 'patch'
-    DELETE = 'delete'
-
-    def __repr__(self):
-        return self.value.upper()
