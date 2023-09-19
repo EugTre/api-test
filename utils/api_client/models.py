@@ -1,25 +1,26 @@
 """Models of framework data related to API Client"""
-from dataclasses import dataclass
-from enum import Enum
+from dataclasses import dataclass, fields as dataclass_fields
+from enum import Enum, StrEnum, auto
+from typing import Any
 
-class HTTPMethod(Enum):
+class HTTPMethod(StrEnum):
     """Enumerations of supported HTTP methods"""
-    GET = 'get'
-    POST = 'post'
-    PUT = 'put'
-    PATCH = 'patch'
-    DELETE = 'delete'
+    GET = auto()
+    POST = auto()
+    PUT = auto()
+    PATCH = auto()
+    DELETE = auto()
 
     def __repr__(self):
         return self.value.upper()
 
-
-class RequestLogEventType(Enum):
+class ApiRequestLogEventType(Enum):
     """Type of log event from Api Client"""
     PREPARED = 0
     SUCCESS = 1
     ERROR = -1
 
+# --- Configurations ---
 @dataclass(slots=True)
 class ApiConfiguration:
     """Model for API configuration from
@@ -83,6 +84,7 @@ class ApiClientSpecification:
             "request_catalog": self.request_catalog
         }
 
+# --- Request catalog ---
 @dataclass(slots=True)
 class RequestEntity:
     """Model for API request"""
@@ -110,3 +112,32 @@ class RequestCatalogEntity:
     name: str
     request: RequestEntity
     response: ResponseEntity
+
+
+# --- BaseApiClient entities ---
+@dataclass(slots=True)
+class IterableDataclass:
+    """Dataclass with dict interface"""
+    def __iter__(self):
+        for field in dataclass_fields(self):
+            yield field.name
+
+    def __getitem__(self, name: str) -> Any:
+        return getattr(self, name)
+
+@dataclass(slots=True)
+class ApiClientIdentificator(IterableDataclass):
+    """Contains identifiaction data for specific Api Client instance"""
+    instance_id: str
+    api_name: str
+    url: str
+
+@dataclass(slots=True)
+class ApiLogEntity(IterableDataclass):
+    """Struct that can be consumed by DatabaseHandler class (logging)"""
+    event_type: ApiRequestLogEventType
+    request_id: str
+    client_id: ApiClientIdentificator
+    request_params: dict[str, Any]|None = None
+    request: str|None = None
+    response: str|None = None

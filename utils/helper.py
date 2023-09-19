@@ -13,8 +13,6 @@ class Helper:
         :return: boolean: True if URI is image/..., False otherwise
         """
         mime_type = mimetypes.guess_type(uri)[0]
-        print(f'URI: {uri}, MIME: {mime_type}')
-
         return mime_type[0:len('image')] == 'image'
 
     @allure.step('Get image by retrieved URL {url}')

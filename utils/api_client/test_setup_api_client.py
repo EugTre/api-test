@@ -7,6 +7,7 @@ from utils.conftest import AppendableFilePath
 from .api_configuration_reader import ApiConfigurationReader
 from .setup_api_client import setup_api_client
 from .simple_api_client import DEFAULT_TIMEOUT
+from .models import ApiClientIdentificator
 
 # Constnats
 API_NAME = "TEST_API"
@@ -29,7 +30,12 @@ def test_setup_api_client_no_requests(json_file: AppendableFilePath):
 
     assert api_client.base_url == content['url'].rstrip('/')
     assert api_client.endpoint == content['endpoint']
-    assert api_client.name == API_NAME
+
+    assert isinstance(api_client.client_id, ApiClientIdentificator)
+    assert  API_NAME in api_client.client_id.instance_id
+    assert api_client.client_id.api_name == API_NAME
+    assert api_client.client_id.url == f"{content['url']}{content['endpoint']}"
+
     assert api_client.logger is None
     assert api_client.request_defaults == {'timeout': DEFAULT_TIMEOUT,
                                            'headers': None,

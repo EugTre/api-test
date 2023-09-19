@@ -63,7 +63,7 @@ class ApiRequestHelper:
         req_cfg = self.api_client.get_from_catalog(name)
         if not req_cfg:
             raise ValueError(f'Unknown request name "{name}" for API '
-                             f'"{self.api_client.name}"')
+                             f'"{self.api_client.client_id.api_name}"')
 
         # Collect use by default path and query params
         path_params = {}
@@ -302,7 +302,7 @@ class ApiRequestHelper:
         expected_path_params = set(self.PATH_PATTERN.findall(self.request.path))
         params_set = set(self.request.path_params) if self.request.path_params else set()
         error_note = 'Error occured on attempting to perpare ' \
-                        f'request {self.request} to "{self.api_client.name}" API.'
+                        f'request {self.request} to "{self.api_client.client_id.api_name}" API.'
         missing = expected_path_params - params_set
         if missing:
             err = KeyError(f'Missing path parameter(s): {", ".join(missing)}.')
@@ -398,4 +398,4 @@ class ApiRequestHelper:
             allure.dynamic.parameter(f'Request {self.count} - JSON payload', self.request.json)
 
     def __repr__(self) -> str:
-        return f'{self.__class__.__name__}(Client: {self.api_client.name})'
+        return f'{self.__class__.__name__}(Client: {self.api_client.client_id.api_name})'

@@ -1,11 +1,12 @@
-"""Tests 'BasicApiClient' class.
+"""Tests 'SimpleApiClient' class.
 
-pytest -s -vv ./utils/api_client/test_basic_api_client.py
+pytest -s -vv ./utils/api_client/test_simple_api_client.py
 """
 
 import pytest
 from utils.conftest import LOCAL_SERVER_URL
 from .simple_api_client import SimpleApiClient, DEFAULT_TIMEOUT
+from .models import ApiClientIdentificator, ApiRequestLogEventType
 
 
 ENDPOINT = "v1"
@@ -31,7 +32,8 @@ def get_local_api_client() -> SimpleApiClient:
 @pytest.fixture(name='client_no_defaults', scope='session')
 def get_api_client() -> SimpleApiClient:
     return SimpleApiClient({
-        'base_url': LOCAL_SERVER_URL, 'endpoint': ENDPOINT,
+        'base_url': LOCAL_SERVER_URL,
+        'endpoint': ENDPOINT,
         'name': 'TestAPI'
     })
 
@@ -67,8 +69,8 @@ def get_api_client_with_default_auth() -> SimpleApiClient:
 
 
 # --- Tests
-class TestBasicApiClient:
-    """Tests for BasicApiClient"""
+class TestSimpleApiClient:
+    """Tests for SimpleApiClient"""
 
     @pytest.mark.parametrize("input_data", [
         (LOCAL_SERVER_URL, 'v1'),
@@ -516,3 +518,69 @@ class TestBasicApiClient:
         prepared = client_default_auth.prepare_request_params(**request_data)
 
         assert prepared == expected
+
+
+import logging
+
+@pytest.fixture(name='client_with_logger')
+def get_api_client_with_logger(monkeypatch) -> SimpleApiClient:
+    """Returns configured logger object"""
+    log_storage = []
+
+    handler = logging.Handler()
+    handler.setLevel(logging.DEBUG)
+    handler.setFormatter(logging.Formatter(fmt='%(message)s'))
+
+    def monkey_emit(*args, **kwargs):
+        log_storage.append(args)
+        return True
+    monkeypatch.setattr(handler, 'emit', monkey_emit)
+
+    logger = logging.getLogger('CustomLogger')
+    logger.addHandler(handler)
+    logger.setLevel(logging.DEBUG)
+
+    client = SimpleApiClient({
+        'base_url': LOCAL_SERVER_URL, 'endpoint': ENDPOINT,
+        'name': 'TestAPI',
+        'request_defaults': CLIENT_DEFAULTS,
+        'logger_name': logger.name
+    })
+    client.log_storage = log_storage
+
+    return client
+
+class TestSimpleApiClientLogging:
+    """Tests logging of SimpleApiClient"""
+    @pytest.mark.xdist_group("localhost_server")
+    def test_log_request(self, client_with_logger: SimpleApiClient, localhost_server):
+        """Logging called for request with params"""
+        req_params = {
+            'override_defaults': True,
+            'method': 'get',
+            'path': 'posts',
+            'params': {'q': 1, 'size': 2},
+            'headers': {'test-header': 'FooBar'},
+            'cookies': {'cookie': 'FooBaz'}
+        }
+        prepared_params = client_with_logger.prepare_request_params(**req_params)
+
+        response = client_with_logger.request(**req_params)
+        request_id = client_with_logger.request_count - 1
+
+        # Read catched logs and assert values
+        prepared_request_log_record = client_with_logger.log_storage[0][0]
+        succes_request_log_recored = client_with_logger.log_storage[1][0]
+
+        assert prepared_request_log_record.event_type == ApiRequestLogEventType.PREPARED
+        assert prepared_request_log_record.request_id == request_id
+        assert prepared_request_log_record.client_id == client_with_logger.client_id
+        assert prepared_request_log_record.request_params == prepared_params
+
+        assert succes_request_log_recored.event_type == ApiRequestLogEventType.SUCCESS
+        assert succes_request_log_recored.request_id == request_id
+        assert succes_request_log_recored.client_id == client_with_logger.client_id
+        assert succes_request_log_recored.request == \
+            client_with_logger.request_object_to_str(response.request)
+        assert succes_request_log_recored.response == \
+            client_with_logger.response_object_to_str(response)

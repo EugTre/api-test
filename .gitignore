@@ -6,4 +6,5 @@ __pycache__/
 headers_authorized.json
 /tmp
 /htmlcov
+logging.db
 sandbox.py

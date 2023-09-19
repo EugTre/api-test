@@ -13,6 +13,7 @@ class TestMatcherDate:
         '2011-11-04T00:05:23',
         '2011-11-04T00:05:23Z',
         '20111104T000523',
+        '2011-11-04 00:05:23',
         '2011-11-04 00:05:23.283',
         '2011-11-04 00:05:23.283+00:00',
         '2011-11-04T00:05:23+04:00'
@@ -23,6 +24,7 @@ class TestMatcherDate:
         '2041-11-04T00:05:23',
         '2041-11-04T00:05:23Z',
         '20411104T000523',
+        '2040-11-04 00:05:23',
         '2040-11-04 00:05:23.283',
         '2040-11-04 00:05:23.283+00:00',
         '2040-11-04T00:05:23+04:00'
@@ -139,7 +141,7 @@ class TestMatcherDate:
     ))
     def test_any_date_in_range(self, left, right):
         matcher_instance = match.AnyDateInRange(left, right)
-        assert matcher_instance == datetime.datetime.now().isoformat()
+        assert datetime.datetime.now().isoformat() == matcher_instance
 
     @pytest.mark.parametrize("left, right, exception, match_pattern", (
         ('+1d', '+2d', AssertionError, r'.*Date In Range.*earlier than.*left limit'),
@@ -149,10 +151,10 @@ class TestMatcherDate:
         ('+100ms', '-100ms', ValueError,
             r'Invalid matcher range limits!.*')
     ))
-    def test_any_date_in_range_fails(self, left, right, exception, match_pattern):
+    def test_any_date_in_range_asserts(self, left, right, exception, match_pattern):
         with pytest.raises(exception, match=re.compile(match_pattern, re.S)):
             matcher_instance = match.AnyDateInRange(left, right)
-            assert matcher_instance == datetime.datetime.now().isoformat()
+            assert datetime.datetime.now().isoformat() == matcher_instance
 
     # --- Negative tests
     # ------------------

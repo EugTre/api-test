@@ -279,15 +279,21 @@ class AnyDateInRange(BaseMatcher):
     def __repr__(self) -> str:
         date_from = self.date_from
         date_to = self.date_to
+        offset = True
         try:
             date_from = datetime.datetime.fromisoformat(self.date_from)\
                 .astimezone(datetime.timezone.utc).isoformat()
             date_to = datetime.datetime.fromisoformat(self.date_to)\
                 .astimezone(datetime.timezone.utc).isoformat()
+            offset = False
         except (ValueError, OverflowError):
             pass
 
-        return f'<Any Date In Range between {date_from} and {date_to}>'
+        if offset:
+            # TODO: TEST
+            return f'<Any Date In Range between {date_from} and {date_to} of {datetime.datetime.now(datetime.timezone.utc).isoformat()}>'
+        else:
+            return f'<Any Date In Range between {date_from} and {date_to}>'
 
     @staticmethod
     def assertrepr_compare(left, right) -> list[str]:

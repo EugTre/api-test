@@ -20,10 +20,8 @@ class TestRandomImageSingleImage:
 
         r = api_request.by_name('GetSingleRandomImage') \
             .perform() \
-            .validate_against_schema()
-
-        print(r.json.expected)
-        print(r.json.content)
+            .validate_against_schema() \
+            .json.equals()
 
     @allure.title('Get single random image, unexpected query params')
     def test_get_with_query_params(self, api_request: ApiRequestHelper):
@@ -36,17 +34,6 @@ class TestRandomImageSingleImage:
             .perform() \
             .validate_against_schema() \
             .json.equals()
-
-
-"""
-{
-    'status': 'success',
-    'message': match.AnyTextLike(r'^(http|https):\/\/.*(\.jpg)$')
-})
-"""
-
-
-
 
 
 

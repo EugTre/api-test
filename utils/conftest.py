@@ -77,3 +77,8 @@ def get_unique_file(tmp_folder) -> typing.Callable:
 def get_ini_file(tmp_folder) -> AppendableFilePath:
     """Provides unqiue path to INI file"""
     return AppendableFilePath(tmp_folder / f'{uuid.uuid4()}.ini')
+
+@pytest.fixture(name='db_file')
+def get_unique_db_file(tmp_path):
+    """Returns unique path to db file"""
+    return tmp_path / f'test_db_{uuid.uuid4()}.db'

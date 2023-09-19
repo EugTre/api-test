@@ -6,7 +6,7 @@ from logging import Handler, LogRecord
 
 from filelock import FileLock
 
-from utils.api_client.models import RequestLogEventType
+from utils.api_client.models import ApiRequestLogEventType, ApiClientIdentificator
 
 
 class DatabaseHandler(Handler):
@@ -75,12 +75,12 @@ class DatabaseHandler(Handler):
         if 'event_type' not in record.__dict__:
             return
 
-        if record.event_type == RequestLogEventType.PREPARED:
+        if record.event_type == ApiRequestLogEventType.PREPARED:
             self.log_request_preparation(record)
-        elif record.event_type  == RequestLogEventType.SUCCESS:
-            self.log_request_result(record, RequestLogEventType.SUCCESS.name)
-        elif record.event_type == RequestLogEventType.ERROR:
-            self.log_request_result(record, RequestLogEventType.ERROR.name)
+        elif record.event_type  == ApiRequestLogEventType.SUCCESS:
+            self.log_request_result(record, ApiRequestLogEventType.SUCCESS.name)
+        elif record.event_type == ApiRequestLogEventType.ERROR:
+            self.log_request_result(record, ApiRequestLogEventType.ERROR.name)
 
     def log_request_preparation(self, record: LogRecord) -> None:
         """Saves request preparation data to database as new entity
@@ -110,6 +110,11 @@ class DatabaseHandler(Handler):
             new_status (str): status of the request.
         """
         session_id = self._get_session_for_client(record.client_id)
+        error_info= None
+        if record.exc_info:
+            error_info = record.exc_text \
+                    if record.exc_text else \
+                    self.formatter.formatException(record.exc_info)
 
         self._update_record(
             session_id=session_id,
@@ -117,10 +122,10 @@ class DatabaseHandler(Handler):
             status=new_status,
             request=record.request,
             response=record.response,
-            error_info=str(record.exc_text) if record.exc_text else None
+            error_info=error_info
         )
 
-    def _get_session_for_client(self, client_id: dict) -> int:
+    def _get_session_for_client(self, client_id: ApiClientIdentificator) -> int:
         """Returns session_id for client.
         If session is not yet started - adds session to DB.
         Otherwise - update session's end_at param.
@@ -131,7 +136,7 @@ class DatabaseHandler(Handler):
         Returns:
             int: session id for client.
         """
-        instance_id = client_id['id']
+        instance_id = client_id.instance_id
         if instance_id in self.active_sessions:
             session_id = self.active_sessions[instance_id]
             self._update_session(session_id)
@@ -141,7 +146,7 @@ class DatabaseHandler(Handler):
         self.active_sessions[instance_id] = session_id
         return session_id
 
-    def _add_session(self, client_id: dict) -> int:
+    def _add_session(self, client_id: ApiClientIdentificator) -> int:
         """Adds session info to DB and return session_id
 
         Args:
@@ -153,13 +158,17 @@ class DatabaseHandler(Handler):
         self.cursor.execute("""
             INSERT INTO sessions (client_id, api, api_url, started_at, ended_at)
             VALUES (:id, :api, :url, DateTime('now'), DateTime('now'))""",
-            client_id
+            {
+                'id': client_id.instance_id,
+                'api': client_id.api_name,
+                'url': client_id.url
+            }
         )
         self.db_conn.commit()
 
         self.cursor.execute(
             "SELECT session_id FROM sessions WHERE client_id = ?",
-            (client_id['id'], )
+            (client_id.instance_id, )
         )
         return self.cursor.fetchone()[0]
 
@@ -181,11 +190,11 @@ class DatabaseHandler(Handler):
         """Saves request info by adding new record to table"""
         self.cursor.execute("""
             INSERT INTO requests
-            (session_id, request_id, status, method, url, start_at, request_params)
+            (session_id, request_id, status, method, url, started_at, request_params)
             VALUES (?, ?, ?, ?, ?, DateTime('now'), ?)
             """, (
                 session_id, request_id,
-                RequestLogEventType.PREPARED.name,
+                ApiRequestLogEventType.PREPARED.name,
                 method, url, request_params
             )
         )
@@ -195,7 +204,7 @@ class DatabaseHandler(Handler):
             status, request = None, response = None, error_info = None):
         """Updates request info by session_id + request_id with response or with error_info"""
         self.cursor.execute("""UPDATE requests
-            SET status = ?, request = ?, response = ?, error_info = ?, end_at = DateTime('now')
+            SET status = ?, request = ?, response = ?, error_info = ?, ended_at = DateTime('now')
             WHERE session_id = ? AND request_id = ?""",
             (
                 status, request, response, error_info,
@@ -259,8 +268,8 @@ class DatabaseHandler(Handler):
             status TEXT NOT NULL,
             method TEXT NOT NULL,
             url TEXT NOT NULL,
-            start_at TEXT NOT NULL,
-            end_at TEXT,
+            started_at TEXT NOT NULL,
+            ended_at TEXT,
             request_params BLOB,
             request BLOB,
             response BLOB,

@@ -6,9 +6,10 @@ from logging import ERROR, INFO
 from abc import ABC, abstractmethod
 
 import requests
-from .models import HTTPMethod, RequestLogEventType, RequestCatalogEntity
+from .models import HTTPMethod, ApiClientIdentificator, RequestCatalogEntity, \
+    ApiRequestLogEventType, ApiLogEntity
 
-DEFAULT_TIMEOUT = 60
+DEFAULT_TIMEOUT = 30
 
 
 class BaseApiClient(ABC):
@@ -23,14 +24,14 @@ class BaseApiClient(ABC):
         if not self.request_defaults.get('timeout'):
             self.request_defaults['timeout'] = DEFAULT_TIMEOUT
 
-        self.name = api_spec_as_dict.get('name', f'{self.get_api_url()} API Client')
-        self.client_id = {
-            'id': f"{self.name}"\
+        name = api_spec_as_dict.get('name', self.get_api_url())
+        self.client_id =  ApiClientIdentificator(
+            instance_id=f"{name}"\
                 f"_{os.getenv('PYTEST_XDIST_WORKER', 'master')}" \
                 f"_{os.getenv('PYTEST_XDIST_TESTRUNUID', uuid.uuid4().hex)}",
-            'api': self.name,
-            'url': self.get_api_url()
-        }
+            api_name=name,
+            url=self.get_api_url()
+        )
         self.request_count = 0
 
         self.logger = None
@@ -39,15 +40,122 @@ class BaseApiClient(ABC):
 
     @abstractmethod
     def request(self, method, path, override_defaults, **kwargs):
-        """Makes HTTP request, wrapping `requests.request` fucntion call"""
+        """Makes HTTP request, wrapping actual lib request fucntion call"""
 
-    @abstractmethod
     def get_api_url(self):
         """Return fully qualified API url (url + endpoint)"""
+        return self.compose_url('')
 
-    @abstractmethod
-    def get_from_catalog(self, name: str):
-        """Get RequestCatalogEntity from api's client request catalog"""
+    def compose_url(self, path: str) -> str:
+        """Composes URL by mergin Base URL, enpoint and given path.
+        Strips unneccessary `/` symbols inbetween.
+
+        Args:
+            path (str): URI path.
+
+        Returns:
+            str: absoulte URL.
+        """
+        url_path = [self.base_url]
+        if self.endpoint:
+            url_path.append(self.endpoint)
+        if path:
+            url_path.append(path.strip(r'/'))
+        return '/'.join(url_path)
+
+    def get_from_catalog(self, name: str) -> RequestCatalogEntity:
+        """Get `RequestCatalogEntity` from api's client request catalog by given name.
+
+        Args:
+            name (str): name of the request entity
+
+        Returns:
+            RequestCatalogEntity: instance of `RequestCatalogEntity`
+        """
+        if not self.request_catalog or name not in self.request_catalog:
+            return None
+
+        return self.request_catalog[name]
+
+    def log_request(self, request_params):
+        """Logs prepared request data.
+        By default"""
+        if not self.logger:
+            return
+
+        self.logger.log(INFO,
+            msg=f"Going to sent '{request_params['method']}' request (#{self.request_count}) "\
+                f"to {request_params['url']}",
+            extra=ApiLogEntity(
+                event_type=ApiRequestLogEventType.PREPARED,
+                request_id=self.request_count,
+                client_id=self.client_id,
+                request_params=request_params,
+            )
+        )
+
+    def log_response(self, response):
+        """Logs response data of the successful request"""
+        if not self.logger:
+            return
+
+        self.logger.log(INFO,
+            msg=f"Request (#{self.request_count}) '{response.request.method}' to "\
+                f"{response.request.url} completed successfully.",
+            extra=ApiLogEntity(
+                event_type=ApiRequestLogEventType.SUCCESS,
+                request_id=self.request_count,
+                client_id=self.client_id,
+                request=self.request_object_to_str(response.request),
+                response=self.response_object_to_str(response)
+            )
+        )
+
+    def log_error(self, exc, response):
+        """Logs error info of the unsuccessful request (exception raised)"""
+        if not self.logger:
+            return
+
+        self.logger.log(
+            ERROR,
+            msg=f"Request (#{self.request_count}) failed: {exc}",
+            exc_info=True,
+            extra=ApiLogEntity(
+                event_type=ApiRequestLogEventType.ERROR,
+                request_id=self.request_count,
+                client_id=self.client_id,
+                request=self.request_object_to_str(response.request),
+                response=self.response_object_to_str(response)
+            )
+        )
+
+    def __repr__(self):
+        return f"<{self.__class__.__name__}(id='{self.client_id.instance_id}', " \
+                f"url='{self.client_id.url}')>"
+
+    @staticmethod
+    def request_object_to_str(request: requests.PreparedRequest):
+        """Converts request object to dict of parameters
+
+        Args:
+            request (requests.Response): request object to convert.
+
+        Returns:
+            str: request object data as string.
+        """
+        if request is None:
+            return None
+
+        fields = {
+            'method': request.method,
+            'url': request.url,
+            'headers': request.headers,
+            'cookies': request.headers["Cookie"]
+                       if "Cookie" in request.headers
+                       else {},
+            'body': request.body
+        }
+        return str(fields)
 
     @staticmethod
     def response_object_to_str(response: requests.Response) -> str:
@@ -77,30 +185,6 @@ class BaseApiClient(ABC):
 
         return str(fields)
 
-    @staticmethod
-    def request_object_to_str(request: requests.PreparedRequest):
-        """Converts request object to dict of parameters
-
-        Args:
-            request (requests.Response): request object to convert.
-
-        Returns:
-            str: request object data as string.
-        """
-        if request is None:
-            return None
-
-        fields = {
-            'method': request.method,
-            'url': request.url,
-            'headers': request.headers,
-            'cookies': request.headers["Cookie"].get_dict()
-                        if "Cookie" in request.headers
-                        else {},
-            'body': request.body
-        }
-        return str(fields)
-
 
 class SimpleApiClient(BaseApiClient):
     """Basic API Client class and base class for inheritence.
@@ -109,7 +193,7 @@ class SimpleApiClient(BaseApiClient):
     def request(self, method: str|HTTPMethod,
                 path: str,
                 override_defaults: bool = False,
-                **params) -> requests.Response:
+                **params) -> requests.Response|None:
         """Performs request with given method and paramerters to given path of API.
         Send request and response data to logger.
 
@@ -132,57 +216,21 @@ class SimpleApiClient(BaseApiClient):
         if isinstance(method, HTTPMethod):
             method = method.value
 
-        request_params = self.prepare_request_params(method, path,
-                                                    override_defaults,
-                                                    **params)
+        request_params = self.prepare_request_params(method,
+                                path, override_defaults, **params)
 
-        self._log_request(request_params)
+        self.log_request(request_params)
         response = None
         try:
             response = requests.request(**request_params)
         except Exception as exc:
-            self._log_error(exc, response)
+            self.log_error(exc, response)
             raise
 
-        self._log_response(response)
+        self.log_response(response)
         self.request_count += 1
 
         return response
-
-    def get_api_url(self) -> str:
-        '''Returns API URL - base url + endpoint'''
-        return self.compose_url('')
-
-    def get_from_catalog(self, name: str) -> RequestCatalogEntity:
-        """Selects and return 'RequestCatalogEntity' by given name.
-
-        Args:
-            name (str): name of the request entity
-
-        Returns:
-            RequestCatalogEntity: instance of `RequestCatalogEntity`
-        """
-        if not self.request_catalog or name not in self.request_catalog:
-            return None
-
-        return self.request_catalog[name]
-
-    def compose_url(self, path: str) -> str:
-        """Composes URL by mergin Base URL, enpoint and given path.
-        Strips unneccessary `/` symbols inbetween.
-
-        Args:
-            path (str): URI path.
-
-        Returns:
-            str: absoulte URL.
-        """
-        url_path = [self.base_url]
-        if self.endpoint:
-            url_path.append(self.endpoint)
-        if path:
-            url_path.append(path.strip(r'/'))
-        return '/'.join(url_path)
 
     def prepare_request_params(self, method: str, path: str,
                                 override_defaults: bool, **params) -> dict:
@@ -251,52 +299,3 @@ class SimpleApiClient(BaseApiClient):
         for key, value in default_value.items():
             if key not in request_value:
                 request_value[key] = value
-
-    def _log_request(self, request_params):
-        """Logs prepared request data"""
-        if not self.logger:
-            return
-
-        self.logger.log(INFO,
-            msg=f"Going to sent '{request_params['method']}' request (#{self.request_count}) "\
-                f"to {request_params['url']}",
-            extra={
-                'event_type': RequestLogEventType.PREPARED,
-                'request_id': self.request_count,
-                'request_params': request_params,
-                'client_id': self.client_id
-        })
-
-    def _log_response(self, response):
-        """Logs response data of the successful request"""
-        if not self.logger:
-            return
-
-        self.logger.log(INFO,
-            msg=f"Request (#{self.request_count}) '{response.request.method}' to "\
-                f"{response.request.url} completed successfully.",
-            extra={
-                'event_type': RequestLogEventType.SUCCESS,
-                'request_id': self.request_count,
-                'request': self.request_object_to_str(response.request),
-                'response': self.response_object_to_str(response),
-                'client_id': self.client_id
-        })
-
-    def _log_error(self, exc, response):
-        """Logs error info of the unsuccessful request (exception raised)"""
-        if not self.logger:
-            return
-
-        self.logger.log(
-            ERROR,
-            msg=f"Request (#{self.request_count}) failed: {exc}",
-            exc_info=True,
-            extra={
-                'event_type': RequestLogEventType.ERROR,
-                'request_id': self.request_count,
-                'request': self.request_object_to_str(response.request) if response else None,
-                'response': self.response_object_to_str(response),
-                'client_id': self.client_id
-            }
-        )
