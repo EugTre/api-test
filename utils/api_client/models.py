@@ -137,8 +137,10 @@ class ApiClientIdentificator(IterableDataclass):
 class ApiLogEntity(IterableDataclass):
     """Struct that can be consumed by DatabaseHandler class (logging)"""
     event_type: ApiRequestLogEventType
-    request_id: str
+    request_id: int
     client_id: ApiClientIdentificator
     request_params: dict[str, Any]|None = None
+    # request data as string
     request: str|None = None
+    # response data as string
     response: str|None = None

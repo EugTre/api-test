@@ -21,7 +21,7 @@ class TestRandomImageSingleImage:
     def test_get(self, api_response: ApiResponseHelper):
         """Verifies random image API call is successful and
            return URI to image MIME type file"""
-        api_response.validate_against_schema() \
+        api_response.validates_against_schema() \
             .headers.are_like() \
             .json.equals()
 
@@ -35,7 +35,7 @@ class TestRandomImageSingleImage:
            unexpected query params were passed"""
         api_request.with_query_params(q=10, size=100, amount=500) \
                     .perform() \
-                    .validate_against_schema() \
+                    .validates_against_schema() \
                     .headers.are_like() \
                     .json.equals()
 
@@ -61,6 +61,6 @@ class TestRandomImageSingleImage:
         supported methods in headers"""
         api_request.with_method(method) \
             .perform() \
-            .validate_against_schema() \
+            .validates_against_schema() \
             .headers.are_like() \
             .json.equals()

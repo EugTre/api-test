@@ -3,7 +3,7 @@ from utils.api_client.setup_api_client import setup_api_client
 from utils.api_client.simple_api_client import SimpleApiClient
 from .constants import API_NAME
 
-@pytest.fixture(scope='package')
+@pytest.fixture(scope='session')
 def api_client(api_clients_configurations) -> SimpleApiClient:
     '''Returns object inherited from `BasicApiClient` class.
 

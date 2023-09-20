@@ -29,7 +29,7 @@ class TestRandomImageMultipleImages:
 
         api_request.with_path_params(amount=amount) \
             .perform() \
-            .validate_against_schema() \
+            .validates_against_schema() \
             .headers.are_like() \
             .json.equals() \
             .json.param_equals(
@@ -46,7 +46,7 @@ class TestRandomImageMultipleImages:
         and returns exactly 50 images"""
         api_request.with_path_params(amount=amount) \
             .perform() \
-            .validate_against_schema() \
+            .validates_against_schema() \
             .headers.are_like() \
             .json.equals() \
             .json.param_equals(
@@ -64,7 +64,7 @@ class TestRandomImageMultipleImages:
         successfully returns 1 image"""
         api_request.with_path_params(amount=amount) \
             .perform() \
-            .validate_against_schema() \
+            .validates_against_schema() \
             .headers.are_like() \
             .json.equals() \
             .json.param_equals('/message', match.AnyListOf(size=1))
@@ -80,7 +80,7 @@ class TestRandomImageMultipleImages:
         api_request.with_query_params(q=10, size=100, amount=33) \
                     .with_path_params(amount=10) \
                     .perform() \
-                    .validate_against_schema() \
+                    .validates_against_schema() \
                     .headers.are_like() \
                     .json.equals() \
                     .json.param_equals('/message', match.AnyListOf(size=10))
@@ -109,7 +109,7 @@ class TestRandomImageMultipleImages:
         api_request.with_path_params(amount=5) \
             .with_method(method) \
             .perform() \
-            .validate_against_schema() \
+            .validates_against_schema() \
             .headers.are_like() \
             .json.equals()
 
@@ -123,6 +123,6 @@ class TestRandomImageMultipleImages:
         supported methods in headers"""
         api_request.with_path_params(amount=5) \
             .perform() \
-            .validate_against_schema() \
+            .validates_against_schema() \
             .headers.are_like() \
             .json.equals()

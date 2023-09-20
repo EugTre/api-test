@@ -39,7 +39,7 @@ def test_delete_user(api_request: ApiRequestHelper):
     r = api_request.by_name("DeleteUser")\
         .with_path_params(user_id=user_id)\
         .perform() \
-        .validate_against_schema() \
+        .validates_against_schema() \
         .is_not_empty() \
         .json_equals({'id': user_id})
     print('\n\n Responmse JSON')

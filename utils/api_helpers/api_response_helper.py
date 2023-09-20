@@ -689,7 +689,7 @@ class ApiResponseHelper:
 
         return self
 
-    def validate_against_schema(self, schema: dict = None) -> Self:
+    def validates_against_schema(self, schema: dict = None) -> Self:
         """Validates response against given JSONSchema or schema from request config,
         if pre-configured request was made.
         Wrapped with Allure.Step.

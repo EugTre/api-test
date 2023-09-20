@@ -1,6 +1,5 @@
 """Constants for DOG.CEO tests"""
 from utils.api_client.models import HTTPMethod
-import utils.matchers.matcher as match
 
 API_NAME = 'DOG.CEO'
 

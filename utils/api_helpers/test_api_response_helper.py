@@ -222,14 +222,14 @@ class TestApiResponseHelperGeneral:
 
     # validate_against_schema(schema)
     def test_valudate_against_schema(self, api_response_simple: ApiResponseHelper):
-        api_response_simple.validate_against_schema(JSONSCHEMA_SIMPLE)
+        api_response_simple.validates_against_schema(JSONSCHEMA_SIMPLE)
 
     def test_set_expected_and_valudate_against_schema(self, api_response_simple: ApiResponseHelper):
-        api_response_simple.set_expected(schema=JSONSCHEMA_SIMPLE).validate_against_schema()
+        api_response_simple.set_expected(schema=JSONSCHEMA_SIMPLE).validates_against_schema()
 
     def test_valudate_against_schema_asserts(self, api_response_simple: ApiResponseHelper):
         with pytest.raises(jsonschema.exceptions.ValidationError):
-            api_response_simple.validate_against_schema(JSONSCHEMA_DETAILED)
+            api_response_simple.validates_against_schema(JSONSCHEMA_DETAILED)
 
     # latency_is_lower_than
     def test_latency_is_lower_than(self):

@@ -24,7 +24,7 @@ class TimedDBRecord:
                 setattr(self, time_attr, f'{val}Z')
 
 @dataclass
-class SessionDBRecord(TimedDBRecord):
+class SessionDBRecord():
     """Model of DB record for `sessions` table"""
     session_id: int
     client_id: str
@@ -34,7 +34,7 @@ class SessionDBRecord(TimedDBRecord):
     ended_at: str
 
 @dataclass
-class RequestDBRecord(TimedDBRecord):
+class RequestDBRecord():
     """Model of DB record for `requests` table"""
     record_id: int
     session_id: int
@@ -51,9 +51,9 @@ class RequestDBRecord(TimedDBRecord):
 
 
 # --- Helper functions ---
-def get_db_logger(db_file):
+def get_db_logger(db_file, buffer_size=1):
     """Returns configured logger object"""
-    db_handler = DatabaseHandler(db_file)
+    db_handler = DatabaseHandler(db_file, buffer_size)
     db_handler.setLevel(logging.DEBUG)
     db_handler.setFormatter(logging.Formatter(fmt='%(message)s'))
 
@@ -319,3 +319,40 @@ class TestLogDatabaseHandlerLogging:
         assert (datetime.datetime.fromisoformat(record.started_at)
                 <=
                 datetime.datetime.fromisoformat(record.ended_at))
+
+    @pytest.mark.parametrize("buffer_size",(3, 10))
+    def test_log_buffered(self, client_id: ApiClientIdentificator,
+                                 request_params, db_file, caplog, buffer_size):
+        """Tests creation of new PREPARE record at `requests` table"""
+        caplog.set_level(logging.DEBUG)
+
+        logger = get_db_logger(db_file, buffer_size)
+        with sqlite3.connect(db_file) as conn:
+            db_cur = conn.cursor()
+
+            # Log few messaged, but don't reach the limit
+            for i in range(buffer_size - 1):
+                log_data = ApiLogEntity(
+                    event_type=ApiRequestLogEventType.PREPARED,
+                    request_id=i,
+                    client_id=client_id,
+                    request_params=request_params
+                )
+                logger.info(msg=f'Logging request {i}', extra=log_data)
+
+            # Logged below buffer limit - no record in db expected
+            records = db_cur.execute(SELECT_ALL_FROM_REQUESTS).fetchall()
+            assert len(records) == 0
+
+            # Log another item to overfill buffer
+            log_data = ApiLogEntity(
+                event_type=ApiRequestLogEventType.PREPARED,
+                request_id=99,
+                client_id=client_id,
+                request_params=request_params
+            )
+            logger.info(msg=f'Logging LAST request', extra=log_data)
+
+            # Check that buffer dumped to db
+            records = db_cur.execute(SELECT_ALL_FROM_REQUESTS).fetchall()
+            assert len(records) == buffer_size
