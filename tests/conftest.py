@@ -17,6 +17,7 @@ from utils.log_database_handler import DatabaseHandler
 
 from utils.api_client.simple_api_client import BaseApiClient
 from utils.api_helpers.api_request_helper import ApiRequestHelper
+from utils.api_helpers.api_response_helper import ApiResponseHelper
 
 def perform_logger_setup(logging_config_file):
     """Setups loggers using given configuration file"""
@@ -51,17 +52,18 @@ def pytest_configure(config):
                             "api(name): set name of API Client to use")
     config.addinivalue_line("markers",
                             "logger(name): set name of logger to use")
+    config.addinivalue_line("markers",
+                            "request(names): used by api_request/api_response fixture "
+                            "to pre-select request from catalog")
 
     # Setup logging from file passed in cmd args
     perform_logger_setup(config.getoption("--logging-config"))
 
 
-# --- Setup fixtures ---
+# --- Common fixtures ---
 # ----------------------
-# Read configs of loggers and api clients, setup loggers and
-# compile api clients specification
 @pytest.fixture(scope='session', name='api_clients_configurations')
-def configure_api_clients(request) -> ApiClientsSpecificationCollection:
+def prepare_api_clients_configurations(request) -> ApiClientsSpecificationCollection:
     """Setups api by configuration provided by --api-config command-line argument"""
     # pylint: disable=unused-argument
     api_config_file = request.config.getoption("--api-config")
@@ -107,10 +109,23 @@ def get_api_client(
 
 
 @pytest.fixture(name='api_request')
-def get_api_request_instance(api_client: BaseApiClient) -> ApiRequestHelper:
+def get_api_request_instance(api_client: BaseApiClient, request) -> ApiRequestHelper:
     '''Returns instance of `ApiRequestHelper` class.'''
     allure.dynamic.parameter('API', api_client.get_api_url())
-    return ApiRequestHelper(api_client=api_client)
+
+    api_request = ApiRequestHelper(api_client=api_client)
+
+    request_mark = request.node.get_closest_marker('request')
+    if request_mark is None:
+        return api_request
+
+    return api_request.by_name(request_mark.args[0])
+
+@pytest.fixture(name='api_response')
+def get_api_response_instance(api_request: ApiRequestHelper) -> ApiResponseHelper:
+    """Performs request and return response wrapped in `ApiResponseHelper` class.
+    Requires `@pytest.mark.request('request_name')` mark for test."""
+    return api_request.perform()
 
 
 # --- Other fixtures ----

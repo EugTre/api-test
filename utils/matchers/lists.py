@@ -297,7 +297,7 @@ class AnyListOfMatchers(BaseMatcher):
 
     def __repr__(self):
         return f'<Any List Of Matchers ({self.matcher}) '\
-            f'of {self.size if self.size else "any number"} item(s)>'
+            f'of {self.size if self.size else "any number of"} item(s)>'
 
     @staticmethod
     def assertrepr_compare(left, right):

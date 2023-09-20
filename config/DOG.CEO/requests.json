@@ -1,5 +1,61 @@
 {
-    "$defs": {"!file": "config/DOG.CEO/defines.json"},
+    "$defs": {
+        "schema": {
+            "SingleImage": {"!include": "config/DOG.CEO/schema/single_image_response.json"},
+            "MultipleImages": {"!include": "config/DOG.CEO/schema/multiple_image_response.json"},
+            "HandledError": {"!include": "config/DOG.CEO/schema/handled_error_response.json"}
+        },
+        "headers": {
+            "ok": {
+                "Content-Type": "application/json",
+                "Access-Control-Allow-Origin": "*"
+            },
+            "405_error": {
+                "Content-Type": "application/json",
+                "Access-Control-Allow-Origin": "*",
+                "Allow": "GET, HEAD"
+            }
+        },
+        "matcher": {
+            "image_url": {
+                "!match": "AnyTextLike",
+                "pattern": "^(http|https)://.*(\\.jpg)$"
+            },
+            "image_urls_list": {
+                "!match": "AnyListOfMatchers",
+                "matcher": {"!ref": "/$defs/matcher/image_url"}
+            },
+            "405_error_msg": {
+                "!match": "AnyTextLike",
+                "pattern": "No route found for \".*\": Method Not Allowed .* with code: 0"
+            },
+            "404_error_msg": {
+                "!match": "AnyTextLike",
+                "pattern": "No route found for \".*\" with code: 0"
+            }
+        },
+
+        "response_on_unsupported_method": {
+            "status_code": 405,
+            "schema": {"!ref": "/$defs/schema/HandledError"},
+            "json": {
+                "status": "error",
+                "message": {"!ref": "/$defs/matcher/405_error_msg"},
+                "code": 405
+            },
+            "headers": {"!ref": "/$defs/headers/405_error"}
+        },
+        "response_on_invalid_subpath": {
+            "status_code": 404,
+            "schema": {"!ref": "/$defs/schema/HandledError"},
+            "json": {
+                "status": "error",
+                "message": {"!ref": "/$defs/matcher/404_error_msg"},
+                "code": 404
+            },
+            "headers": {"!ref": "/$defs/headers/ok"}
+        }
+    },
 
     "GetSingleRandomImage": {
         "request": {
@@ -11,14 +67,18 @@
             "schema": {"!ref": "/$defs/schema/SingleImage"},
             "json": {
                 "status": "success",
-                "message": {
-                    "!match": "AnyTextLike",
-                    "pattern": "^(http|https)://.*(\\.jpg)$"
-                }
-            }
+                "message": {"!ref": "/$defs/matcher/image_url"}
+            },
+            "headers": {"!ref": "/$defs/headers/ok"}
         }
     },
-
+    "GetSingleRandomImage_MethodNotAllowed": {
+        "request": {
+            "method": "POST",
+            "path": {"!ref": "/GetSingleRandomImage/request/path"}
+        },
+        "response": {"!ref": "/$defs/response_on_unsupported_method"}
+    },
 
 
     "GetMultipleRandomImages": {
@@ -28,9 +88,37 @@
         },
         "response": {
             "status_code": 200,
-            "schema": {"!ref": "/$defs/schema/MultipleImages"}
+            "schema": {"!ref": "/$defs/schema/MultipleImages"},
+            "json": {
+                "status": "success",
+                "message": {"!ref": "/$defs/matcher/image_urls_list"}
+            },
+            "headers": {
+                "Content-Type": "application/json"
+            }
         }
     },
+    "GetMultipleRandomImages_MethodNotAllowed": {
+        "request": {
+            "method": "POST",
+            "path": {"!ref": "/GetMultipleRandomImages/request/path"}
+        },
+        "response": {"!ref": "/$defs/response_on_unsupported_method"}
+    },
+    "GetMultipleRandomImages_InvalidSubPath": {
+        "request": {
+            "method": "POST",
+            "path": "breeds/image/random/{amount}/extra"
+        },
+        "response": {"!ref": "/$defs/response_on_invalid_subpath"}
+    },
+
+
+
+
+
+
+
     "GetRandomImageByBreed": {
         "request": {
             "method": "GET",

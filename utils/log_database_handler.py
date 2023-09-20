@@ -241,7 +241,7 @@ class DatabaseHandler(Handler):
 
     def _connect(self):
         """Creates new connection and cursort for DB"""
-        self.db_conn = sqlite3.connect(self.db_name)
+        self.db_conn = sqlite3.connect(self.db_name, timeout=30)
         self.cursor = self.db_conn.cursor()
 
     def _initialize_db(self):

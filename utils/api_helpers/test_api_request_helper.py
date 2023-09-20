@@ -190,6 +190,28 @@ class TestApiRequestHelper:
             cookies={"TestCookie": "New", "TestCookie2": "New"}
         )
 
+    def test_append_params_to_preconfigured_request(self, api: ApiRequestHelper):
+        """Params append already defined params"""
+        api.by_name(REQUEST_NAME_2) \
+            .with_path_params(id1=100500) \
+            .with_path_params(id2=201000) \
+            .with_query_params(p1=100) \
+            .with_query_params(p2=200) \
+            .with_headers({'Test': 'New'}) \
+            .with_headers({'Test2': 'New'}) \
+            .with_cookies({'TestCookie': 'New'}) \
+            .with_cookies({'TestCookie2': 'New'}) \
+
+        assert api.request == RequestEntity(
+            method=REQUEST_CONFIGURED_2.method,
+            path=REQUEST_CONFIGURED_2.path,
+            path_params={"id1": 100500, "id2": 201000},
+            query_params={"p1": 100, "p2": 200},
+            headers={**REQUEST_CONFIGURED_2.headers, "Test": "New", "Test2": "New"},
+            cookies={**REQUEST_CONFIGURED_2.cookies, "TestCookie": "New", "TestCookie2": "New"},
+            json=REQUEST_CONFIGURED_2.json
+        )
+
     def test_overwrite_params(self, api: ApiRequestHelper):
         """Params may be overwritten"""
         api.by_path(method="GET", path="") \
@@ -340,6 +362,35 @@ class TestApiRequestHelper:
             'json': None,
             **params
         }
+
+    def test_change_request_method(self, api: ApiRequestHelper):
+        new_method = 'POST'
+        new_path = '/my/custom/path'
+        api.by_name(REQUEST_NAME_1) \
+            .with_method(new_method) \
+            .with_path(new_path)
+
+        assert api.request.method == new_method
+        assert api.request.path == new_path
+
+    def test_change_request_path(self, api: ApiRequestHelper):
+        new_path = '/my/custom/path/{size}'
+        api.by_name(REQUEST_NAME_1) \
+            .with_path(new_path) \
+            .with_path_params(size=10)
+
+        assert api.request.path == new_path
+        assert api.check_for_missing_path_params()
+
+    def test_with_text_payload(self, api: ApiRequestHelper):
+        text_data = "some text"
+        params = api.by_name(REQUEST_NAME_2) \
+            .with_path_params(node=1, id=2) \
+            .with_text_payload(text_data) \
+            .prepare_request_params(None)
+
+        assert params['json'] is None
+        assert params['data'] == text_data.encode('utf-8')
 
 
 @pytest.mark.xdist_group("localhost_server")

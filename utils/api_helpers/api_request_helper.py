@@ -108,6 +108,40 @@ class ApiRequestHelper:
         return self
 
     @expect_initialized
+    def with_method(self, method: str|HTTPMethod) -> Self:
+        """Changes request method to selected one.
+
+        Args:
+            method (str | HTTPMethod): selected HTTP method
+
+        Returns:
+            Self: instance of class `ApiRequestHelper`
+
+        Raises:
+            RuntimeError: request path is not defined yet.
+        """
+        self.request.method = method
+        return self
+
+    @expect_initialized
+    def with_path(self, path: str) -> Self:
+        """Changes request target path (URI sub-path) to selected one.
+        Purges path_params set previously.
+
+        Args:
+            path (str): new target path.
+
+        Returns:
+            Self: instance of class `ApiRequestHelper`
+
+        Raises:
+            RuntimeError: request path is not defined yet.
+        """
+        self.request.path = path
+        self.request.path_params.clear()
+        return self
+
+    @expect_initialized
     def with_path_params(self, **path_params) -> Self:
         """Adds params which should be inserted into path's placeholders.
         Appends/overwrites defaults params if defined for request.
@@ -222,6 +256,22 @@ class ApiRequestHelper:
         return self
 
     @expect_initialized
+    def with_text_payload(self, payload: str, encoding: str = 'utf-8') -> Self:
+        """Sets text payload of the request. JSON payload will be removed!
+
+        Args:
+            payload (str): text to sent by request.
+            encoding (str, optional): text encoding. Defaults to 'utf-8'.
+
+        Returns:
+            Self: instance of `ApiRequestHelper` class
+        """
+        self.request.json = None
+        self.request.text = payload.encode(encoding)
+
+        return self
+
+    @expect_initialized
     def with_expected(self, status_code: int = None,
                     schema: dict = None,
                     headers: JsonContent|dict = None,
@@ -266,14 +316,17 @@ class ApiRequestHelper:
             Self: dict
         """
         self.check_for_missing_path_params()
+        if not request_args:
+            request_args = {}
 
         request_args['path'] = self.request.path.format(**self.request.path_params) \
                                 if self.request.path_params else \
                                 self.request.path
 
-        request_args['method'] = self.request.method
+        request_args['method'] = request_args.get('method', self.request.method)
         request_args['params'] = self.request.query_params
         request_args['json'] = self.request.json
+        request_args['data'] = self.request.text
 
         # Ensure that given args will be appended to current requests settings
         request_args['headers'] = self.request.headers | request_args.get('headers', {}) \
@@ -382,7 +435,7 @@ class ApiRequestHelper:
             path (str): request URI.
             request_args (dict): request parameters.
         """
-        request_name = f'(pre-configured, "{self.name}")'if self.name else ''
+        request_name = f' (pre-configured, "{self.name}")'if self.name else ''
         param_name = f'Request {self.count}{request_name}'
         param_value = {
             'method': request_args['method'],

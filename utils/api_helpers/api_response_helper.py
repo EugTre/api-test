@@ -31,6 +31,8 @@ class ResponseHeadersValidator:
         """
         self.expected = headers
 
+        allure.dynamic.parameter('Expected headers', headers)
+
         return self.response_helper
 
     @allure.step('Check that headers are like given')
@@ -270,6 +272,7 @@ class ResponseBodyJsonValidatior:
             if isinstance(json_content, JsonContent) else \
             JsonContentBuilder().from_data(json_content).build()
 
+        allure.dynamic.parameter('Expected JSON', self.expected.get(''))
         return self.response_helper
 
     # -------
@@ -597,6 +600,7 @@ class ApiResponseHelper:
         # Then apply specific values
         if status_code is not None:
             self.expected_status_code = status_code
+            allure.dynamic.parameter('Expected status code', status_code)
         if schema is not None:
             self.schema = schema
         if json is not None:

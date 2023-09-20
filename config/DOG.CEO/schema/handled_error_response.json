@@ -3,17 +3,19 @@
     "type": "object",
     "properties": {
         "message": {
-            "type": "string",
-            "format": "uri",
-            "pattern": "^(https|http)://"
+            "type": "string"
         },
         "status": {
             "type": "string",
-            "enum": ["success","error"]
+            "const": "error"
+        },
+        "code": {
+            "type": "integer"
         }
     },
     "required": [
         "message",
-        "status"
+        "status",
+        "code"
     ]
 }

@@ -95,7 +95,8 @@ class RequestEntity:
     path_params: dict = None
     cookies: dict = None
     auth: tuple = None
-    json: dict|list = None
+    json: dict|list|None = None
+    text: str|None = None
     timeout: int = None
 
 @dataclass(slots=True)
