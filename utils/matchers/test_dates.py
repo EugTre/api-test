@@ -132,16 +132,19 @@ class TestMatcherDate:
         assert datetime.datetime.now(utc).isoformat() == matcher_instance
 
     # Any Date In Range
-    @pytest.mark.parametrize("left, right", (
-        ('-1d', '+1d'),
-        ('-1y', '+1y'),
-        ('-1s', '+1s'),
-        ('now', '+1d'),
-        ('-1d', 'now')
+    @pytest.mark.parametrize("left, right, delta", (
+        ('-1d', '+1d', 0),
+        ('-1y', '+1y', 0),
+        ('-1s', '+1s', 0),
+        ('now', '+1d', 500),
+        ('-1d', 'now', -500)
     ))
-    def test_any_date_in_range(self, left, right):
+    def test_any_date_in_range(self, left, right, delta):
         matcher_instance = match.AnyDateInRange(left, right)
-        assert datetime.datetime.now().isoformat() == matcher_instance
+        utc_tz = datetime.timezone.utc
+        offset = datetime.timedelta(microseconds=delta)
+        assert (datetime.datetime.now().astimezone(utc_tz) + offset).isoformat() == \
+            matcher_instance
 
     @pytest.mark.parametrize("left, right, exception, match_pattern", (
         ('+1d', '+2d', AssertionError, r'.*Date In Range.*earlier than.*left limit'),

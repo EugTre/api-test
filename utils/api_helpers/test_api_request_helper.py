@@ -342,7 +342,8 @@ class TestApiRequestHelper:
                 'Test2': 'test'
             },
             'auth': ('foo', 'bar'),
-            'json': {"stuff": "foobar"}
+            'json': {"stuff": "foobar"},
+            'data': None
         }
 
     def test_prepare_request_params_for_unconfigured_request(self, api: ApiRequestHelper):

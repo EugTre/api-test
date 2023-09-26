@@ -79,6 +79,7 @@ def test_api_config_reader_request_catalog_required_only_no_references(get_file)
                 "cookies": None,
                 "auth": None,
                 "json": None,
+                "text": None,
                 "timeout": None
             }
     assert asdict(req_entity.response) == {
@@ -108,6 +109,7 @@ def test_api_config_reader_request_catalog_full_no_references(get_file):
                 "cookies": {"key2": "value2"},
                 "auth": ["user", "pass"],
                 "json": {"item1": 1},
+                "text": None,
                 "timeout": 5
             },
             "response": {
