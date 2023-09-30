@@ -1,10 +1,10 @@
 .idea
-.vs_code
 /venv/
 /.pytest_cache/
 __pycache__/
 headers_authorized.json
 /tmp
 /htmlcov
+/.coverage
 logging.db
 sandbox.py

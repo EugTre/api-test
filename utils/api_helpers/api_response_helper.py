@@ -35,7 +35,7 @@ class ResponseHeadersValidator:
 
         return self.response_helper
 
-    @allure.step('Check that headers are like given')
+    @allure.step('Response headers are like given')
     def are_like(self, headers: dict[str, str|BaseMatcher]|None = None) -> 'ApiResponseHelper':
         """Check that response headers are like given.
         If 'headers' not passed as parameter - headers
@@ -56,6 +56,7 @@ class ResponseHeadersValidator:
         Returns:
             Instance of `ApiResponseHelper` class.
         """
+        desc = "pre-defined" if headers is None else "given"
         expected_headers = self.__get_default_if_none(headers)
 
         failed = []
@@ -72,11 +73,12 @@ class ResponseHeadersValidator:
                     f'doesn\'t match to expected value "{value}"'
                 )
 
-        assert not failed, f'Response headers are not like given: {", ".join(failed)}'
+        with allure.step(f'Compare headers to be like {desc}'):
+            assert not failed, f'Response headers are not like given: {", ".join(failed)}'
 
         return self.response_helper
 
-    @allure.step('Check that headers are match to given')
+    @allure.step('Check that headers match to given')
     def equals(self, headers: dict[str, str] = None, ignore: tuple = None) -> 'ApiResponseHelper':
         """Check of response headers to be equal to given.
         If 'expected_headers' not passed as parameter - headers from response
@@ -278,7 +280,7 @@ class ResponseBodyJsonValidatior:
     # -------
     # Overall JSON validation
     # -------
-    @allure.step('Validate response JSON content equals to expected')
+    @allure.step('Response JSON content equals to given')
     def equals(self, json: JsonContent|dict|list = None,
                     ignore: tuple = None) -> 'ApiResponseHelper':
         """"Compare JSON of response with given one or expected.
@@ -302,6 +304,7 @@ class ResponseBodyJsonValidatior:
         Returns:
             Instance of `ApiResponseHelper` class.
         """
+        desc = "pre-defined" if json is None else "given"
         json = self.__get_default_if_none(json)
 
         # Make both dicts|lists
@@ -317,8 +320,9 @@ class ResponseBodyJsonValidatior:
             json =  builder.from_data(json, True)\
                 .build().delete(*ignore).get()
 
-        assert json == response_json, \
-            "Response's JSON is not equal to given one."
+        with allure.step(f"Check JSON to be equal to {desc}"):
+            assert json == response_json, \
+                "Response's JSON is not equal to given one."
 
         return self.response_helper
 
@@ -682,13 +686,14 @@ class ApiResponseHelper:
         """
         status_code = status_code if status_code else self.expected_status_code
 
-        with allure.step(f'Check response status code is {status_code}'):
+        with allure.step(f'Response status code is {status_code}'):
             assert status_code == self.response_object.status_code, \
                    f'Response status code {self.response_object.status_code} doesn\'t '\
                    f'match to expected code {status_code}.'
 
         return self
 
+    @allure.step("Response is validated against JSON schema")
     def validates_against_schema(self, schema: dict = None) -> Self:
         """Validates response against given JSONSchema or schema from request config,
         if pre-configured request was made.
@@ -706,17 +711,17 @@ class ApiResponseHelper:
         Returns:
             Self: instance of class `ApiResponseHelper`
         """
-        desc = "given JSON Schema"
+        desc = "given"
 
         if schema is None:
             if self.schema is None:
                 raise ValueError('JSONSchema is not defined nor in request config, '
                              'nor in method! Validation is not possible.')
 
-            desc = "expected JSON Schema"
+            desc = "pre-defined"
             schema = self.schema
 
-        with allure.step(f'Validate response against {desc}'):
+        with allure.step(f'Validate against {desc} JSON schema'):
             validate(self.__get_value(ROOT_POINTER), schema)
 
         return self

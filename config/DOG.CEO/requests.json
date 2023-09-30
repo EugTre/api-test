@@ -2,6 +2,8 @@
     "$defs": {
         "schema": {
             "SingleImage": {"!include": "config/DOG.CEO/schema/single_image_response.json"},
+            "ListBreeds": {"!include": "config/DOG.CEO/schema/list_of_all_breeds.json"},
+
             "MultipleImages": {"!include": "config/DOG.CEO/schema/multiple_image_response.json"},
             "HandledError": {"!include": "config/DOG.CEO/schema/handled_error_response.json"}
         },
@@ -80,7 +82,6 @@
         "response": {"!ref": "/$defs/response_on_unsupported_method"}
     },
 
-
     "GetMultipleRandomImages": {
         "request": {
             "method": "GET",
@@ -113,8 +114,30 @@
         "response": {"!ref": "/$defs/response_on_invalid_subpath"}
     },
 
-
-
+    "GetListOfAllBreeds": {
+        "request": {
+            "method": "GET",
+            "path": "breeds/list/all"
+        },
+        "response": {
+            "status_code": 200,
+            "schema": {"!ref": "/$defs/schema/ListBreeds"},
+            "json": {
+                "status": "success",
+                "message": {
+                    "akita": [],
+                    "australian": ["shepherd"],
+                    "bulldog": ["boston","english","french"],
+                    "clumber": [],
+                    "mountain": ["bernese","swiss"],
+                    "shiba": []
+                }
+            },
+            "headers": {
+                "Content-Type": "application/json"
+            }
+        }
+    },
 
 
 

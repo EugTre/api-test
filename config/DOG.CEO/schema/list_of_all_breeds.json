@@ -3,11 +3,14 @@
     "type": "object",
     "properties": {
         "message": {
-            "type": "array",
-            "items": {
-                "type": "string",
-                "format": "uri",
-                "pattern": "^(https|http)://"
+            "type": "object",
+            "patternProperties": {
+                "[a-z]+": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
             }
         },
         "status": {

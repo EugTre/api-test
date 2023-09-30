@@ -45,6 +45,8 @@ class ApiRequestHelper:
         self.expected = None
 
     # Request setup
+
+    @allure.step('Request "{name}" from catalog')
     def by_name(self, name: str) -> Self:
         """Selects request from API Client's catalogue by request name.
         Invocation of the method resets instance's properties.
@@ -172,6 +174,7 @@ class ApiRequestHelper:
         return self
 
     @expect_initialized
+    @allure.step('Request with custom query params')
     def with_query_params(self, **query_params) -> Self:
         """Adds params which should be added as URL query params.
         Appends/overwrites defaults params if defined for request.
@@ -413,7 +416,7 @@ class ApiRequestHelper:
         self.__allure_save_request_params(args)
 
         request_step_info = f' "{self.name}"' if self.name else ''
-        with allure.step(f'Request {self.count}{request_step_info} '
+        with allure.step(f'Request {self.count}{request_step_info} was performed '
                          f'[method: {self.request.method}, url: {self.request.path}]'):
 
             response = self.api_client.request(
