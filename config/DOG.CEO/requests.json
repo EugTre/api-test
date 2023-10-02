@@ -3,20 +3,12 @@
         "schema": {
             "SingleImage": {"!include": "config/DOG.CEO/schema/single_image_response.json"},
             "ListBreeds": {"!include": "config/DOG.CEO/schema/list_of_all_breeds.json"},
-
             "MultipleImages": {"!include": "config/DOG.CEO/schema/multiple_image_response.json"},
             "HandledError": {"!include": "config/DOG.CEO/schema/handled_error_response.json"}
         },
         "headers": {
-            "ok": {
-                "Content-Type": "application/json",
-                "Access-Control-Allow-Origin": "*"
-            },
-            "405_error": {
-                "Content-Type": "application/json",
-                "Access-Control-Allow-Origin": "*",
-                "Allow": "GET, HEAD"
-            }
+            "ok": {"!include": "config/DOG.CEO/headers/ok.json"},
+            "405_error": {"!include": "config/DOG.CEO/headers/405.json"}
         },
         "matcher": {
             "image_url": {
@@ -36,7 +28,6 @@
                 "pattern": "No route found for \".*\" with code: 0"
             }
         },
-
         "response_on_unsupported_method": {
             "status_code": 405,
             "schema": {"!ref": "/$defs/schema/HandledError"},

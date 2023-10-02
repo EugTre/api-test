@@ -6,6 +6,7 @@ import random
 import pytest
 import utils.generators as gen
 
+
 class TestGeneratosManager:
     """Tests generators manager"""
     # Generators to use
@@ -15,10 +16,12 @@ class TestGeneratosManager:
     def configurable_generator(self, a, b):
         return f'{a}/{b}'
 
-    def heavy_configurable_generator(self, a, b, c = 'c.default', d = 'd.default'):
-        return '/'.join((a,b,c,d))
+    def heavy_configurable_generator(self, a, b,
+                                     c='c.default',
+                                     d='d.default'):
+        return '/'.join((a, b, c, d))
 
-    def random_generator(self, range_min = 0, range_max = 100):
+    def random_generator(self, range_min=0, range_max=100):
         return random.randrange(range_min, range_max)
 
     # Tests
@@ -119,7 +122,10 @@ class TestGeneratosManager:
         manager = gen.GeneratorsManager(False)
         manager.add(generator)
 
-        assert manager.generate(reg_name, kwargs={'a': 'foo', 'b': 'bar'}) == 'foo/bar'
+        assert manager.generate(
+            reg_name,
+            kwargs={'a': 'foo', 'b': 'bar'}
+        ) == 'foo/bar'
 
     def test_manager_generate_with_mixed_args(self):
         generator = self.heavy_configurable_generator
@@ -127,8 +133,11 @@ class TestGeneratosManager:
         manager = gen.GeneratorsManager(False)
         manager.add(generator)
 
-        assert manager.generate(reg_name, ('foo', 'bar'), kwargs={'c': 'baz'}) \
-            == 'foo/bar/baz/d.default'
+        assert manager.generate(
+            reg_name,
+            ('foo', 'bar'),
+            kwargs={'c': 'baz'}
+        ) == 'foo/bar/baz/d.default'
 
     def test_manager_generate_with_correlation_id(self):
         generator = self.random_generator
@@ -140,7 +149,11 @@ class TestGeneratosManager:
 
         generated_value = manager.generate(reg_name, correlation_id=cid)
         for _ in range(10):
-            assert manager.generate(reg_name, correlation_id=cid) == generated_value
+            assert manager.generate(
+                reg_name,
+                correlation_id=cid
+            ) == generated_value
+
         assert manager.generate(
             reg_name,
             correlation_id='BazBar',
@@ -155,12 +168,16 @@ class TestGeneratosManager:
         manager = gen.GeneratorsManager(False)
         manager.add(generator)
 
-        generated_value = manager.generate(reg_name, (100, 500), correlation_id=cid)
+        generated_value = manager.generate(
+            reg_name, (100, 500), correlation_id=cid
+        )
         for i in range(10):
-            assert manager.generate(reg_name, (100 * i, 500 * i), correlation_id=cid) \
-                == generated_value
-        assert manager.generate(reg_name, (0, 20), correlation_id='BazBar') \
-            != generated_value
+            assert manager.generate(
+                reg_name, (100 * i, 500 * i), correlation_id=cid
+            ) == generated_value
+        assert manager.generate(
+            reg_name, (0, 20), correlation_id='BazBar'
+        ) != generated_value
 
     # --- Negative
     def test_manager_unregister_by_invalid_name_quietly_fails(self):
@@ -218,14 +235,32 @@ class TestGeneratosManager:
 class TestGenerators:
     """Tests actual generator functions"""
     def test_names_generator_first_name_generator(self):
-        assert gen.NamesGenerator.generate_first_name() in gen.NamesGenerator.MALE_NAMES
+        assert gen.NamesGenerator.generate_first_name() \
+            in gen.NamesGenerator.MALE_NAMES
 
     @pytest.mark.parametrize('arg, expected', [
         ('male', gen.NamesGenerator.MALE_NAMES),
         ('female', gen.NamesGenerator.FEMALE_NAMES)
     ])
-    def test_names_generator_first_name_generator_gender_specific(self, arg, expected):
+    def test_names_generator_first_name_generator_gender_specific(
+        self, arg, expected
+    ):
         assert gen.NamesGenerator.generate_first_name(arg) in expected
 
     def test_names_generator_last_name_generator(self):
-        assert gen.NamesGenerator.generate_last_name() in gen.NamesGenerator.LAST_NAMES
+        assert gen.NamesGenerator.generate_last_name() \
+            in gen.NamesGenerator.LAST_NAMES
+
+    @pytest.mark.parametrize('size', (3, 10))
+    def test_username_generator(self, size: int):
+        value = gen.generate_username(size)
+        print(value)
+        assert len(value) == size
+        assert value.isalpha()
+
+    @pytest.mark.parametrize('size', (3, 10))
+    def test_password_generator(self, size: int):
+        value = gen.generate_password(size)
+        print(value)
+        assert len(value) == size
+        assert value.isalnum()

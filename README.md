@@ -5,7 +5,7 @@ This repository is an exercies in automation of API testing using public test AP
 Repository contains:
 - testing framework
 - framework's unit tests
-- test suites for [DOG.CEO API](https://dog.ceo/dog-api/) and [DummyAPI](https://dummyapi.io/) [TBD]
+- test suites for [DOG.CEO API](https://dog.ceo/dog-api/) and [Restful-Booker](https://restful-booker.herokuapp.com/apidoc/index.html) [TBD]
 
 # <a name='toc'></a>Table of content
 1. [How to use](#howto)

@@ -3,6 +3,7 @@
 pytest -s -vv ./utils/api_helpers/test_api_request_helper.py
 """
 import pytest
+from requests.cookies import RequestsCookieJar
 from utils.api_client.simple_api_client import SimpleApiClient
 from utils.api_client.models import RequestCatalogEntity, RequestEntity, \
     ResponseEntity, HTTPMethod
@@ -16,7 +17,8 @@ REQUEST_CONFIGURED_1 = RequestEntity(
     method="GET",
     path="items/{amount}",
     path_params={"amount": 4},
-    query_params={"page": 1}
+    query_params={"page": 1},
+    cookies=RequestsCookieJar()
 )
 RESPONSE_CONFIGURED_1 = ResponseEntity(
     status_code=200,
@@ -24,6 +26,9 @@ RESPONSE_CONFIGURED_1 = ResponseEntity(
 )
 
 REQUEST_NAME_2 = "UpdateItem"
+REQUEST_COOKIES_RAW_2 = {"Foo": "Baz"}
+REQUEST_COOKIES_2 = RequestsCookieJar()
+REQUEST_COOKIES_2.update(REQUEST_COOKIES_RAW_2)
 REQUEST_CONFIGURED_2 = RequestEntity(
     method="POST",
     path="items/{node}/update/{id}",
@@ -34,7 +39,7 @@ REQUEST_CONFIGURED_2 = RequestEntity(
         "price": 100500
     },
     headers={"Foo": "Bar"},
-    cookies={'Foo': 'Baz'}
+    cookies=REQUEST_COOKIES_2  # {'Foo': 'Baz'}
 )
 RESPONSE_CONFIGURED_2 = ResponseEntity(
     status_code=200,
@@ -75,7 +80,7 @@ API_CLIENT_CONFIG = {
                 path_params={"id": 10},
                 query_params=None,
                 headers=REQUEST_CONFIGURED_2.headers,
-                cookies=REQUEST_CONFIGURED_2.cookies,
+                cookies=REQUEST_COOKIES_RAW_2,
                 json=REQUEST_CONFIGURED_2.json
             ),
             response=RESPONSE_CONFIGURED_2
@@ -83,10 +88,12 @@ API_CLIENT_CONFIG = {
     }
 }
 
+
 @pytest.fixture(name='client', scope='session')
 def get_api_client() -> SimpleApiClient:
     '''Returns api client instance'''
     return SimpleApiClient(API_CLIENT_CONFIG)
+
 
 @pytest.fixture(name='client_requestless', scope='session')
 def get_api_client_no_requests() -> SimpleApiClient:
@@ -98,10 +105,12 @@ def get_api_client_no_requests() -> SimpleApiClient:
         'request_catalog': None
     })
 
+
 @pytest.fixture(name='api')
 def get_api_helper(client) -> ApiRequestHelper:
     """Returns configured ApiRequestHelper"""
     return ApiRequestHelper(client)
+
 
 class TestApiRequestHelper:
     """Positive tests for ApiRequestHelper"""
@@ -119,7 +128,8 @@ class TestApiRequestHelper:
             method='POST',
             path='user',
             headers=header,
-            query_params=query_param
+            query_params=query_param,
+            cookies=RequestsCookieJar()
         )
         expected_response_code = 200
 
@@ -143,11 +153,11 @@ class TestApiRequestHelper:
         json_data = {'a': 100}
 
         api.by_name(REQUEST_NAME_1) \
-                .with_path_params(**path_params) \
-                .with_query_params(**query_params) \
-                .with_headers(headers) \
-                .with_cookies(cookies) \
-                .with_json_payload(json_data)
+            .with_path_params(**path_params) \
+            .with_query_params(**query_params) \
+            .with_headers(headers) \
+            .with_cookies(cookies) \
+            .with_json_payload(json_data)
 
         assert api.request == RequestEntity(
             method=REQUEST_CONFIGURED_1.method,
@@ -165,7 +175,8 @@ class TestApiRequestHelper:
         api.by_path()
         assert api.request == RequestEntity(
             method=HTTPMethod.GET,
-            path=""
+            path="",
+            cookies=RequestsCookieJar()
         )
         assert api.expected == ResponseEntity(status_code=200)
 
@@ -190,7 +201,8 @@ class TestApiRequestHelper:
             cookies={"TestCookie": "New", "TestCookie2": "New"}
         )
 
-    def test_append_params_to_preconfigured_request(self, api: ApiRequestHelper):
+    def test_append_params_to_preconfigured_request(self,
+                                                    api: ApiRequestHelper):
         """Params append already defined params"""
         api.by_name(REQUEST_NAME_2) \
             .with_path_params(id1=100500) \
@@ -207,8 +219,16 @@ class TestApiRequestHelper:
             path=REQUEST_CONFIGURED_2.path,
             path_params={"id1": 100500, "id2": 201000},
             query_params={"p1": 100, "p2": 200},
-            headers={**REQUEST_CONFIGURED_2.headers, "Test": "New", "Test2": "New"},
-            cookies={**REQUEST_CONFIGURED_2.cookies, "TestCookie": "New", "TestCookie2": "New"},
+            headers={
+                **REQUEST_CONFIGURED_2.headers,
+                "Test": "New",
+                "Test2": "New"
+            },
+            cookies={
+                **REQUEST_CONFIGURED_2.cookies,
+                "TestCookie": "New",
+                "TestCookie2": "New"
+            },
             json=REQUEST_CONFIGURED_2.json
         )
 
@@ -235,7 +255,7 @@ class TestApiRequestHelper:
     def test_unset_extra_path_param(self, api: ApiRequestHelper):
         """Extra path params may be removed by setting to null"""
         params_extra = {
-            'id':100500, 'node':'FooBarr', 'amount':45
+            'id': 100500, 'node': 'FooBarr', 'amount': 45
         }
 
         api.by_name(REQUEST_NAME_2) \
@@ -252,7 +272,7 @@ class TestApiRequestHelper:
     def test_unset_extra_query_param(self, api: ApiRequestHelper):
         """Extra query params may be removed by setting to null"""
         params_extra = {
-            'id':100500, 'node':'FooBarr', 'amount':45
+            'id': 100500, 'node': 'FooBarr', 'amount': 45
         }
 
         api.by_name(REQUEST_NAME_2) \
@@ -314,8 +334,10 @@ class TestApiRequestHelper:
             schema=RESPONSE_CONFIGURED_2.schema
         )
 
-    def test_prepare_request_params_for_configured_request(self, api: ApiRequestHelper):
-        """Prepare request method test for concifugrd request"""
+    def test_prepare_request_params_for_configured_request(
+        self, api: ApiRequestHelper
+    ):
+        """Prepare request method test for configured request"""
         api.by_path(path='{node}/{id}') \
             .with_path_params(node='foobar', id=100500) \
             .with_query_params(page=2) \
@@ -328,6 +350,8 @@ class TestApiRequestHelper:
             'cookies': {'Test2': 'test'},
             'auth': ('foo', 'bar')
         })
+        cookies_prepared = RequestsCookieJar()
+        cookies_prepared.update({'Test': 'test', 'Test2': 'test'})
 
         assert req_params == {
             'method': HTTPMethod.GET,
@@ -337,16 +361,15 @@ class TestApiRequestHelper:
                 'Test': 'test',
                 'Test2': 'test'
             },
-            'cookies': {
-                'Test': 'test',
-                'Test2': 'test'
-            },
+            'cookies': cookies_prepared,
             'auth': ('foo', 'bar'),
             'json': {"stuff": "foobar"},
             'data': None
         }
 
-    def test_prepare_request_params_for_unconfigured_request(self, api: ApiRequestHelper):
+    def test_prepare_request_params_for_unconfigured_request(
+        self, api: ApiRequestHelper
+    ):
         """Prepare request method test for unconcifugrd request"""
         params = {
             'headers': {'Foo': 'Bar'},
@@ -365,6 +388,7 @@ class TestApiRequestHelper:
         }
 
     def test_change_request_method(self, api: ApiRequestHelper):
+        """Change request method for pre-configured request"""
         new_method = 'POST'
         new_path = '/my/custom/path'
         api.by_name(REQUEST_NAME_1) \
@@ -375,6 +399,7 @@ class TestApiRequestHelper:
         assert api.request.path == new_path
 
     def test_change_request_path(self, api: ApiRequestHelper):
+        """Change request path for pre-configured request"""
         new_path = '/my/custom/path/{size}'
         api.by_name(REQUEST_NAME_1) \
             .with_path(new_path) \
@@ -384,6 +409,7 @@ class TestApiRequestHelper:
         assert api.check_for_missing_path_params()
 
     def test_with_text_payload(self, api: ApiRequestHelper):
+        """Set raw text payload for request"""
         text_data = "some text"
         params = api.by_name(REQUEST_NAME_2) \
             .with_path_params(node=1, id=2) \
@@ -393,18 +419,82 @@ class TestApiRequestHelper:
         assert params['json'] is None
         assert params['data'] == text_data.encode('utf-8')
 
+    def test_use_session_cookies_on_request(self, api: ApiRequestHelper):
+        """Session cookies are re-used on request"""
+        session_cookies = RequestsCookieJar()
+        session_cookies.update({
+            'Foo': 'Bar',
+            'Test': '123'
+        })
+        api.session_cookies = session_cookies
+
+        api.by_name(REQUEST_NAME_1)
+        req_params = api.prepare_request_params()
+
+        assert req_params['cookies'] == session_cookies
+
+    def test_use_session_cookies_with_request_cookies(self,
+                                                      api: ApiRequestHelper):
+        """Session cookies are re-used on request and composed with
+        pre-defined for request"""
+        session_cookies = RequestsCookieJar()
+        session_cookies.set('BySession', 'test')
+        api.session_cookies = session_cookies
+
+        api.by_name(REQUEST_NAME_2) \
+            .with_path_params(node=123, id=456)
+        req_params = api.prepare_request_params()
+
+        expected_cookies = RequestsCookieJar()
+        expected_cookies.update({
+            'BySession': 'test',
+            **REQUEST_COOKIES_RAW_2
+        })
+        assert req_params['cookies'] == expected_cookies
+
+    def test_use_session_cookies_with_request_and_method_cookies(
+        self, api: ApiRequestHelper
+    ):
+        """Session cookies are re-used on request and composed with
+        defined for request & method"""
+        session_cookies = RequestsCookieJar()
+        session_cookies.set('BySession', 'test1')
+        api.session_cookies = session_cookies
+
+        api.by_name(REQUEST_NAME_2) \
+            .with_path_params(node=123, id=456) \
+            .with_cookies({"ByMethod": "test2"})
+        req_params = api.prepare_request_params({
+            'cookies':{"ByMethod2": "test3"}
+        })
+
+        expected_cookies = RequestsCookieJar()
+        expected_cookies.update({
+            'BySession': 'test1',
+            **REQUEST_COOKIES_RAW_2,
+            "ByMethod": "test2",
+            "ByMethod2": "test3"
+        })
+
+        assert req_params['cookies'] == expected_cookies
+
 
 @pytest.mark.xdist_group("localhost_server")
 class TestApiRequestHelperPerform:
     """Test .perform() method"""
-    def test_perform_request_no_params(self, api: ApiRequestHelper, localhost_server):
+    def test_perform_request_no_params(self,
+                                       api: ApiRequestHelper,
+                                       localhost_server):
         """Request may be performed without additional args"""
-        response = api.by_path("/items").with_expected(status_code=501).perform()
+        response = api.by_path("/items") \
+            .with_expected(status_code=501) \
+            .perform()
 
         assert response
         assert isinstance(response, ApiResponseHelper)
 
-    def test_perform_request_with_params(self, api: ApiRequestHelper, localhost_server):
+    def test_perform_request_with_params(self, api: ApiRequestHelper,
+                                         localhost_server):
         """Request may be performed with additional args"""
         response = api.by_path("/items").with_expected(status_code=501)\
             .perform(headers={'foo': 'bar'})
@@ -412,8 +502,10 @@ class TestApiRequestHelperPerform:
         assert response
         assert 'foo' in (response.get_response().request.headers)
 
-    def test_perform_request_with_params_mixin(self, api: ApiRequestHelper, localhost_server):
-        """Request may be performed with mixin preset params and .perform() args params"""
+    def test_perform_request_with_params_mixin(self, api: ApiRequestHelper,
+                                               localhost_server):
+        """Request may be performed with mixin preset params and .perform()
+        args params"""
         response = api.by_name(REQUEST_NAME_2)\
             .with_path_params(node='node', id=2) \
             .with_expected(status_code=501) \
@@ -425,8 +517,10 @@ class TestApiRequestHelperPerform:
         assert response
         assert 'Omaha' in response.get_response().request.headers
 
-    def test_perform_request_with_params_override(self, api: ApiRequestHelper, localhost_server):
-        """Request may be performed with overwriting preset params by .perform() args params"""
+    def test_perform_request_with_params_override(self, api: ApiRequestHelper,
+                                                  localhost_server):
+        """Request may be performed with overwriting preset params
+        by .perform() args params"""
         new_header_value = "NotBar"
         response = api.by_name(REQUEST_NAME_2)\
             .with_path_params(node='node', id=100) \
@@ -494,7 +588,6 @@ class TestApiRequestHelperNegative:
         """Error occurs if request is not set before performing request"""
         with pytest.raises(RuntimeError, match='Request is not initialized.*'):
             api.perform()
-
 
     @pytest.mark.parametrize("param, args", (
         ("with_path_params", {'a': 1, 'b': 2}),

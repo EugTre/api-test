@@ -1,0 +1,96 @@
+{
+    "$defs": {
+        "schema": {
+            "auth": { "!include": "config/Restful-Booker/schema/auth.json" },
+            "auth_bad_creds": { "!include": "config/Restful-Booker/schema/auth_bad_creds.json" },
+            "booking_info": { "!include": "config/Restful-Booker/schema/booking_info.json" }
+        },
+        "headers": {
+            "ok": {
+                "Content-Type": "application/json; charset=utf-8"
+            }
+        }
+    },
+
+    "Auth": {
+        "request": {
+            "method": "POST",
+            "path": "/auth",
+            "json": {
+                "username": { "!gen": "Username" },
+                "password": { "!gen": "Password" }
+            }
+        },
+        "response": {
+            "status_code": 200,
+            "schema": { "!ref": "/$defs/schema/auth" },
+            "headers": { "!ref": "/$defs/headers/ok" }
+        }
+    },
+    "Auth_BadCredentials": {
+        "request": { "!ref": "/Auth/request" },
+        "response": {
+            "status_code": 200,
+            "schema": { "!ref": "/$defs/schema/auth_bad_creds" },
+            "headers": { "!ref": "/$defs/headers/ok" },
+            "json": {
+                "reason": "Bad credentials"
+            }
+        }
+    },
+    "Auth_BadRequest": {
+        "request": {
+            "method": "POST",
+            "path": "/auth",
+            "headers": {
+                "Content-Type": "application/json"
+            }
+        },
+        "response": {
+            "status_code": 400
+        }
+    },
+
+    "CreateBooking": {
+        "request": {
+            "method": "POST",
+            "path": "/booking",
+            "json": {
+                "!gen": "Booking",
+                "!id": "Create_01"
+            }
+        },
+        "response": {
+            "status_code": 200,
+            "schema": { "!ref": "/$defs/schema/booking_info" },
+            "headers": { "!ref": "/$defs/headers/ok" },
+            "json": {
+                "bookingid": { "!match": "AnyNumber" },
+                "booking": {
+                    "!gen": "Booking",
+                    "!id": "Create_01"
+                }
+            }
+        }
+    },
+
+    "UpdateBooking": {
+        "request": {
+            "method": "PUT",
+            "path": "/booking/{id}",
+            "json": {
+                "!gen": "Booking",
+                "!id": "Update_01"
+            }
+        },
+        "response": {
+            "status_code": 200,
+            "schema": { "!ref": "/$defs/schema/booking_info/properties/booking" },
+            "json": {
+                "!gen": "Booking",
+                "!id": "Update_01"
+            }
+        }
+    }
+
+}

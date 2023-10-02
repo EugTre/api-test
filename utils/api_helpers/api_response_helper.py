@@ -11,14 +11,18 @@ from utils.json_content.json_content import JsonContent, JsonContentBuilder
 from utils.json_content.pointer import ROOT_POINTER
 from utils.matchers.matcher import BaseMatcher
 
+
 class ResponseHeadersValidator:
     """Provide methods to validate reponse's headers"""
-    def __init__(self, api_response_helper: 'ApiResponseHelper', headers: dict):
+    def __init__(self, api_response_helper: 'ApiResponseHelper',
+                 headers: dict):
         self.response_helper = api_response_helper
         self.headers = headers
-        self.headers_lowercase = {header.lower(): value.lower()
-                                for header, value in headers.items()}
-        self.expected: dict|None = None
+        self.headers_lowercase = {
+            header.lower(): value.lower()
+            for header, value in headers.items()
+        }
+        self.expected: dict | None = None
 
     def set_expected(self, headers: dict) -> 'ApiResponseHelper':
         """Sets expected headers to compare against by other methods.
@@ -36,7 +40,8 @@ class ResponseHeadersValidator:
         return self.response_helper
 
     @allure.step('Response headers are like given')
-    def are_like(self, headers: dict[str, str|BaseMatcher]|None = None) -> 'ApiResponseHelper':
+    def are_like(self, headers: dict[str, str | BaseMatcher] | None = None
+                 ) -> 'ApiResponseHelper':
         """Check that response headers are like given.
         If 'headers' not passed as parameter - headers
         from response section of Request Catalog entity will be used.
@@ -49,9 +54,9 @@ class ResponseHeadersValidator:
         `utils.matchers.AnyTextWith` to match by regex/substring matches.
 
         Args:
-            expected_headers (dict[str,str], optional): dictionary of headers and
-            it's values. Defaults to None (Request Catalog will be used or value
-            set by .set_expected()).
+            expected_headers (dict[str,str], optional): dictionary of headers
+            and it's values. Defaults to None (Request Catalog will be used
+            or value set by .set_expected()).
 
         Returns:
             Instance of `ApiResponseHelper` class.
@@ -69,32 +74,36 @@ class ResponseHeadersValidator:
             actual_value = self.headers[header]
             if value != actual_value:
                 failed.append(
-                    f'header\'s value "{header}" = "{actual_value}" ' \
+                    f'header\'s value "{header}" = "{actual_value}" '
                     f'doesn\'t match to expected value "{value}"'
                 )
 
         with allure.step(f'Compare headers to be like {desc}'):
-            assert not failed, f'Response headers are not like given: {", ".join(failed)}'
+            assert not failed, 'Response headers are not like given: '\
+                f'{", ".join(failed)}'
 
         return self.response_helper
 
     @allure.step('Check that headers match to given')
-    def equals(self, headers: dict[str, str] = None, ignore: tuple = None) -> 'ApiResponseHelper':
+    def equals(self, headers: dict[str, str] = None, ignore: tuple = None
+               ) -> 'ApiResponseHelper':
         """Check of response headers to be equal to given.
         If 'expected_headers' not passed as parameter - headers from response
         section of Request Catalog entity will be used.
 
         Asserts that:
         - all headers present in response, except headers listed in 'ignore'
-        - there is no extra headers in response, except headers listed in 'ignore'
+        - there is no extra headers in response, except headers listed in
+        'ignore'
         - values are exactly the same for checked headers
 
         Args:
-            expected_headers (dict[str,str], optional): dictionary of headers and
-            it's values. Defaults to None (Request Catalog will be used or value
-            set by .set_expected()).
-            ignore (optional, tuple): names of the headers that should be excluded
-            from comparison (e.g. ('Accept', 'From')). Defaults to None.
+            expected_headers (dict[str,str], optional): dictionary of headers
+            and it's values. Defaults to None (Request Catalog will be used or
+            value set by .set_expected()).
+            ignore (optional, tuple): names of the headers that should be
+            excluded from comparison (e.g. ('Accept', 'From')).
+            Defaults to None.
 
         Returns:
             instance of class `ApiResponseHelper`
@@ -615,7 +624,7 @@ class ApiResponseHelper:
         return self
 
     # General functions
-    def get_response(self) -> Response|None:
+    def get_response(self) -> Response | None:
         """Returns instance of `requests.Response` class
         if present. Otherwise returns None.
 
@@ -651,7 +660,7 @@ class ApiResponseHelper:
 
         return self.json.content.get() if as_dict else self.json.content
 
-    def get_json_value(self, pointer: str)-> Any:
+    def get_json_value(self, pointer: str) -> Any:
         """Returns value at given pointer.
 
         Args:
@@ -734,7 +743,7 @@ class ApiResponseHelper:
             Self: instance of class `ApiResponseHelper`
         """
         assert not self.response_object.text, \
-            'Response has JSON content, but expected to be empty.'
+            'Response has content, but expected to be empty.'
 
         return self
 
@@ -746,7 +755,24 @@ class ApiResponseHelper:
             Self: instance of class `ApiResponseHelper`
         """
         assert self.response_object.text, \
-            'Response has no JSON content, but expected to be not empty.'
+            'Response has no content, but expected to be not empty.'
+
+        return self
+
+    @allure.step('Check response equals')
+    def equals(self, text: str | BaseMatcher) -> Self:
+        """Checks that response content equals to given.
+        Args:
+            text (str | BaseMatcher): text to compare with or
+            text matcher.
+
+        Returns:
+            Self: instance of class `ApiResponseHelper`
+        """
+        self.is_not_empty()
+
+        assert self.response_object.text == text, \
+            'Response content doesn\'t match to expected'
 
         return self
 

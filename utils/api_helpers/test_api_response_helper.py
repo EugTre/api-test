@@ -130,7 +130,7 @@ def get_api_with_mocked_response(status_code: int,
         resp.cookies.update(cookies)
 
     if content is not None:
-        resp._content = bytes(content)
+        resp._content = bytes(content, encoding=resp.encoding)
 
     if json_content is not None:
         resp._content = bytes(
@@ -245,8 +245,10 @@ class TestApiResponseHelperGeneral:
         get_api_with_mocked_response(200).is_empty()
 
     def test_is_empty_asserts(self, api_response_simple: ApiResponseHelper):
-        with pytest.raises(AssertionError,
-                           match='Response has JSON content, but expected to be empty.'):
+        with pytest.raises(
+            AssertionError,
+            match='Response has content, but expected to be empty.'
+        ):
             api_response_simple.is_empty()
 
     # is_not_empty
@@ -254,9 +256,28 @@ class TestApiResponseHelperGeneral:
         api_response_simple.is_not_empty()
 
     def test_is_not_empty_asserts(self):
-        with pytest.raises(AssertionError,
-                           match='Response has no JSON content, but expected to be not empty.'):
+        with pytest.raises(
+            AssertionError,
+            match='Response has no content, but expected to be not empty.'
+        ):
             get_api_with_mocked_response(200).is_not_empty()
+
+    # equals
+    @pytest.mark.parametrize("matcher", (
+        "Bad Request",
+        match.AnyText()
+    ))
+    def test_equals(self, matcher):
+        get_api_with_mocked_response(200, content="Bad Request") \
+            .equals(matcher)
+
+    def test_equals_asserts(self):
+        with pytest.raises(
+            AssertionError,
+            match='Response content doesn\'t match to expected'
+        ):
+            get_api_with_mocked_response(200, content="Bad Request") \
+                .equals("Page Not Found")
 
 
 class TestApiResponseHelperHeaders:

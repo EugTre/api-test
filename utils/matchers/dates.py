@@ -15,6 +15,7 @@ OFFSET_UNITS = {
     'us': 'microseconds'
 }
 
+
 def get_offset_date(date_str: str) -> datetime.datetime:
     """Parses date and return parsed date, or date defined using
     offset expression (e.g. 'now', '+2d', etc.)"""
@@ -45,7 +46,9 @@ def get_offset_date(date_str: str) -> datetime.datetime:
         amount *= -1
 
     # Return Now() with offset
-    return datetime.datetime.now(utc) + datetime.timedelta(**{unit_name: amount})
+    return datetime.datetime.now(utc) + datetime.timedelta(
+        **{unit_name: amount}
+    )
 
 
 @dataclass(frozen=True, eq=False, repr=False)
@@ -71,7 +74,8 @@ class AnyDate(BaseMatcher):
 
     @staticmethod
     def assertrepr_compare(left, right) -> list[str]:
-        """Return full list of string as explanation of why values are not equal"""
+        """Return full list of string as explanation of why values are not
+        equal"""
         output = [
             "Comparing to Any Date matcher:",
             f"{BaseMatcher.shorten_repr(left)} != {right}"
@@ -81,12 +85,14 @@ class AnyDate(BaseMatcher):
 
     @staticmethod
     def assertrepr_compare_brief(left, right) -> list[str]:
-        """Return shortened list of string as explanation of why values are not equal"""
+        """Return shortened list of string as explanation of why values are
+        not equal"""
         return [
             "Type mismatch:",
-            f"Unexpected data type of {BaseMatcher.shorten_repr(left)} (type: {type(left)}). "
-                "Only ISO formatted string is allowed."
+            f"Unexpected data type of {BaseMatcher.shorten_repr(left)} "
+            f"(type: {type(left)}). Only ISO formatted string is allowed."
         ]
+
 
 @dataclass(frozen=True, eq=False, repr=False)
 class AnyDateBefore(BaseMatcher):
@@ -134,7 +140,8 @@ class AnyDateBefore(BaseMatcher):
 
     @staticmethod
     def assertrepr_compare(left, right) -> list[str]:
-        """Return full list of string as explanation of why values are not equal"""
+        """Return full list of string as explanation of why values are
+        not equal"""
         output = [
             "Comparing to Date Before matcher:",
             f"{BaseMatcher.shorten_repr(left)} != {right}"
@@ -144,20 +151,23 @@ class AnyDateBefore(BaseMatcher):
 
     @staticmethod
     def assertrepr_compare_brief(left, right) -> list[str]:
-        """Return shortened list of string as explanation of why values are not equal"""
+        """Return shortened list of string as explanation of why values are
+        not equal"""
         eq_cache = right.eq_cache
         if not eq_cache:
             return [
                 "Type mismatch:",
-                f"Unexpected data type of {BaseMatcher.shorten_repr(left)} (type: {type(left)}). "
-                    "Only ISO formatted string is allowed."
+                f"Unexpected data type of {BaseMatcher.shorten_repr(left)} "
+                f"(type: {type(left)}). Only ISO formatted string is allowed."
             ]
 
         diff = eq_cache['other_date'] - eq_cache['self_date']
         return [
             'Date mismatch:',
-            f"{eq_cache['other_date']} is <{diff}> later than {eq_cache['self_date']} "
+            f"{eq_cache['other_date']} is <{diff}> later than "
+            f"{eq_cache['self_date']}"
         ]
+
 
 @dataclass(frozen=True, eq=False, repr=False)
 class AnyDateAfter(BaseMatcher):
@@ -206,7 +216,8 @@ class AnyDateAfter(BaseMatcher):
 
     @staticmethod
     def assertrepr_compare(left, right) -> list[str]:
-        """Return full list of string as explanation of why values are not equal"""
+        """Return full list of string as explanation of why values are
+        not equal"""
         output = [
             "Comparing to Date After matcher:",
             f"{BaseMatcher.shorten_repr(left)} != {right}"
@@ -216,20 +227,23 @@ class AnyDateAfter(BaseMatcher):
 
     @staticmethod
     def assertrepr_compare_brief(left, right: 'AnyDateAfter') -> list[str]:
-        """Return shortened list of string as explanation of why values are not equal"""
+        """Return shortened list of string as explanation of why values are
+        not equal"""
         eq_cache = right.eq_cache
         if not eq_cache:
             return [
                 "Type mismatch:",
-                f"Unexpected data type of {BaseMatcher.shorten_repr(left)} (type: {type(left)}). "
-                    "Only ISO formatted string is allowed."
+                f"Unexpected data type of {BaseMatcher.shorten_repr(left)} "
+                f"(type: {type(left)}). Only ISO formatted string is allowed."
             ]
 
         diff = eq_cache['self_date'] - eq_cache['other_date']
         return [
             'Date mismatch:',
-            f"{eq_cache['other_date']} is <{diff}> earlier than {eq_cache['self_date']} "
+            f"{eq_cache['other_date']} is "
+            f"<{diff}> earlier than {eq_cache['self_date']} "
         ]
+
 
 @dataclass(frozen=True, eq=False, repr=False)
 class AnyDateInRange(BaseMatcher):
@@ -289,15 +303,16 @@ class AnyDateInRange(BaseMatcher):
         except (ValueError, OverflowError):
             pass
 
-        if offset:
-            # TODO: TEST
-            return f'<Any Date In Range between {date_from} and {date_to} of {datetime.datetime.now(datetime.timezone.utc).isoformat()}>'
-        else:
+        if not offset:
             return f'<Any Date In Range between {date_from} and {date_to}>'
+
+        return f'<Any Date In Range between {date_from} and {date_to} of' \
+            f'{datetime.datetime.now(datetime.timezone.utc).isoformat()}>'
 
     @staticmethod
     def assertrepr_compare(left, right) -> list[str]:
-        """Return full list of string as explanation of why values are not equal"""
+        """Return full list of string as explanation of why values are not
+        equal"""
         output = [
             "Comparing to Date In Range matcher:",
             f"{BaseMatcher.shorten_repr(left)} != {right}"
@@ -307,23 +322,26 @@ class AnyDateInRange(BaseMatcher):
 
     @staticmethod
     def assertrepr_compare_brief(left, right) -> list[str]:
-        """Return shortened list of string as explanation of why values are not equal"""
+        """Return shortened list of string as explanation of why values are
+        not equal"""
         eq_cache = right.eq_cache
         if not eq_cache:
             return [
                 "Type mismatch:",
-                f"Unexpected data type of {BaseMatcher.shorten_repr(left)} (type: {type(left)}). "
-                    "Only ISO formatted string is allowed."
+                f"Unexpected data type of {BaseMatcher.shorten_repr(left)} "
+                "(type: {type(left)}). Only ISO formatted string is allowed."
             ]
 
         output = ['Date mismatch:']
         if eq_cache['self_date_from'] > eq_cache['other_date']:
             diff = eq_cache['self_date_from'] - eq_cache['other_date']
-            output.append(f"{eq_cache['other_date']} (UTC) is <{diff}> earlier than "
+            output.append(f"{eq_cache['other_date']} (UTC) is "
+                          f"<{diff}> earlier than "
                           f"{eq_cache['self_date_from']} (UTC, left limit)")
         else:
             diff = eq_cache['other_date'] - eq_cache['self_date_to']
-            output.append(f"{eq_cache['other_date']} (UTC) is <{diff}> later than "
+            output.append(f"{eq_cache['other_date']} (UTC) is "
+                          f"<{diff}> later than "
                           f"{eq_cache['self_date_to']} (UTC, right limit)")
 
         return output

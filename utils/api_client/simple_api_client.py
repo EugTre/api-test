@@ -2,7 +2,7 @@
 import os
 import uuid
 import logging
-from logging import ERROR, INFO
+from logging import ERROR, INFO, DEBUG
 from abc import ABC, abstractmethod
 
 import requests
@@ -25,10 +25,10 @@ class BaseApiClient(ABC):
             self.request_defaults['timeout'] = DEFAULT_TIMEOUT
 
         name = api_spec_as_dict.get('name', self.get_api_url())
-        self.client_id =  ApiClientIdentificator(
-            instance_id=f"{name}"\
-                f"_{os.getenv('PYTEST_XDIST_WORKER', 'master')}" \
-                f"_{os.getenv('PYTEST_XDIST_TESTRUNUID', uuid.uuid4().hex)}",
+        self.client_id = ApiClientIdentificator(
+            instance_id=f"{name}"
+            f"_{os.getenv('PYTEST_XDIST_WORKER', 'master')}"
+            f"_{os.getenv('PYTEST_XDIST_TESTRUNUID', uuid.uuid4().hex)}",
             api_name=name,
             url=self.get_api_url()
         )
@@ -64,7 +64,8 @@ class BaseApiClient(ABC):
         return '/'.join(url_path)
 
     def get_from_catalog(self, name: str) -> RequestCatalogEntity:
-        """Get `RequestCatalogEntity` from api's client request catalog by given name.
+        """Get `RequestCatalogEntity` from api's client request catalog by
+        given name.
 
         Args:
             name (str): name of the request entity
@@ -83,9 +84,10 @@ class BaseApiClient(ABC):
         if not self.logger:
             return
 
-        self.logger.log(INFO,
-            msg=f"Going to sent '{request_params['method']}' request (#{self.request_count}) "\
-                f"to {request_params['url']}",
+        self.logger.log(
+            INFO,
+            msg=f"Going to sent '{request_params['method']}' "
+                f"request (#{self.request_count}) to {request_params['url']}",
             extra=ApiLogEntity(
                 event_type=ApiRequestLogEventType.PREPARED,
                 request_id=self.request_count,
@@ -99,17 +101,23 @@ class BaseApiClient(ABC):
         if not self.logger:
             return
 
-        self.logger.log(INFO,
-            msg=f"Request (#{self.request_count}) '{response.request.method}' to "\
+        request_str = self.request_object_to_str(response.request)
+        response_str = self.response_object_to_str(response)
+        self.logger.log(
+            INFO,
+            msg=f"Request (#{self.request_count}) "
+                f"'{response.request.method}' to "
                 f"{response.request.url} completed successfully.",
             extra=ApiLogEntity(
                 event_type=ApiRequestLogEventType.SUCCESS,
                 request_id=self.request_count,
                 client_id=self.client_id,
-                request=self.request_object_to_str(response.request),
-                response=self.response_object_to_str(response)
+                request=request_str,
+                response=response_str
             )
         )
+        self.logger.log(DEBUG, "Request: %s", request_str)
+        self.logger.log(DEBUG, "Response: %s", response_str)
 
     def log_error(self, exc, response):
         """Logs error info of the unsuccessful request (exception raised)"""
@@ -130,8 +138,9 @@ class BaseApiClient(ABC):
         )
 
     def __repr__(self):
-        return f"<{self.__class__.__name__}(id='{self.client_id.instance_id}', " \
-                f"url='{self.client_id.url}')>"
+        return f"<{self.__class__.__name__}" \
+            f"(id='{self.client_id.instance_id}', " \
+            f"url='{self.client_id.url}')>"
 
     @staticmethod
     def request_object_to_str(request: requests.PreparedRequest):
@@ -150,9 +159,10 @@ class BaseApiClient(ABC):
             'method': request.method,
             'url': request.url,
             'headers': request.headers,
-            'cookies': request.headers["Cookie"]
-                       if "Cookie" in request.headers
-                       else {},
+            'cookies':
+                request.headers["Cookie"]
+                if "Cookie" in request.headers
+                else {},
             'body': request.body
         }
         return str(fields)
@@ -188,26 +198,32 @@ class BaseApiClient(ABC):
 
 class SimpleApiClient(BaseApiClient):
     """Basic API Client class and base class for inheritence.
-    Wraps `requests` module with little custom logic and logging of request & response.
+    Wraps `requests` module with little custom logic and logging of
+    request & response.
     """
-    def request(self, method: str|HTTPMethod,
+    def request(self, method: str | HTTPMethod,
                 path: str,
                 override_defaults: bool = False,
-                **params) -> requests.Response|None:
-        """Performs request with given method and paramerters to given path of API.
+                **params) -> requests.Response | None:
+        """Performs request with given method and paramerters to given
+        path of API.
         Send request and response data to logger.
 
-        Each request will be extended with defaults parameters (headers, cookies, auth, timeout)
-        from config file (e.g. api_config.ini). If 'override_defaults' flag set to True - only
-        missing parameters will be set to defaults (e.g. if 'override_defaults' is True,
-        default headers is set and request invoked with headers - only passed headers will be used)
+        Each request will be extended with defaults parameters (headers,
+        cookies, auth, timeout) from config file (e.g. api_config.ini).
+        If 'override_defaults' flag set to True - only missing parameters
+        will be set to defaults (e.g. if 'override_defaults' is True,
+        default headers is set and request invoked with headers - only
+        passed headers will be used)
 
         Args:
-            method (str or `HTTPMethod` enum): method to make a request ('get', 'post', etc.)
+            method (str or `HTTPMethod` enum): method to make a request ('get',
+            'post', etc.)
             path (str): path relative to API base url (e.g. 'v1/check')
-            override_defaults(bool): flag to override default values of API Client. If True -
-            values passed in **params will override API Client's defaults. However for params
-            that not passed - defaults will still apply.
+            override_defaults(bool): flag to override default values
+            of API Client. If True - values passed in **params will override
+            API Client's defaults. However for params that
+            not passed - defaults will still apply.
             params(): additional keyword arguments for request.
 
         Returns:
@@ -216,8 +232,9 @@ class SimpleApiClient(BaseApiClient):
         if isinstance(method, HTTPMethod):
             method = method.value
 
-        request_params = self.prepare_request_params(method,
-                                path, override_defaults, **params)
+        request_params = self.prepare_request_params(
+            method, path, override_defaults, **params
+        )
 
         self.log_request(request_params)
         response = None
@@ -233,16 +250,17 @@ class SimpleApiClient(BaseApiClient):
         return response
 
     def prepare_request_params(self, method: str, path: str,
-                                override_defaults: bool, **params) -> dict:
+                               override_defaults: bool, **params) -> dict:
         """Compose request parameters into a dictionary.
-        Sets defaults to `timeout` parameter if missign to `self.default_timeout`.
+        Sets defaults to `timeout` parameter if missign to
+        `self.default_timeout`.
 
         Args:
             method (str): method name ('get', 'post', etc.).
             path (str): path relative to API base url (e.g. 'v1/check').
-            override_defaults (bool): flag to override params if given; if True -
-            given params will be used as is; otherwise given params will be
-            appended/set with values from request_defaults.
+            override_defaults (bool): flag to override params if given;
+            if True - given params will be used as is; otherwise given
+            params will be appended/set with values from request_defaults.
 
         Returns:
             dict: dictionary of the request parameters.
@@ -256,8 +274,8 @@ class SimpleApiClient(BaseApiClient):
         # If param is set and no override required - combine request
         # values with defaults.
         # If param is not set in request - apply default.
-        # So to override Client's defaults - one should just set 'header'/'cookies'
-        # with any value.
+        # So to override Client's defaults - one should just
+        # set header/cookies with any value.
         for param in ('headers', 'cookies'):
             default = self.request_defaults.get(param)
 
@@ -269,16 +287,18 @@ class SimpleApiClient(BaseApiClient):
             else:
                 request_params[param] = default
 
-        # Auth param will be set to defaults if not set in request, but never overwritten
-        if not 'auth' in request_params:
+        # Auth param will be set to defaults if not set in request,
+        # but never overwritten
+        if 'auth' not in request_params:
             request_params['auth'] = self.request_defaults.get('auth')
 
-        if not 'timeout' in request_params:
+        if 'timeout' not in request_params:
             request_params['timeout'] = self.request_defaults.get('timeout')
 
         return request_params
 
-    def _combine_values(self, request_value: dict, default_value: dict) -> None:
+    def _combine_values(self, request_value: dict, default_value: dict
+                        ) -> None:
         """Safely merges 2 dictionaries (without overriding 'request_value').
         Used to apply config level params to request.
 
