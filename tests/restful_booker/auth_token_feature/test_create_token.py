@@ -42,7 +42,49 @@ class TestCreateToken:
             response.validates_against_schema() \
                 .headers.are_like()
 
+    @allure.title("HEAD method returns headers only")
+    @allure.severity(allure.severity_level.MINOR)
+    @pytest.mark.xfail(reason="API returns 404 Not Found")
+    def test_head(self, api_request: ApiRequestHelper):
+        """HEAD method returns headers only"""
+        with given("request with no payload"):
+            pass
+
+        with when("HEAD request performed with 200 OK"):
+            response = api_request.by_name("Auth") \
+                .with_method(HTTPMethod.HEAD) \
+                .with_json_payload(None) \
+                .perform()
+
+        with then("response should be headers only"):
+            response.is_empty() \
+                .headers.present("Content-Type", "Date")
+
+    @allure.title("OPTIONS method returns supported methods")
+    @allure.severity(allure.severity_level.MINOR)
+    def test_options(self, api_request: ApiRequestHelper):
+        """OPTIONS method returns headers only"""
+        with given("request with no payload"):
+            pass
+
+        with when("OPTIONS request performed with 200 OK"):
+            response = api_request.by_name("Auth") \
+                .with_method(HTTPMethod.OPTIONS) \
+                .with_json_payload(None) \
+                .perform()
+
+        with then("supported methods reported in the response"):
+            response.equals('POST') \
+                .headers.are_like({"Allow": "POST"})
+
+
+@allure.epic("Restful-Booker API")
+@allure.feature("Auth Token")
+@allure.story('Token creation')
+@allure.tag('negative')
+class TestCreateTokenNegative:
     # title("No token creation on empty fields")
+
     @pytest.mark.parametrize("username, password", (
         pytest.param("", "",            id="Empty-Empty"),
         pytest.param("user", "",        id="user-Empty"),
@@ -79,6 +121,7 @@ class TestCreateToken:
                 .json.equals()
 
     # title("No token creation on missing fields")
+    # @allure.tag('negative')
     @pytest.mark.parametrize("payload", (
         pytest.param({}, id="No_Fields"),
         pytest.param({"username": "user"}, id="User_Field_Only"),
@@ -110,6 +153,7 @@ class TestCreateToken:
                 .json.equals()
 
     # title("No token creation on non-string creds")
+    # @allure.tag('negative')
     @pytest.mark.parametrize("username, password", (
         pytest.param(142, "pass",        id="Number-String"),
         pytest.param(True, "pass",       id="Bool-String"),
@@ -150,7 +194,34 @@ class TestCreateToken:
                 .headers.are_like() \
                 .json.equals()
 
+    @allure.title("Request with "
+                  "unsupported method \"{method}\" is handled")
+    @allure.severity(allure.severity_level.MINOR)
+    # @allure.tag('negative')
+    @pytest.mark.parametrize("method", (
+        HTTPMethod.GET,
+        HTTPMethod.PUT,
+        HTTPMethod.PATCH,
+        HTTPMethod.DELETE
+    ))
+    def test_unsupported_methods(self, method: HTTPMethod,
+                                 api_request: ApiRequestHelper):
+        """Unsupported method should return 400-like error code"""
+
+        with given(f"unsupported request method {method}"):
+            api_request.by_name("Auth_UnsupportedMethod") \
+                       .with_json_payload(None) \
+                       .with_method(method)
+
+        with when("request performed with 404 status code"):
+            response = api_request.perform()
+
+        with then("error message is returned"):
+            response.equals()
+
     # title("Request with malformed payload is handled")
+    @allure.severity(allure.severity_level.MINOR)
+    # @allure.tag('negative')
     @pytest.mark.parametrize("payload", (
         '{"username": "user", "password": "password", }',
         '{"username", "pasword"}',
@@ -166,7 +237,7 @@ class TestCreateToken:
         """Token creation fails if credentials are missing"""
 
         allure.dynamic.title(
-            f"No token creation on invalid fields data types [{test_id}]"
+            f"Request with malformed payload is handled [{test_id}]"
         )
 
         with given('malformed payload'):
@@ -180,54 +251,4 @@ class TestCreateToken:
                 .perform()
 
         with then("response contain only error message"):
-            response.equals("Bad Request") \
-                .headers.are_like({
-                    "Content-Type": "text/plain; charset=utf-8"
-                })
-
-    @allure.title("HEAD method returns headers only")
-    @pytest.mark.xfail(reason="API returns 404 Not Found")
-    def test_head(self, api_request: ApiRequestHelper):
-        """HEAD method returns headers only"""
-        with given("request with no payload"):
-            pass
-
-        with when("HEAD request performed with 200 OK"):
-            response = api_request.by_name("Auth") \
-                .with_method(HTTPMethod.HEAD) \
-                .with_json_payload(None) \
-                .perform()
-
-        with then("response should be headers only"):
-            response.is_empty() \
-                .headers.present("Content-Type", "Date")
-
-    @allure.title("OPTIONS method returns supported methods")
-    def test_options(self, api_request: ApiRequestHelper):
-        """OPTIONS method returns headers only"""
-        with given("request with no payload"):
-            pass
-
-        with when("OPTIONS request performed with 200 OK"):
-            response = api_request.by_name("Auth") \
-                .with_method(HTTPMethod.OPTIONS) \
-                .with_json_payload(None) \
-                .perform()
-
-        with then("supported methods reported in the response"):
-            response.equals('POST') \
-                .headers.are_like({
-                    "Allow": "POST"
-                })
-
-    # title("Request with unsupported method is handled")
-    @pytest.mark.parametrize("method", (
-        HTTPMethod.GET,
-        HTTPMethod.PUT,
-        HTTPMethod.PATCH,
-        HTTPMethod.DELETE
-    ))
-    def test_unsupported_methods(self, method: HTTPMethod,
-                                 api_request: ApiRequestHelper):
-        # TBD
-        pass
+            response.equals()

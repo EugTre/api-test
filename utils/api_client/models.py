@@ -119,6 +119,7 @@ class ResponseEntity:
     status_code: int
     schema: dict = None
     json: dict | list = None
+    text: str | None = None
     headers: dict = None
 
 

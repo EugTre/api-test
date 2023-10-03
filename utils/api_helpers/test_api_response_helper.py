@@ -11,6 +11,7 @@ from requests.models import Response
 
 import utils.matchers.matcher as match
 from utils.json_content.json_content import JsonContent, JsonContentBuilder
+from utils.api_client.models import ResponseEntity
 from .api_response_helper import ApiResponseHelper
 
 
@@ -106,7 +107,7 @@ HEADERS_DETAILED = {
 
 # --- Fixtures and functions
 def get_api_with_mocked_response(status_code: int,
-                content: str = None,  json_content: dict|list = None,
+                content: str = None,  json_content: dict | list = None,
                 headers: dict = None, cookies: dict = None,
                 latency: int = None) -> ApiResponseHelper:
     """Creates ApiResponseHelper with mocked `requests.models.Response` object
@@ -205,6 +206,49 @@ class TestApiResponseHelperBasic:
         api_resp = get_api_with_mocked_response(200, json_content=PAYLOAD_DETAILED)
         assert api_resp.get_json_value(pointer) == expected
 
+    def test_set_expected(self):
+        """.set_expected() method set expected values"""
+        expected_response = ResponseEntity(
+            status_code=404,
+            schema={'schema': 'foobar'},
+            json={'Foo': 'Bar'},
+            text='foobar',
+            headers={'Foo': 'Baz'}
+        )
+        response: ApiResponseHelper = get_api_with_mocked_response(200)
+        response.set_expected(
+            status_code=expected_response.status_code,
+            schema=expected_response.schema,
+            headers=expected_response.headers,
+            json=expected_response.json,
+            text=expected_response.text,
+        )
+
+        assert response.expected_status_code == expected_response.status_code
+        assert response.schema == expected_response.schema
+        assert response.expected_text == expected_response.text
+        assert response.headers.expected == expected_response.headers
+        assert response.json.expected == expected_response.json
+
+    def test_set_expected_by_response_object(self):
+        """.set_expected() method set expected values by
+        passing ResponseEntity objet"""
+        expected_response = ResponseEntity(
+            status_code=404,
+            schema={'schema': 'foobar'},
+            json={'Foo': 'Bar'},
+            text='foobar',
+            headers={'Foo': 'Baz'}
+        )
+        response: ApiResponseHelper = get_api_with_mocked_response(200)
+        response.set_expected(expected_response=expected_response)
+
+        assert response.expected_status_code == expected_response.status_code
+        assert response.schema == expected_response.schema
+        assert response.expected_text == expected_response.text
+        assert response.headers.expected == expected_response.headers
+        assert response.json.expected == expected_response.json
+
 
 class TestApiResponseHelperGeneral:
     """Response general validation methods tests"""
@@ -221,13 +265,13 @@ class TestApiResponseHelperGeneral:
             get_api_with_mocked_response(404).status_code_equals(200)
 
     # validate_against_schema(schema)
-    def test_valudate_against_schema(self, api_response_simple: ApiResponseHelper):
+    def test_validate_against_schema(self, api_response_simple: ApiResponseHelper):
         api_response_simple.validates_against_schema(JSONSCHEMA_SIMPLE)
 
     def test_set_expected_and_valudate_against_schema(self, api_response_simple: ApiResponseHelper):
         api_response_simple.set_expected(schema=JSONSCHEMA_SIMPLE).validates_against_schema()
 
-    def test_valudate_against_schema_asserts(self, api_response_simple: ApiResponseHelper):
+    def test_validate_against_schema_asserts(self, api_response_simple: ApiResponseHelper):
         with pytest.raises(jsonschema.exceptions.ValidationError):
             api_response_simple.validates_against_schema(JSONSCHEMA_DETAILED)
 
@@ -268,16 +312,24 @@ class TestApiResponseHelperGeneral:
         match.AnyText()
     ))
     def test_equals(self, matcher):
+        """Test .equals() not asserts on matching content"""
         get_api_with_mocked_response(200, content="Bad Request") \
             .equals(matcher)
 
     def test_equals_asserts(self):
+        """Test .equals() asserts on not-matching text"""
         with pytest.raises(
             AssertionError,
             match='Response content doesn\'t match to expected'
         ):
             get_api_with_mocked_response(200, content="Bad Request") \
                 .equals("Page Not Found")
+
+    def test_set_expected_text_and_equals(self):
+        """Test .equals() method use expected text to compare"""
+        resp = get_api_with_mocked_response(200, content="Bad Request")
+        resp.set_expected(text="Bad Request")
+        resp.equals()
 
 
 class TestApiResponseHelperHeaders:

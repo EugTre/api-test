@@ -86,7 +86,8 @@ def test_api_config_reader_request_catalog_required_only_no_references(get_file)
                 "status_code": 200,
                 "schema": None,
                 "json": None,
-                "headers": None
+                "headers": None,
+                "text": None
             }
 
 def test_api_config_reader_request_catalog_full_no_references(get_file):
@@ -116,7 +117,8 @@ def test_api_config_reader_request_catalog_full_no_references(get_file):
                 "status_code": 200,
                 "schema": {"a": "b"},
                 "json": {"item2": 2},
-                "headers": {"key3": "value3"}
+                "headers": {"key3": "value3"},
+                "text": None
             }
         }
     }

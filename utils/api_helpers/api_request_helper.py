@@ -298,10 +298,12 @@ class ApiRequestHelper:
         return self
 
     @expect_initialized
-    def with_expected(self, status_code: int = None,
-                      schema: dict = None,
-                      headers: JsonContent | dict = None,
-                      json: JsonContent | dict | list = None) -> Self:
+    def with_expected(self,
+                      status_code: int | None = None,
+                      schema: dict | None = None,
+                      headers: JsonContent | dict | None = None,
+                      json: JsonContent | dict | list | None = None,
+                      text: str | None = None) -> Self:
         """Sets expected response data.
 
         Args:
@@ -316,14 +318,16 @@ class ApiRequestHelper:
         Returns:
             Self: instance of `ApiRequestHelper` class
         """
-        if status_code:
+        if status_code is not None:
             self.expected.status_code = status_code
-        if headers:
+        if headers is not None:
             self.expected.headers = headers
-        if json:
+        if json is not None:
             self.expected.json = json
-        if schema:
+        if schema is not None:
             self.expected.schema = schema
+        if text is not None:
+            self.expected.text = text
 
         return self
 

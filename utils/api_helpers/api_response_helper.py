@@ -1,6 +1,7 @@
 """Response helper and test wrapper"""
 
 from typing import Self, Any
+from dataclasses import asdict
 from requests import Response, exceptions as requests_exceptions
 from requests.models import CaseInsensitiveDict
 
@@ -84,7 +85,7 @@ class ResponseHeadersValidator:
 
         return self.response_helper
 
-    @allure.step('Check that headers match to given')
+    @allure.step('Response headers match to given')
     def equals(self, headers: dict[str, str] = None, ignore: tuple = None
                ) -> 'ApiResponseHelper':
         """Check of response headers to be equal to given.
@@ -124,7 +125,7 @@ class ResponseHeadersValidator:
 
         return self.response_helper
 
-    @allure.step('Check headers are present in response.')
+    @allure.step('Response headers are present')
     def present(self, *headers_to_check: str) -> 'ApiResponseHelper':
         """Checks that response contains all given headers.
         If headers not passed as parameter - headers from
@@ -146,12 +147,13 @@ class ResponseHeadersValidator:
         missing_headers = [header for header in headers_to_check
                            if header not in self.headers]
 
-        assert not missing_headers, 'Some headers are not present, but expected to be. '\
-                                f'Missing headers: {", ".join(missing_headers)}'
+        assert not missing_headers, \
+            'Some headers are not present, but expected to be. '\
+            f'Missing headers: {", ".join(missing_headers)}'
 
         return self.response_helper
 
-    @allure.step('Check that headers aren\'t present in response.')
+    @allure.step('Response headers aren\'t present in response')
     def not_present(self, *headers_to_check: str) -> 'ApiResponseHelper':
         """Checks that response doesn't contain any of given headers.
         Assertion is case insensitive.
@@ -165,14 +167,14 @@ class ResponseHeadersValidator:
         present = [header for header in headers_to_check
                    if header in self.headers]
 
-        assert not present, 'Some headers are present, but expected not to be. '\
-                                f'Headers: {", ".join(present)}'
+        assert not present, 'Some headers are present, but expected ' \
+            f'not to be. Headers: {", ".join(present)}'
 
         return self.response_helper
 
-    @allure.step('Check that header "{header}" contains substring "{value}"')
+    @allure.step('Response header "{header}" contains substring "{value}"')
     def header_contains(self, header: str, value: str,
-                case_sensitive: bool = False) -> 'ApiResponseHelper':
+                        case_sensitive: bool = False) -> 'ApiResponseHelper':
         """Checks that given header is present and it's value contains given
         substring 'value'.
 
@@ -199,9 +201,9 @@ class ResponseHeadersValidator:
 
         return self.response_helper
 
-    @allure.step('Check that header "{header}" equals to "{value}"')
+    @allure.step('Response header "{header}" equals to "{value}"')
     def header_equals(self, header: str, value: str,
-                    case_sensitive: bool = False) -> 'ApiResponseHelper':
+                      case_sensitive: bool = False) -> 'ApiResponseHelper':
         """Checks that given header is present and it's value equals
         to given 'value'.
 
@@ -229,8 +231,9 @@ class ResponseHeadersValidator:
         return self.response_helper
 
     def __get(self, case_sensitive: bool = False) -> dict:
-        """Returns response's headers. If flag 'case_sensitive' is set to False -
-        returns all lowercase version of the headers (both keys and values).
+        """Returns response's headers. If flag 'case_sensitive' is
+        set to False - returns all lowercase version of the headers
+        (both keys and values).
 
         Args:
             case_sensitive (bool, optional): flag to return headers as
@@ -251,26 +254,30 @@ class ResponseHeadersValidator:
             return headers
 
         if not self.expected:
-            raise ValueError("There is no headers to compare - "\
-                    "headers must be passed as argument, "\
-                    "via .set_exepcted() method or defined in Request Catalog.")
+            raise ValueError(
+                "There is no headers to compare - "
+                "headers must be passed as argument, "
+                "via .set_exepcted() method or defined in Request Catalog."
+            )
 
         return self.expected
 
 
 class ResponseBodyJsonValidatior:
     """Provide methods to validate JSON body of the repsonse"""
-    def __init__(self, api_response_helper: 'ApiResponseHelper', response_json: dict|None):
+    def __init__(self, api_response_helper: 'ApiResponseHelper',
+                 response_json: dict | None) -> None:
         self.response_helper: 'ApiResponseHelper' = api_response_helper
-        self.content: JsonContent|None = None
-        self.expected: JsonContent|None = None
+        self.content: JsonContent | None = None
+        self.expected: JsonContent | None = None
 
         if response_json is not None:
             self.content = JsonContentBuilder() \
                             .from_data(response_json) \
                             .build()
 
-    def set_expected(self, json_content: dict|JsonContent) -> 'ApiResponseHelper':
+    def set_expected(self, json_content: dict | JsonContent
+                     ) -> 'ApiResponseHelper':
         """Sets expected JSON content to test against in various methods.
 
         Args:
@@ -289,23 +296,26 @@ class ResponseBodyJsonValidatior:
     # -------
     # Overall JSON validation
     # -------
-    @allure.step('Response JSON content equals to given')
-    def equals(self, json: JsonContent|dict|list = None,
-                    ignore: tuple = None) -> 'ApiResponseHelper':
+    @allure.step('Response JSON content equals to expected')
+    def equals(self, json: JsonContent | dict | list = None,
+               ignore: tuple = None) -> 'ApiResponseHelper':
         """"Compare JSON of response with given one or expected.
 
         Asserts that:
-        - all keys from passed 'json' are present in response, except params listed in 'ignore'
+        - all keys from passed 'json' are present in response, except params
+        listed in 'ignore'
         - there is no extra keys in response, except params listed in 'ignore'
         - values are excatly the same for all checked params
 
         Wrapped with Allure.Step.
 
         Args:
-            json (JsonContent | dict | list, optional): JSON content to compare with.
-            Defaults to None and content set via .set_expected() will be used.
-            ignore (tuple, optional): JSON pointers to fields that should be excluded
-            from comparison (e.g. ('/status', '/message/0')). Defaults to None.
+            json (JsonContent | dict | list, optional): JSON content to
+            compare with. Defaults to None and content set via .set_expected()
+            will be used.
+            ignore (tuple, optional): JSON pointers to fields that should be
+            excluded from comparison (e.g. ('/status', '/message/0')).
+            Defaults to None.
 
         Raises:
             ValueError: If given JSON Pointers have invalid syntax.
@@ -326,7 +336,7 @@ class ResponseBodyJsonValidatior:
             builder = JsonContentBuilder()
             response_json = builder.from_data(response_json, True)\
                 .build().delete(*ignore).get()
-            json =  builder.from_data(json, True)\
+            json = builder.from_data(json, True)\
                 .build().delete(*ignore).get()
 
         with allure.step(f"Check JSON to be equal to {desc}"):
@@ -335,8 +345,9 @@ class ResponseBodyJsonValidatior:
 
         return self.response_helper
 
-    @allure.step('Validate response JSON content is like expected')
-    def is_like(self, json: JsonContent|dict|list = None) -> 'ApiResponseHelper':
+    @allure.step('Response JSON content is like expected')
+    def is_like(self, json: JsonContent | dict | list = None
+                ) -> 'ApiResponseHelper':
         """Weak comparison of given JSON with response's JSON.
         Use `utils.matchers.AbstactMatcher` as values to check only
         datatypes/approximate values.
@@ -346,7 +357,8 @@ class ResponseBodyJsonValidatior:
         - given values are equal
 
         Args:
-            json (JsonContent | dict | list, optional): JSON content to compare with.
+            json (JsonContent | dict | list, optional): JSON content to
+            compare with.
             Defaults to None and content set via .set_expected() will be used.
 
         Returns:
@@ -359,7 +371,8 @@ class ResponseBodyJsonValidatior:
 
         failed = []
         on_key_missing = 'pointer "{ptr}" is missing'
-        on_value_mismatch = 'value at pointer "{ptr}" = {value} (of type: {value_type}) ' \
+        on_value_mismatch = 'value at pointer "{ptr}" = {value} ' \
+                            '(of type: {value_type}) ' \
                             'doesn\'t match to expected value '\
                             '{expected_value} (of type: {expected_value_type})'
         for ptr, value in json:
@@ -372,23 +385,24 @@ class ResponseBodyJsonValidatior:
             if actual_value != value:
                 failed.append(
                     on_value_mismatch.format(
-                        ptr = ptr,
-                        value = actual_value,
-                        value_type = type(actual_value),
-                        expected_value = value,
-                        expected_value_type = type(value)
+                        ptr=ptr,
+                        value=actual_value,
+                        value_type=type(actual_value),
+                        expected_value=value,
+                        expected_value_type=type(value)
                     )
                 )
 
         failed_explanation = "\n- ".join(failed) if failed else None
-        assert not failed, f'JSON content is not like given: \n- {failed_explanation}'
+        assert not failed, \
+            f'JSON content is not like given: \n- {failed_explanation}'
 
         return self.response_helper
 
     # -------
     # Params validation
     # -------
-    @allure.step('Check response has params "{pointers}"')
+    @allure.step('Response has params "{pointers}"')
     def params_present(self, *pointers: str) -> 'ApiResponseHelper':
         """Checks that param is present in response
 
@@ -408,7 +422,7 @@ class ResponseBodyJsonValidatior:
 
         return self.response_helper
 
-    @allure.step('Check response has no param "{pointers}"')
+    @allure.step('Response doesn\t has params "{pointers}"')
     def params_not_present(self, *pointers: str) -> 'ApiResponseHelper':
         """Checks that param is not present in response.
 
@@ -429,7 +443,7 @@ class ResponseBodyJsonValidatior:
 
         return self.response_helper
 
-    @allure.step('Check response has non-empty param "{pointers}"')
+    @allure.step('Response has non-empty params "{pointers}"')
     def params_are_not_empty(self, *pointers: str) -> 'ApiResponseHelper':
         """Checks that value at given keylist is not empty or null.
 
@@ -452,19 +466,24 @@ class ResponseBodyJsonValidatior:
 
             value = self.content.get(ptr)
             # Empty is None or empty str/dict/list
-            if value is None or (isinstance(value, (str, dict, list)) and not value):
-                value_msg = f'"{value}"' if isinstance(value, str) else str(value)
+            if any((
+                value is None,
+                isinstance(value, (str, dict, list)) and not value
+            )):
+                value_msg = f'"{value}"' \
+                            if isinstance(value, str) else \
+                            str(value)
                 failed.append(f'param "{ptr}" is empty (value={value_msg})')
-
 
         failed_explanation = "\n- ".join(failed) if failed else None
         assert not failed, \
-            'Params are empty or missing, but expected to present and be not empty:\n' \
+            'Params are empty or missing, but expected to present and ' \
+            'be not empty:\n' \
             f'- {failed_explanation}'
 
         return self.response_helper
 
-    @allure.step('Check response has empty param "{pointers}"')
+    @allure.step('Response has empty params "{pointers}"')
     def params_are_empty(self, *pointers: str) -> 'ApiResponseHelper':
         """Checks that value at given keylist is empty.
 
@@ -495,18 +514,22 @@ class ResponseBodyJsonValidatior:
                 isinstance(value, (bool, int, float)),
                 isinstance(value, (str, dict, list)) and value
             )):
-                value_msg = f'"{value}"' if isinstance(value, str) else str(value)
-                failed.append(f'param "{ptr}" is not empty (value={value_msg})')
-
+                value_msg = f'"{value}"' \
+                            if isinstance(value, str) else \
+                            str(value)
+                failed.append(
+                    f'param "{ptr}" is not empty (value={value_msg})'
+                )
 
         failed_explanation = "\n- ".join(failed) if failed else None
         assert not failed, \
-            'Params are not empty or missing, but expected to present and be empty:\n' \
+            'Params are not empty or missing, but expected to present and ' \
+            'be empty:\n' \
             f'- {failed_explanation}'
 
         return self.response_helper
 
-    @allure.step('Check response has param "{pointer}" = {value}')
+    @allure.step('Response param "{pointer}" = {value}')
     def param_equals(self, pointer: str, value: Any) -> 'ApiResponseHelper':
         """Checks that given key has value equal to given.
         Use `utils.matchers` for inaccurate comparison.
@@ -518,7 +541,8 @@ class ResponseBodyJsonValidatior:
         Raises:
             AssertionError: when value is not equals to given.
             ValueError: if JSON Pointer has invalid syntax.
-            KeyError/IndexError: if pointer refers to non-existsend key/out of range index.
+            KeyError/IndexError: if pointer refers to non-existsend key/out of
+            range index.
 
         Returns:
             Instance of `ApiResponseHelper` class.
@@ -535,17 +559,21 @@ class ResponseBodyJsonValidatior:
         return self
 
     # Private functions
-    def __get_default_if_none(self, json: JsonContent|dict|None = None) -> JsonContent|dict:
+    def __get_default_if_none(self, json: JsonContent | dict | None = None
+                              ) -> JsonContent | dict:
         """Checks that given 'json' value and:
         - returns given value is it's not None
         - returns default expected JSON is it's None and expected is set
-        - raises ValueError if bot given value and default expected value are None
+        - raises ValueError if bot given value and default expected value are
+        None
 
         Args:
-            json (JsonContent | dict | None, optional): JSON value to check. Defaults to None.
+            json (JsonContent | dict | None, optional): JSON value to check.
+            Defaults to None.
 
         Raises:
-            ValueError: if both given and default values are not defined (None).
+            ValueError: if both given and default values are
+            not defined (None).
 
         Returns:
             JsonContent|dict: given value or default expected value.
@@ -553,9 +581,10 @@ class ResponseBodyJsonValidatior:
         if json is not None:
             return json
 
-        if self.expected is  None:
+        if self.expected is None:
             raise ValueError(
-                'There is no JSON to compare - expected JSON must be passed as argument, '
+                'There is no JSON to compare - expected JSON'
+                'must be passed as argument, '
                 'via .set_exepcted() method or defined in Request Catalog.'
             )
         return self.expected
@@ -569,6 +598,7 @@ class ApiResponseHelper:
         self.response_object = response
 
         self.expected_status_code = 200
+        self.expected_text = None
         self.schema = None
 
         try:
@@ -576,39 +606,41 @@ class ApiResponseHelper:
         except requests_exceptions.JSONDecodeError:
             json_of_response = None
 
-        self.headers = ResponseHeadersValidator(self, self.response_object.headers)
+        self.headers = ResponseHeadersValidator(self,
+                                                self.response_object.headers)
         self.json = ResponseBodyJsonValidatior(self, json_of_response)
 
     # Setup functions
     def set_expected(self,
-                     status_code: int = None,
-                     schema: dict = None,
-                     headers: dict = None,
-                     json: JsonContent|dict|list = None,
-                     expected_response: ResponseEntity = None) -> Self:
-        """Sets expected response data for futher use as defaults in validation methods.
+                     status_code: int | None = None,
+                     schema: dict | None = None,
+                     headers: dict | None = None,
+                     json: JsonContent | dict | list | None = None,
+                     text: str | None = None,
+                     expected_response: ResponseEntity | None = None) -> Self:
+        """Sets expected response data for futher use as defaults
+        in validation methods.
 
         Args:
-            status_code (int, optional): expected status code. Defaults to None.
+            status_code (int, optional): expected status code.
+            Defaults to None.
             schema (dict, optional): expected JSON schema. Defaults to None.
-            headers (JsonContent | dict, optional): expected headers. Defaults to None.
-            json (JsonContent | dict | list, optional): expected JSON content. Defaults to None.
-            expected_response (utils.api_client.models.ResponseEntity): expected response params.
+            headers (JsonContent | dict, optional): expected headers.
+            Defaults to None.
+            json (JsonContent | dict | list, optional): expected JSON content.
+            Defaults to None.
+            expected_response (utils.api_client.models.ResponseEntity):
+            expected response params.
             Defaults to None.
 
         Returns:
             Self: instance of `ApiResponseHelper` class
         """
 
-        # Apply data from response entity (e.g. from pre-configured expected response)
-        # if passed.
+        # Apply data from response entity if passed.
+        # (e.g. from pre-configured expected response)
         if expected_response:
-            self.set_expected(
-                status_code=expected_response.status_code,
-                schema=expected_response.schema,
-                headers=expected_response.headers,
-                json=expected_response.json
-            )
+            self.set_expected(**asdict(expected_response))
 
         # Then apply specific values
         if status_code is not None:
@@ -620,6 +652,9 @@ class ApiResponseHelper:
             self.json.set_expected(json)
         if headers is not None:
             self.headers.set_expected(headers)
+        if text is not None:
+            allure.dynamic.parameter('Expected content', text)
+            self.expected_text = text
 
         return self
 
@@ -697,15 +732,15 @@ class ApiResponseHelper:
 
         with allure.step(f'Response status code is {status_code}'):
             assert status_code == self.response_object.status_code, \
-                   f'Response status code {self.response_object.status_code} doesn\'t '\
-                   f'match to expected code {status_code}.'
+                   f'Response status code {self.response_object.status_code}' \
+                   f'doesn\'t match to expected code {status_code}.'
 
         return self
 
     @allure.step("Response is validated against JSON schema")
     def validates_against_schema(self, schema: dict = None) -> Self:
-        """Validates response against given JSONSchema or schema from request config,
-        if pre-configured request was made.
+        """Validates response against given JSONSchema or schema
+        from request config, if pre-configured request was made.
         Wrapped with Allure.Step.
 
         Args:
@@ -724,8 +759,10 @@ class ApiResponseHelper:
 
         if schema is None:
             if self.schema is None:
-                raise ValueError('JSONSchema is not defined nor in request config, '
-                             'nor in method! Validation is not possible.')
+                raise ValueError(
+                    'JSONSchema is not defined nor in request config, '
+                    'nor in method! Validation is not possible.'
+                )
 
             desc = "pre-defined"
             schema = self.schema
@@ -735,7 +772,7 @@ class ApiResponseHelper:
 
         return self
 
-    @allure.step('Check response is empty')
+    @allure.step('Response is empty')
     def is_empty(self) -> Self:
         """Checks that response content is empty.
 
@@ -747,7 +784,7 @@ class ApiResponseHelper:
 
         return self
 
-    @allure.step('Check response is not empty')
+    @allure.step('Response is not empty')
     def is_not_empty(self) -> Self:
         """Checks that response content is not empty.
 
@@ -759,8 +796,8 @@ class ApiResponseHelper:
 
         return self
 
-    @allure.step('Check response equals')
-    def equals(self, text: str | BaseMatcher) -> Self:
+    @allure.step('Response equals to given')
+    def equals(self, text: str | BaseMatcher | None = None) -> Self:
         """Checks that response content equals to given.
         Args:
             text (str | BaseMatcher): text to compare with or
@@ -771,12 +808,24 @@ class ApiResponseHelper:
         """
         self.is_not_empty()
 
-        assert self.response_object.text == text, \
-            'Response content doesn\'t match to expected'
+        desc = "pre-defined" if text is None else "given"
+        if text is None:
+            if self.expected_text is None:
+                raise ValueError(
+                    "There is no text to compare - "
+                    "text must be passed as argument, "
+                    "via .set_exepcted() method or defined in Request Catalog."
+                )
+
+            text = self.expected_text
+
+        with allure.step(f'Compare response body to be equal to {desc}'):
+            assert self.response_object.text == text, \
+                'Response content doesn\'t match to expected'
 
         return self
 
-    @allure.step('Check response latency is lower than {latency} ms')
+    @allure.step('Response latency is lower than {latency} ms')
     def latency_is_lower_than(self, latency: int) -> Self:
         """Checks that request lasted no longer than given latency.
 
@@ -787,7 +836,8 @@ class ApiResponseHelper:
             Self: instance of class `ApiResponseHelper`
         """
 
-        response_latency = int(self.response_object.elapsed.microseconds / 1000)
+        latensy_micro = self.response_object.elapsed.microseconds
+        response_latency = int(latensy_micro // 1000)
         assert response_latency <= latency, \
             f'Response latency of {response_latency} ms is higher '\
             f'than expected {latency} ms'
@@ -802,7 +852,8 @@ class ApiResponseHelper:
             pointer (str): JSON pointer to param.
 
         Raises:
-            IndexError: on attempt to get element of list by out of bound index.
+            IndexError: on attempt to get element of list by out of
+            bound index.
             KeyError: when pointer uses non-existent node.
 
         Returns:

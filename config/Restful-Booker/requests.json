@@ -17,8 +17,8 @@
             "method": "POST",
             "path": "/auth",
             "json": {
-                "username": { "!gen": "Username" },
-                "password": { "!gen": "Password" }
+                "username": "admin",
+                "password": "password123"
             }
         },
         "response": {
@@ -41,13 +41,24 @@
     "Auth_BadRequest": {
         "request": {
             "method": "POST",
-            "path": "/auth",
+            "path": { "!ref": "/Auth/request/path" },
             "headers": {
                 "Content-Type": "application/json"
             }
         },
         "response": {
-            "status_code": 400
+            "status_code": 400,
+            "text": "Bad Request"
+        }
+    },
+    "Auth_UnsupportedMethod": {
+        "request": {
+            "method": "POST",
+            "path": { "!ref": "/Auth/request/path" }
+        },
+        "response": {
+            "status_code": 404,
+            "text": "Not Found"
         }
     },
 
