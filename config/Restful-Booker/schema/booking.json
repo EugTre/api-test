@@ -21,7 +21,7 @@
                         "format": "date"
                     }
                 },
-                "required": ["checkin", "ckeckout"],
+                "required": ["checkin", "checkout"],
                 "additionalProperties": false
             }
         },

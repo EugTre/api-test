@@ -1,7 +1,6 @@
 """Response helper and test wrapper"""
 
 from typing import Self, Any
-from dataclasses import asdict
 from requests import Response, exceptions as requests_exceptions
 from requests.models import CaseInsensitiveDict
 
@@ -323,6 +322,8 @@ class ResponseBodyJsonValidatior:
         Returns:
             Instance of `ApiResponseHelper` class.
         """
+        self.response_helper.is_not_empty()
+
         desc = "pre-defined" if json is None else "given"
         json = self.__get_default_if_none(json)
 
@@ -364,6 +365,8 @@ class ResponseBodyJsonValidatior:
         Returns:
             Instance of `ApiResponseHelper` class.
         """
+        self.response_helper.is_not_empty()
+
         json = self.__get_default_if_none(json)
 
         if not isinstance(json, JsonContent):
@@ -416,6 +419,8 @@ class ResponseBodyJsonValidatior:
         Returns:
             Instance of `ApiResponseHelper` class.
         """
+        self.response_helper.is_not_empty()
+
         failed = [ptr for ptr in pointers if ptr not in self.content]
         assert not failed, 'Params are not present, ' \
             f'but expected to be: {", ".join(failed)}'
@@ -436,6 +441,7 @@ class ResponseBodyJsonValidatior:
         Returns:
             Instance of `ApiResponseHelper` class.
         """
+        self.response_helper.is_not_empty()
 
         failed = [ptr for ptr in pointers if ptr in self.content]
         assert not failed, 'Params are present, ' \
@@ -457,6 +463,7 @@ class ResponseBodyJsonValidatior:
         Returns:
             Instance of `ApiResponseHelper` class.
         """
+        self.response_helper.is_not_empty()
 
         failed = []
         for ptr in pointers:
@@ -499,6 +506,7 @@ class ResponseBodyJsonValidatior:
         Returns:
             Instance of `ApiResponseHelper` class.
         """
+        self.response_helper.is_not_empty()
 
         failed = []
         for ptr in pointers:
@@ -547,6 +555,7 @@ class ResponseBodyJsonValidatior:
         Returns:
             Instance of `ApiResponseHelper` class.
         """
+        self.response_helper.is_not_empty()
 
         assert pointer in self.content, \
             f'Param "{pointer}" is missing in the response JSON.'
@@ -640,7 +649,15 @@ class ApiResponseHelper:
         # Apply data from response entity if passed.
         # (e.g. from pre-configured expected response)
         if expected_response:
-            self.set_expected(**asdict(expected_response))
+            # Note: asdict() method parses Matchers into an dicts,
+            # as they are dataclasses. So manually map fields
+            self.set_expected(
+                status_code=expected_response.status_code,
+                schema=expected_response.schema,
+                headers=expected_response.headers,
+                json=expected_response.json,
+                text=expected_response.text
+            )
 
         # Then apply specific values
         if status_code is not None:
@@ -860,3 +877,8 @@ class ApiResponseHelper:
             Any: found value
         """
         return self.json.content.get(pointer)
+
+    def __resp__(self) -> str:
+        return f'ApiResponseHelper(' \
+            f'status_code={self.response_object.status_code}, ' \
+            f'url={self.response_object.url})'

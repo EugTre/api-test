@@ -83,8 +83,9 @@ class TestCreateToken:
 @allure.story('Token creation')
 @allure.tag('negative')
 class TestCreateTokenNegative:
-    # title("No token creation on empty fields")
+    """Negative test related to Auth Token feature"""
 
+    # title("No token creation on empty fields")
     @pytest.mark.parametrize("username, password", (
         pytest.param("", "",            id="Empty-Empty"),
         pytest.param("user", "",        id="user-Empty"),
@@ -121,7 +122,6 @@ class TestCreateTokenNegative:
                 .json.equals()
 
     # title("No token creation on missing fields")
-    # @allure.tag('negative')
     @pytest.mark.parametrize("payload", (
         pytest.param({}, id="No_Fields"),
         pytest.param({"username": "user"}, id="User_Field_Only"),
@@ -153,7 +153,6 @@ class TestCreateTokenNegative:
                 .json.equals()
 
     # title("No token creation on non-string creds")
-    # @allure.tag('negative')
     @pytest.mark.parametrize("username, password", (
         pytest.param(142, "pass",        id="Number-String"),
         pytest.param(True, "pass",       id="Bool-String"),
@@ -197,7 +196,6 @@ class TestCreateTokenNegative:
     @allure.title("Request with "
                   "unsupported method \"{method}\" is handled")
     @allure.severity(allure.severity_level.MINOR)
-    # @allure.tag('negative')
     @pytest.mark.parametrize("method", (
         HTTPMethod.GET,
         HTTPMethod.PUT,
@@ -221,7 +219,6 @@ class TestCreateTokenNegative:
 
     # title("Request with malformed payload is handled")
     @allure.severity(allure.severity_level.MINOR)
-    # @allure.tag('negative')
     @pytest.mark.parametrize("payload", (
         '{"username": "user", "password": "password", }',
         '{"username", "pasword"}',

@@ -18,3 +18,10 @@ def api_client(api_clients_configurations) -> SimpleApiClient:
         API_NAME,
         api_clients_configurations
     )
+
+
+@pytest.fixture()
+def auth_token(api_request) -> str:
+    """Creates and returns token"""
+    response = api_request.by_name('Auth').perform()
+    return response.get_json_value('/token')
