@@ -20,7 +20,7 @@ class Pointer:
     """Class to wrap JSON Pointer (RFC6901).
     Provides parsing and validation of pointers.
     """
-    path: tuple|None
+    path: tuple | None
     raw: str
     rfc_pointer: str
 
@@ -36,7 +36,7 @@ class Pointer:
             return self
         return Pointer.from_path(self.path[:-1])
 
-    def child(self, path: str|int|tuple|list) -> "Pointer":
+    def child(self, path: str | int | tuple | list) -> "Pointer":
         """Creates child pointer by appending given 'path' to current pointer.
 
         Args:
@@ -142,7 +142,8 @@ class Pointer:
 
         Raises:
             ValueError: when None passed, not a string was passed, or pointer
-            is not an entire document pointer, but doesn't start from root ('/').
+            is not an entire document pointer, but doesn't start from
+            root ('/').
 
         Returns:
             Pointer: instance of `Pointer` class
@@ -155,16 +156,16 @@ class Pointer:
             return Pointer(None, pointer_str, pointer_str)
 
         return Pointer(
-            path = tuple(
+            path=tuple(
                 Pointer.decode_escaped_chars(v)
                 for v in pointer_str[1:].split(POINTER_SEP)
             ),
-            rfc_pointer = pointer_str,
-            raw = pointer_str
+            rfc_pointer=pointer_str,
+            raw=pointer_str
         )
 
     @staticmethod
-    def from_path(pointer_path: tuple|list) -> "Pointer":
+    def from_path(pointer_path: tuple | list) -> "Pointer":
         """Creates pointer from path
 
         Args:
@@ -177,7 +178,9 @@ class Pointer:
             return Pointer(None, ROOT_POINTER, ROOT_POINTER)
 
         pointer_path = tuple(str(p) for p in pointer_path)
-        escaped_path = POINTER_SEP.join((Pointer.encode_escaped_chars(p) for p in pointer_path))
+        escaped_path = POINTER_SEP.join(
+            (Pointer.encode_escaped_chars(p) for p in pointer_path)
+        )
 
         rfc_pointer = f'{POINTER_SEP}{escaped_path}'
         return Pointer(pointer_path, rfc_pointer, rfc_pointer)

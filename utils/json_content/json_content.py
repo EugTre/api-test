@@ -11,27 +11,29 @@ from .composer import Composer
 from .composition_handlers import DEFAULT_COMPOSITION_HANDLERS_COLLECTION
 from .pointer import Pointer, ROOT_POINTER
 
+
 class JsonContent:
     """Class to wrap JSON with get/update/delete methods and
     reference resolution mechanism"""
     __slots__ = ["content", "composer"]
 
-    def __init__(self, content: dict|list, composer_setup: dict = None):
+    def __init__(self, content: dict | list, composer_setup: dict = None):
         """Create a new instance of `JsonContent` wrapper class.
         One may use existing dictionary (by using 'content' arg) or read JSON
         data from a file ('from_file' arg).
 
         Args:
-            content (dict, optional): JSON-like dictionary to wrap. Defaults to None.
-            from_file (str, optional): Read JSON from given file. Overrides 'content'
-            if defined. Defaults to None.
+            content (dict, optional): JSON-like dictionary to wrap.
+            Defaults to None.
+            from_file (str, optional): Read JSON from given file.
+            Overrides 'content' if defined. Defaults to None.
             make_copy (bool, optional): Make a copy of content and wraps it.
             Defaults to False.
             allow_references (bool, optional): Enable reference resolution for
             reference pointers values (like '!ref /a/b' and '!file file.json').
             Defaults to False.
-            wrapper (AbstractContentWrapper, optional): Content wrapper class to
-            use for content wrapping. Defaults to JsonContentWrapper.
+            wrapper (AbstractContentWrapper, optional): Content wrapper class
+            to use for content wrapping. Defaults to JsonContentWrapper.
         """
         if content is None:
             content = {}
@@ -46,17 +48,25 @@ class JsonContent:
             self.composer = Composer(self.content, handlers=composer_setup)
             self.composer.compose_content(remove_defs=True)
 
-    def get(self, pointer: str|Pointer = ROOT_POINTER, make_copy: bool = False) -> Any:
+    @property
+    def nodes(self) -> dict:
+        """Returns node map of underlaying JsonWrapper"""
+        return self.content.node_map
+
+    def get(self, pointer: str | Pointer = ROOT_POINTER,
+            make_copy: bool = False) -> Any:
         """Returns property at given JSON pointer.
 
         Args:
-            pointer (str|Pointer, optional): JSON pointer to a property as string.
-            Defaults to empty (return whole content).
-            make_copy (bool, optional): Flag to return a copy of the mutable property.
+            pointer (str|Pointer, optional): JSON pointer to a property
+            as string. Defaults to empty (return whole content).
+            make_copy (bool, optional): Flag to return a copy of the mutable
+            property.
             Defaults to False.
 
         Raises:
-            IndexError: on attempt to get element of list by out of bound index.
+            IndexError: on attempt to get element of list by out of bound
+            index.
             KeyError: when pointer uses non-existent node.
 
         Returns:
@@ -78,7 +88,7 @@ class JsonContent:
         value = self.content.get(pointer)
         return self.__copy_value(value) if make_copy else value
 
-    def get_or_default(self, pointer: str|Pointer,
+    def get_or_default(self, pointer: str | Pointer,
                        default_value: Any, make_copy: bool = False) -> Any:
         """Returns property at given pointer or default_value
         if property is not present.
@@ -86,8 +96,8 @@ class JsonContent:
         Args:
             pointer (str|Pointer): JSON pointer to a property as string.
             default_value (Any): value to fallback to.
-            make_copy (bool, optional): Flag to return a copy of the mutable property.
-            Defaults to False.
+            make_copy (bool, optional): Flag to return a copy of the mutable
+            property. Defaults to False.
 
         Returns:
             Any: property's value or 'default_value'
@@ -95,7 +105,7 @@ class JsonContent:
         value = self.content.get_or_default(pointer, default_value)
         return self.__copy_value(value) if make_copy else value
 
-    def update(self, pointer: str|Pointer, value: Any) -> Self:
+    def update(self, pointer: str | Pointer, value: Any) -> Self:
         """Updates or add content to wrapped JSON structure.
         If end key is not exists - it will be added with new value,
         but non-existent keys in the middle cause KeyError exception.
@@ -105,12 +115,13 @@ class JsonContent:
 
         Args:
             pointer (str|Pointer): JSON pointer to a property as string.
-            value (Any): New value to set. May be a '!ref' or '!file' pointer which
-            will be resolved before updating content.
+            value (Any): New value to set. May be a '!ref' or '!file' pointer
+            which will be resolved before updating content.
 
         Raises:
             ValueError: on attempt to update root node.
-            IndexError: on attempt to update list element with out of range index.
+            IndexError: on attempt to update list element with out of range
+            index.
             KeyError: when pointer uses non-existent node.
 
         Returns:
@@ -145,14 +156,15 @@ class JsonContent:
 
         return self
 
-    def delete(self, *pointers: str|Pointer) -> Self:
+    def delete(self, *pointers: str | Pointer) -> Self:
         """Deletes node at given pointer or several nodes, if list
         of pointers was given.
         No error will be raised if desired node doesn't exists.
 
         Node deletion - Args:
-            pointers (str): JSON pointers to a property as strings. Pointer may be
-            root ('/') - entire JSON structure will be cleared.
+            pointers (str): JSON pointers to a property as strings.
+            Pointer may be root ('/') - entire JSON structure will
+            be cleared.
 
         Bulk deletion - Args:
             pointers (list | tuple): iterable of pointers.
@@ -170,20 +182,24 @@ class JsonContent:
 
     def __eq__(self, other):
         if isinstance(other, JsonContent):
-            return self.content.get(ROOT_POINTER) == other.content.get(ROOT_POINTER)
+            return self.content.get(ROOT_POINTER) == \
+                other.content.get(ROOT_POINTER)
 
-        if isinstance(other, dict|list):
+        if isinstance(other, dict | list):
             return self.content.get(ROOT_POINTER) == other
 
         return False
 
-    def __contains__(self, pointer: str|Pointer):
+    def __contains__(self, pointer: str | Pointer):
         if not isinstance(pointer, (str, Pointer)):
             return False
         return pointer in self.content
 
     def __iter__(self):
         return self.content.__iter__()
+
+    def __len__(self) -> int:
+        return len(self.content)
 
     @staticmethod
     def __copy_value(value: Any):
@@ -195,7 +211,10 @@ class JsonContent:
         Returns:
             Any: copy (if value is mutable) of value or value
         """
-        return copy.deepcopy(value) if isinstance(value, (dict, list)) else value
+        return copy.deepcopy(value) \
+            if isinstance(value, (dict, list)) else \
+            value
+
 
 class JsonContentBuilder:
     """Builder class to create and setup isntnace of JsonContent.
@@ -207,7 +226,7 @@ class JsonContentBuilder:
     """
 
     __slots__ = ["__content", "__use_composer",
-                 "__composer_handlers",]
+                 "__composer_handlers"]
 
     def __init__(self):
         self.__content = {}
@@ -218,15 +237,18 @@ class JsonContentBuilder:
         """Creates instance of `JsonContent` class with desired setup."""
         return JsonContent(
             content=self.__content,
-            composer_setup=(self.__composer_handlers if self.__use_composer else None)
+            composer_setup=(self.__composer_handlers
+                            if self.__use_composer else
+                            None)
         )
 
-    def from_data(self, content: dict|list, make_copy: bool = False) -> Self:
+    def from_data(self, content: dict | list, make_copy: bool = False) -> Self:
         """Sets source of data for JsonContent object - variable or literal.
 
         Args:
             content (dict | list): data to wrap by JsonContent.
-            make_copy (bool, optional): Flag to use a deep copy of data. Defaults to False.
+            make_copy (bool, optional): Flag to use a deep copy of data.
+            Defaults to False.
 
         Returns:
             Self: builder instance
@@ -250,9 +272,11 @@ class JsonContentBuilder:
         """Enable compsoer for instance of JsonWrapper
 
         Args:
-            use (bool, optional): flag to enable/disable compsoer. Defaults to True.
-            handlers (dict, optional): configuration of handlers as dict, where keys - class names
-            of the handles and values - dict of kwargs for handler constructor.
+            use (bool, optional): flag to enable/disable compsoer.
+            Defaults to True.
+            handlers (dict, optional): configuration of handlers as dict,
+            where keys - class names of the handles and values - dict of
+            kwargs for handler constructor.
             Defaults to DEFAULT_COMPOSITION_HANDLERS_COLLECTION.
 
         Returns:

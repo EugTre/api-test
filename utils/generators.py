@@ -3,8 +3,13 @@ collection."""
 import typing
 import datetime
 import random
+from copy import deepcopy
 from string import ascii_letters, digits, ascii_lowercase
+
+import pytest
+from _pytest.mark import ParameterSet
 from utils.basic_manager import BasicManager
+from utils.json_content.json_wrapper import JsonWrapper
 
 
 class GeneratorsManager(BasicManager):
@@ -137,11 +142,10 @@ class GeneratorsManager(BasicManager):
         return decorator
     # pylint: enable=no-self-argument
 
+
 # --- Generators ---
 # ------------------
-
-
-class NamesGenerator:
+class FormDataGenerator:
     """Generates names from pool of names/lastnames"""
     MALE_NAMES = (
         "James",
@@ -182,15 +186,44 @@ class NamesGenerator:
     @staticmethod
     def generate_first_name(gender: str = 'male'):
         """Returns random first name"""
-        return random.choice(NamesGenerator.MALE_NAMES
+        return random.choice(FormDataGenerator.MALE_NAMES
                              if gender.lower().strip() == 'male' else
-                             NamesGenerator.FEMALE_NAMES)
+                             FormDataGenerator.FEMALE_NAMES)
 
     @GeneratorsManager.register('LastName')
     @staticmethod
     def generate_last_name():
         """Returns random last name"""
-        return random.choice(NamesGenerator.LAST_NAMES)
+        return random.choice(FormDataGenerator.LAST_NAMES)
+
+    @GeneratorsManager.register("Username")
+    @staticmethod
+    def generate_username(size: int = 7):
+        """Generates random alphabetic sequence"""
+        name = (random.choice(ascii_letters) for _ in range(size))
+        return ''.join(name)
+
+    @GeneratorsManager.register("Password")
+    @staticmethod
+    def generate_password(size: int = 7):
+        """Generates random alphanumeric sequence"""
+        passwd = (random.choice(random.choice([ascii_letters, digits]))
+                  for _ in range(size))
+        return ''.join(passwd)
+
+    @GeneratorsManager.register("Sentence")
+    @staticmethod
+    def generate_sentence(words: int = 4):
+        """Generates several 'words' of random length (3-10 chars)"""
+        words = [
+            ''.join([
+                random.choice(ascii_lowercase)
+                for _ in range(random.randint(3, 10))
+            ])
+            for _ in range(words)
+        ]
+
+        return ' '.join(words).capitalize()
 
 
 class Dates:
@@ -225,46 +258,191 @@ class Dates:
         return (target_date - Dates.get_offset(days_offset)).isoformat()
 
 
-@GeneratorsManager.register("Username")
-def generate_username(size: int = 7):
-    """Generates random alphabetic sequence"""
-    name = (random.choice(ascii_letters) for _ in range(size))
-    return ''.join(name)
+class ParamsGenerator:
+    """Generators that creates pytest parameters for
+    test parametrization"""
+    empty_null_ruleset = {
+        "str": ["", None],
+        "int": [None],
+        "float": [None],
+        "bool": [None],
+        "dict": [{}, None],
+        "list": [[], None]
+    }
+    data_types_ruleset = {
+        "str": [124],      # [123, True, [], {}],
+        "int": ["str"],    # ["string", True, [], {}],
+        "float": ["str"],  # ["string", True, [], {}],
+        "bool": ["str"],   # ["string", 123, [], {}],
+        "dict": [123],     # ["string", 123, True, []],
+        "list": [123]      # ["string", 123, True, {}],
+    }
 
+    @staticmethod
+    def _apply_for(reference: dict,
+                   skip: tuple | list | None,
+                   callback: callable,
+                   ruleset: dict | None) -> list[ParameterSet]:
+        """Loops through given reference dict,
+        select appropriate rule from ruleset by value type,
+        and apply callback function.
 
-@GeneratorsManager.register("Password")
-def generate_password(size: int = 7):
-    """Generates random alphanumeric sequence"""
-    passwd = (random.choice(random.choice([ascii_letters, digits]))
-              for _ in range(size))
-    return ''.join(passwd)
+        Args:
+            reference (dict): data to process.
+            skip (tuple | list | None): pointers to skip.
+            callback (callable): function that apply rule to specific pointer.
+            ruleset (dict[str, list]): ruleset with name of datatype as key
+            and list of values to generate as value.
 
+        Returns:
+            list[ParameterSet]: list of pytest params
+        """
+        reference_content = JsonWrapper(deepcopy(reference))
+        if skip is not None:
+            for skipped_ptr in skip:
+                reference_content.delete(skipped_ptr)
 
-@GeneratorsManager.register("Sentence")
-def generate_sentence(words: int = 4):
-    """Generates several 'words' of random length (3-10 chars)"""
-    words = [
-        ''.join([
-            random.choice(ascii_lowercase)
-            for _ in range(random.randint(3, 10))
-        ])
-        for _ in range(words)
-    ]
+        output = []
+        for ptr in reference_content.node_map:
+            # Ruleset not present:
+            if ruleset is None:
+                result = callback(
+                    JsonWrapper(deepcopy(reference)), ptr
+                )
+                if result is not None:
+                    output.append(result)
 
-    return ' '.join(words).capitalize()
+                continue
+
+            # Ruleset present case:
+            val = reference_content.get(ptr)
+            rules = ruleset[type(val).__name__]
+            for rule_value in rules:
+                # Note: Currently both used functions are very similar,
+                # but if rule_value will be something special (like
+                # generator function) - current approach will allow to
+                # invoke function inside the callback
+                result = callback(
+                    JsonWrapper(deepcopy(reference)), ptr, rule_value
+                )
+                if result is not None:
+                    output.append(result)
+
+        return output
+
+    @staticmethod
+    def _empty_null_fields(content, ptr, rule_value):
+        """Generate payload where given pointer will be replaced
+        with rule_value and returns test param with payload and
+        readable ID"""
+        content.update(ptr, rule_value)
+        id_name = "Empty" if isinstance(rule_value, str) else rule_value
+        return pytest.param(content.get(''), id=f'{ptr}={id_name}')
+
+    @staticmethod
+    def _mixed_types_fields(content, ptr, rule_value):
+        """Generate payload where given pointer will be replaced
+        with rule_value and returns test param with payload and
+        readable ID"""
+        content.update(ptr, rule_value)
+        id_name = type(rule_value).__name__
+        return pytest.param(content.get(''), id=f'{ptr}={id_name}')
+
+    @staticmethod
+    def _missing_fields(content, ptr):
+        """Generate payload where given pointer is missing
+        and returns test param with payload and
+        readable ID"""
+        content.delete(ptr)
+        return pytest.param(content.get(''), id=f'{ptr}=Missing')
+
+    @staticmethod
+    def get_empty_null_fields(reference: dict,
+                              skip: list | tuple | None = None,
+                              ruleset: dict = None,
+                              ) -> list[ParameterSet]:
+        """Returns list of ParameterSet with payloads
+        where one of the fields is empty or null
+        according to given rules
+
+        Args:
+            reference (dict): payload reference.
+            skip (list | tuple, optional): pointers to nodes that must be
+            skipped during generation. Defaults to None.
+            ruleset (dict, optional): set of rules to apply empty/null values
+            for specific type of fields. Defaults to None.
+
+        Returns:
+            list[ParameterSet]: list of pytest params for test.
+        """
+        if ruleset is None:
+            ruleset = ParamsGenerator.empty_null_ruleset
+
+        return ParamsGenerator._apply_for(
+            reference, skip, ParamsGenerator._empty_null_fields, ruleset
+        )
+
+    @staticmethod
+    def get_payloads_with_invalid_types(
+        reference: dict,
+        skip: list | tuple | None = None,
+        ruleset: dict | None = None
+    ) -> list[ParameterSet]:
+        """Returns list of pytest params with payload where fields
+        are populated with values of invalid data types.
+
+        Args:
+            reference (dict, optional): payload reference.
+            skip (list | tuple, optional): pointers to nodes that must be
+            skipped during generation. Defaults to None.
+            ruleset (dict, optional): set of rules to apply empty/null values
+            for specific type of fields. Defaults to None.
+
+        Returns:
+            list[ParameterSet]: list of pytest params for test.
+        """
+        if ruleset is None:
+            ruleset = ParamsGenerator.data_types_ruleset
+
+        return ParamsGenerator._apply_for(
+            reference, skip, ParamsGenerator._mixed_types_fields, ruleset
+        )
+
+    @staticmethod
+    def get_payloads_with_missing_fields(reference: dict,
+                                         skip: list | tuple | None = None,
+                                         ) -> list[ParameterSet]:
+        """Returns list of pytest's ParameterSet with
+        payloads where one of the fields is missing
+
+        Args:
+            reference (dict, optional): payload reference.
+            skip (list | tuple, optional): pointers to nodes that must be
+            skipped during generation. Defaults to None.
+
+        Returns:
+            list[ParameterSet]: list of pytest params for test.
+        """
+
+        return [
+            pytest.param({}, id="NoFields"),
+            *ParamsGenerator._apply_for(
+                reference, skip, ParamsGenerator._missing_fields, None
+            )
+        ]
 
 
 @GeneratorsManager.register("Booking")
 def generate_booking():
     """Generates booking entry"""
     return {
-        "firstname": NamesGenerator.generate_first_name(),
-        "lastname": NamesGenerator.generate_last_name(),
+        "firstname": FormDataGenerator.generate_first_name(),
+        "lastname": FormDataGenerator.generate_last_name(),
         "totalprice": random.randint(1, 1000),
         "depositpaid": random.choice([True, False]),
         "bookingdates": {
             "checkin": Dates.generate_date_after(days_offset=2),
             "checkout": Dates.generate_date_after(days_offset=(3, 10))
         },
-        "additionalneeds": generate_sentence(5)
+        "additionalneeds": FormDataGenerator.generate_sentence(5)
     }

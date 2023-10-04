@@ -5,7 +5,7 @@ from .constants import API_NAME
 
 
 @pytest.fixture(scope='session')
-def api_client(api_clients_configurations) -> SimpleApiClient:
+def api_client() -> SimpleApiClient:
     '''Returns object inherited from `BasicApiClient` class.
 
        Actual class and options are selected by given name
@@ -14,5 +14,5 @@ def api_client(api_clients_configurations) -> SimpleApiClient:
     '''
     return setup_api_client(
         API_NAME,
-        api_clients_configurations
+        pytest.api_config
     )

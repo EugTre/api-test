@@ -18,7 +18,7 @@ from utils.api_helpers.api_request_helper import ApiRequestHelper
 from utils.api_helpers.api_response_helper import ApiResponseHelper
 
 
-def perform_logger_setup(logging_config_file):
+def perform_logger_setup(logging_config_file: str):
     """Setups loggers using given configuration file"""
     if not os.path.exists(logging_config_file):
         raise FileNotFoundError(
@@ -28,6 +28,20 @@ def perform_logger_setup(logging_config_file):
 
     logging.handlers.DatabaseHandler = DatabaseHandler
     fileConfig(logging_config_file)
+
+
+def prepare_api_clients_configurations(
+    api_config_file: str
+) -> ApiClientsSpecificationCollection:
+    """Setups api by configuration provided by --api-config command-line
+    argument"""
+    if not os.path.exists(api_config_file):
+        raise FileNotFoundError(
+            'Missing API config file provided by `--api-config` option '
+            f'with name "{api_config_file}".'
+        )
+
+    return ApiConfigurationReader(api_config_file).read_configurations()
 
 
 # --- Initialization hooks ----
@@ -60,27 +74,13 @@ def pytest_configure(config):
     # Setup logging from file passed in cmd args
     perform_logger_setup(config.getoption("--logging-config"))
 
+    # Setup API configuration from file parsed in cmd args
+    pytest.api_config = prepare_api_clients_configurations(
+        config.getoption("--api-config")
+    )
 
 # --- Common fixtures ---
 # ----------------------
-@pytest.fixture(scope='session', name='api_clients_configurations')
-def prepare_api_clients_configurations(
-    request
-) -> ApiClientsSpecificationCollection:
-    """Setups api by configuration provided by --api-config command-line
-    argument"""
-    # pylint: disable=unused-argument
-    api_config_file = request.config.getoption("--api-config")
-
-    if not os.path.exists(api_config_file):
-        raise FileNotFoundError(
-            'Missing API config file provided by `--api-config` option '
-            f'with name "{api_config_file}".'
-        )
-
-    return ApiConfigurationReader(api_config_file).read_configurations()
-
-
 @pytest.fixture(name='logger')
 def get_logger(request):
     """Returns logger defined by name defined by tests
@@ -99,9 +99,7 @@ def get_logger(request):
 
 
 @pytest.fixture(scope='class', name="api_client")
-def get_api_client(
-    request, api_clients_configurations: ApiClientsSpecificationCollection
-) -> BaseApiClient:
+def get_api_client(request) -> BaseApiClient:
     '''Returns API Client object of class that implements
     `AbstractApiClient` class using API name provided by
     '@pytest.mark.api(...)' test mark.
@@ -111,7 +109,7 @@ def get_api_client(
     `--api-config` under the same name)
     '''
     api_name = request.node.get_closest_marker("api").args[0]
-    return setup_api_client(api_name, api_clients_configurations)
+    return setup_api_client(api_name, pytest.api_config)
 
 
 @pytest.fixture(name='api_request')

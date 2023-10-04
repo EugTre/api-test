@@ -235,32 +235,255 @@ class TestGeneratosManager:
 class TestGenerators:
     """Tests actual generator functions"""
     def test_names_generator_first_name_generator(self):
-        assert gen.NamesGenerator.generate_first_name() \
-            in gen.NamesGenerator.MALE_NAMES
+        assert gen.FormDataGenerator.generate_first_name() \
+            in gen.FormDataGenerator.MALE_NAMES
 
     @pytest.mark.parametrize('arg, expected', [
-        ('male', gen.NamesGenerator.MALE_NAMES),
-        ('female', gen.NamesGenerator.FEMALE_NAMES)
+        ('male', gen.FormDataGenerator.MALE_NAMES),
+        ('female', gen.FormDataGenerator.FEMALE_NAMES)
     ])
     def test_names_generator_first_name_generator_gender_specific(
         self, arg, expected
     ):
-        assert gen.NamesGenerator.generate_first_name(arg) in expected
+        assert gen.FormDataGenerator.generate_first_name(arg) in expected
 
     def test_names_generator_last_name_generator(self):
-        assert gen.NamesGenerator.generate_last_name() \
-            in gen.NamesGenerator.LAST_NAMES
+        assert gen.FormDataGenerator.generate_last_name() \
+            in gen.FormDataGenerator.LAST_NAMES
 
     @pytest.mark.parametrize('size', (3, 10))
     def test_username_generator(self, size: int):
-        value = gen.generate_username(size)
+        value = gen.FormDataGenerator.generate_username(size)
         print(value)
         assert len(value) == size
         assert value.isalpha()
 
     @pytest.mark.parametrize('size', (3, 10))
     def test_password_generator(self, size: int):
-        value = gen.generate_password(size)
+        value = gen.FormDataGenerator.generate_password(size)
         print(value)
         assert len(value) == size
         assert value.isalnum()
+
+
+class TestParamGenerator:
+    """Tests for ParamsGenerator"""
+    @pytest.mark.parametrize("ref, expected", (
+        (
+            {
+                "a": 1,
+                "b": "str"
+            },
+            [
+                pytest.param({
+                    "a": None,
+                    "b": "str"
+                }, id="/a=None"),
+                pytest.param({
+                    "a": 1,
+                    "b": None
+                }, id="/b=None"),
+                pytest.param({
+                    "a": 1,
+                    "b": ""
+                }, id="/b=Empty")
+            ]
+        ),
+        (
+            {
+                "a": 1,
+                "b": {
+                    "c": 2
+                }
+            },
+            [
+                pytest.param({
+                    "a": None,
+                    "b": {"c": 2}
+                }, id="/a=None"),
+                pytest.param({
+                    "a": 1,
+                    "b": None
+                }, id="/b=None"),
+                pytest.param({
+                    "a": 1,
+                    "b": {}
+                }, id="/b={}"),
+                pytest.param({
+                    "a": 1,
+                    "b": {"c": None}
+                }, id="/b/c=None")
+            ]
+        )
+    ))
+    def test_get_empty_null_fields(self, ref, expected):
+        """get_empty_null_fields returns valid payload"""
+        value = gen.ParamsGenerator.get_empty_null_fields(
+            reference=ref,
+            ruleset={
+                "int": [None],
+                "str": [None, ""],
+                "dict": [None, {}]
+            }
+        )
+
+        assert value == expected
+
+    def test_get_empty_null_fields_with_skip(self):
+        """get_empty_null_fields returns valid payload
+        and do not touch unwanted field"""
+        ref = {"a": 1, "b": "str"}
+        expected = [
+            pytest.param({
+                "a": None,
+                "b": "str"
+            }, id="/a=None")
+        ]
+
+        value = gen.ParamsGenerator.get_empty_null_fields(
+            reference=ref,
+            skip=['/b'],
+            ruleset={"int": [None]}
+        )
+
+        assert value == expected
+
+    @pytest.mark.parametrize("ref, expected", (
+        (
+            {
+                "a": 1,
+                "b": "str"
+            },
+            [
+                pytest.param({
+                    "a": "str",
+                    "b": "str"
+                }, id="/a=str"),
+                pytest.param({
+                    "a": 1,
+                    "b": 123
+                }, id="/b=int")
+            ]
+        ),
+        (
+            {
+                "a": 1,
+                "b": {
+                    "c": 2
+                }
+            },
+            [
+                pytest.param({
+                    "a": "str",
+                    "b": {"c": 2}
+                }, id="/a=str"),
+                pytest.param({
+                    "a": 1,
+                    "b": 123
+                }, id="/b=int"),
+                pytest.param({
+                    "a": 1,
+                    "b": {"c": "str"}
+                }, id="/b/c=str")
+            ]
+        )
+    ))
+    def test_get_payloads_with_invalid_types(self, ref, expected):
+        """get_payloads_with_invalid_types returns valid params"""
+        value = gen.ParamsGenerator.get_payloads_with_invalid_types(
+            reference=ref,
+            ruleset={
+                "int": ["str"],
+                "str": [123],
+                "dict": [123]
+            }
+        )
+
+        assert value == expected
+
+    def test_get_payloads_with_invalid_types_with_skip(self):
+        """get_payloads_with_invalid_types returns valid params
+        and do not touch unwanted field"""
+        ref = {"a": 1, "b": "str"}
+        expected = [
+            pytest.param({
+                "a": "str",
+                "b": "str"
+            }, id="/a=str")
+        ]
+
+        value = gen.ParamsGenerator.get_payloads_with_invalid_types(
+            reference=ref,
+            skip=['/b'],
+            ruleset={
+                "int": ["str"],
+                "str": [123],
+                "dict": [123]
+            }
+        )
+
+        assert value == expected
+
+    @pytest.mark.parametrize("ref, expected", (
+        (
+            {
+                "a": 1,
+                "b": "str"
+            },
+            [
+                pytest.param({}, id="NoFields"),
+                pytest.param({
+                    "b": "str"
+                }, id="/a=Missing"),
+                pytest.param({
+                    "a": 1,
+                }, id="/b=Missing")
+            ]
+        ),
+        (
+            {
+                "a": 1,
+                "b": {
+                    "c": 2
+                }
+            },
+            [
+                pytest.param({}, id="NoFields"),
+                pytest.param({
+                    "b": {"c": 2}
+                }, id="/a=Missing"),
+                pytest.param({
+                    "a": 1,
+                }, id="/b=Missing"),
+                pytest.param({
+                    "a": 1,
+                    "b": {}
+                }, id="/b/c=Missing")
+            ]
+        )
+    ))
+    def test_get_payloads_with_missing_fields(self, ref, expected):
+        """get_payloads_with_missing_fields returns valid params"""
+        value = gen.ParamsGenerator.get_payloads_with_missing_fields(
+            reference=ref
+        )
+
+        assert value == expected
+
+    def test_get_payloads_with_missing_fields_with_skip(self):
+        """get_payloads_with_missing_fields returns valid params
+        and do not touch unwanted field"""
+        ref = {"a": 1, "b": "str"}
+        expected = [
+            pytest.param({}, id="NoFields"),
+            pytest.param({
+                "b": "str"
+            }, id="/a=Missing")
+        ]
+
+        value = gen.ParamsGenerator.get_payloads_with_missing_fields(
+            reference=ref,
+            skip=['/b']
+        )
+
+        assert value == expected

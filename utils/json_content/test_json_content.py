@@ -31,6 +31,7 @@ CONTENT_WITH_REFS = {
     'e': {"!ref": "/$defs/values/1"}
 }
 
+
 class TestJsonContent:
     """Tests for JsonContent object based on JSON object"""
 
@@ -107,7 +108,14 @@ class TestJsonContent:
         assert cnt.content is not None
         assert cnt.composer is not None
 
-    def test_get_return_copy(self):
+    def test_property_nodes(self):
+        """Access to nodes_map from JsonWrapper"""
+        cnt = JsonContentBuilder().from_data(CONTENT).build()
+        wrapper_nodes_map = cnt.content.node_map
+
+        assert cnt.nodes is wrapper_nodes_map
+
+    def test_get_returns_copy(self):
         """Get returns a copy of mutable if flag is set to True"""
         cnt = JsonContentBuilder().from_data(CONTENT).build()
 

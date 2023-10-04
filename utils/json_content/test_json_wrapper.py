@@ -666,7 +666,7 @@ class TestJsonWrapperDelete:
         """Deletion of entire content should be successful and return True"""
         assert wrapper.delete('')
         assert wrapper.get('') == {}
-        assert not wrapper._node_map
+        assert not wrapper.node_map
 
     def test_delete_container_recalculates_structure(self):
         """Deletion of container should recalculate structure and remove
@@ -879,7 +879,7 @@ class TestJsonWrapperArrayDelete:
         """Deletion of entire content should be successful and return True"""
         assert array_wrapper.delete('')
         assert array_wrapper == []
-        assert not array_wrapper._node_map
+        assert not array_wrapper.node_map
 
     def test_array_delete_value_at_root(self):
         """Delete elements of root array updates nodes successfully"""

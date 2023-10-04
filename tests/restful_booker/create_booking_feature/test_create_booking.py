@@ -63,3 +63,5 @@ class TestCreateBooking:
 @allure.tag('negative')
 class TestCreateBookingNegative:
     """Tests related to CreateBooking feature, negative tests"""
+
+    # title("Missing fields ")
