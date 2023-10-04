@@ -10,6 +10,7 @@ from .composition_handlers import CompositionHandler, CompositionStatus, \
 HANDLER_CONTEXT_KEY = "content_context"
 DEFS_POINTER = '/$defs'
 
+
 class Composer:
     """Class to compose content by resolving references, generating values
     in given `AbstractContentWrapper` object."""

@@ -24,7 +24,7 @@ from .composition_handlers import CompositionStatus, \
 def get_ref_handler() -> ReferenceCompositionHandler:
     return ReferenceCompositionHandler(JsonWrapper({
         "a": 100,
-        "b": [1,2,3],
+        "b": [1, 2, 3],
         "c": {
             "n1": True,
             "n2": {"!ref": "/a"}
@@ -49,14 +49,17 @@ def get_generator_handler() -> GeneratorCompositionHandler:
     ])
     return GeneratorCompositionHandler(manager)
 
+
 # --- Tests
 # ---
 class TestReferenceCompositionHandler:
     """Tests for ReferenceCompositionHandler"""
     def test_create(self):
+        """Ref composer creates with no error"""
         assert ReferenceCompositionHandler(content_context=JsonWrapper({"a": 1}))
 
     def test_matches(self, ref_handler: ReferenceCompositionHandler):
+        """Ref composition matches to RefHandler expected syntax"""
         assert ref_handler.match({"!ref": "/a/b/c"})
 
     @pytest.mark.parametrize('input_value, expected_pointer', [
@@ -65,15 +68,60 @@ class TestReferenceCompositionHandler:
         ({"!ref": "/c"}, "/c"),
         ({"!ref": "/c/n1"}, "/c/n1"),
     ])
-    def test_compose(self, input_value, expected_pointer, ref_handler: ReferenceCompositionHandler):
+    def test_compose(self, input_value, expected_pointer,
+                     ref_handler: ReferenceCompositionHandler):
+        """Ref composition handled successfully - return value at
+        given pointer"""
         result, value = ref_handler.compose(input_value)
         assert result == CompositionStatus.SUCCESS
         assert value == ref_handler.content_context.get(expected_pointer)
 
-    def test_compose_with_unexpected_args(self, ref_handler: ReferenceCompositionHandler):
-        result, value = ref_handler.compose({"!ref": "/a", "!args": [1,2,3], "stuff": "kek"})
+    def test_compose_with_unexpected_args(
+        self, ref_handler: ReferenceCompositionHandler
+    ):
+        """Composition args are ignored"""
+        result, value = ref_handler.compose({
+            "!ref": "/a",
+            "!args": [1, 2, 3],
+            # "stuff": "kek"
+        })
         assert result == CompositionStatus.SUCCESS
         assert value == ref_handler.content_context.get("/a")
+
+    @pytest.mark.parametrize("content, ref_composition, expected", [
+        (
+            {"a": {"a1": 100, "a2": True}},
+            {"!ref": "/a", "a1": 300, "a3": "string"},
+            {"a1": 300, "a2": True, "a3": "string"}
+        ),
+        (
+            {"a": {"a1": 100, "a2": {"b1": 300}}},
+            {"!ref": "/a", "a1": 300, "a2": {"b1": 100}},
+            {"a1": 300, "a2": {"b1": 100}}
+        ),
+        (
+            {"a": {"a1": 100, "a2": {"b1": 300}}},
+            {"!ref": "/a", "a2": {"b2": 100}},
+            {"a1": 100, "a2": {"b1": 300, "b2": 100}}
+        ),
+        (
+            {"a": {"a1": 100}},
+            {"!ref": "/a", "a2": {"b2": 100}},
+            {"a1": 100, "a2": {"b2": 100}}
+        )
+    ], ids=[
+        "PlainDictAddUpdate",
+        "NestedDictUpdate",
+        "NestedDictAddUpdate",
+        "AddDict"
+    ])
+    def test_compose_and_merge(self, content, ref_composition, expected):
+        """Ref composition with kwargs update referenced dict value"""
+        ref_handler = ReferenceCompositionHandler(JsonWrapper(content))
+        result, value = ref_handler.compose(ref_composition)
+
+        assert result == CompositionStatus.SUCCESS
+        assert value == expected
 
     # --- Negative
     @pytest.mark.parametrize('input_value', [
@@ -82,8 +130,9 @@ class TestReferenceCompositionHandler:
         {"!ref": "/c/n1/3"},
         {"!ref": "/c/n1/x"}
     ])
-    def test_compose_on_missing_pointer_quitely_fails(self, input_value,
-                                                      ref_handler: ReferenceCompositionHandler):
+    def test_compose_on_missing_pointer_quitely_fails(
+        self, input_value, ref_handler: ReferenceCompositionHandler
+    ):
         result, value = ref_handler.compose(input_value)
         assert result == CompositionStatus.RETRY
         assert value is None

@@ -54,7 +54,8 @@ class CompositionHandler(ABC):
             obj (dict): dictionary object to check.
 
         Returns:
-            tuple[CompositionStatus, Any]: result of processing and composed value.
+            tuple[CompositionStatus, Any]: result of processing and
+            composed value.
         """
 
     @staticmethod
@@ -67,7 +68,9 @@ class CompositionHandler(ABC):
         Returns:
             Any: copy (if value is mutable) of value or value
         """
-        return copy.deepcopy(value) if isinstance(value, (dict, list)) else value
+        return copy.deepcopy(value) \
+            if isinstance(value, (dict, list)) \
+            else value
 
 
 class ReferenceCompositionHandler(CompositionHandler):
@@ -77,8 +80,8 @@ class ReferenceCompositionHandler(CompositionHandler):
     Reference syntax:
     `{"!ref": "/path/to/node"}
 
-    Should be instantiated with `utils.json_content.json_wrapper.JsonWrapper` instance,
-    to provide context for reference resolution.
+    Should be instantiated with `utils.json_content.json_wrapper.JsonWrapper`
+    instance, to provide context for reference resolution.
     """
     DEFINITION_KEY = "!ref"
 
@@ -89,16 +92,35 @@ class ReferenceCompositionHandler(CompositionHandler):
         try:
             pointer: Pointer = Pointer.from_string(obj[self.DEFINITION_KEY])
             if pointer.path is None:
-                raise ValueError("Referencing to document root is not allowed!")
+                raise ValueError(
+                    "Referencing to document root is not allowed!"
+                )
         except Exception as err:
-            err.add_note(f'Error occured on composing Reference Composition {json.dumps(obj)}.')
+            err.add_note(
+                'Error occured on composing Reference Composition '
+                f'{json.dumps(obj)}.'
+            )
             raise
 
         if pointer not in self.content_context:
             return CompositionStatus.RETRY, None
 
-        value = self.content_context.get(pointer)
-        return CompositionStatus.SUCCESS, self._copy_value(value)
+        value = self._copy_value(self.content_context.get(pointer))
+
+        if isinstance(value, dict) and len(obj) > 1:
+            # If ref to dict and there are kwargs - use them to
+            # update referenced value
+            del obj[self.DEFINITION_KEY]
+            value_content = JsonWrapper(value)
+            update_content = JsonWrapper(obj)
+            for ptr in update_content.node_map:
+                cur_value = value_content.get_or_default(ptr, None)
+                if cur_value is not None and isinstance(cur_value, dict):
+                    continue
+                value_content.update(ptr, update_content.get(ptr))
+            value = value_content.get('')
+
+        return CompositionStatus.SUCCESS, value
 
 
 class FileReferenceCompositionHandler(CompositionHandler):
@@ -124,7 +146,8 @@ class FileReferenceCompositionHandler(CompositionHandler):
 
         if self.use_cache and path in self.cache:
             # Return copy to avoid modification by reference
-            return CompositionStatus.SUCCESS, self._copy_value(self.cache[path])
+            return CompositionStatus.SUCCESS, \
+                self._copy_value(self.cache[path])
 
         try:
             content = DataReader.read_from_file(path)
@@ -155,10 +178,10 @@ class IncludeFileCompositionHandler(CompositionHandler):
 
     Params:
         "!include" (str) - path to file.
-        "!compose" (optional, bool) - flag to compose file content before including
-        to it's data to parent document. Defaults to False.
-        "!format" (optional, str) - explicit file format definition as lower case.
-        If not set - uses file extension.
+        "!compose" (optional, bool) - flag to compose file content before
+        including to it's data to parent document. Defaults to False.
+        "!format" (optional, str) - explicit file format definition as
+        lower case. If not set - uses file extension.
 
     Should be instantiated with `use_cache` bool flag to enable/disable
     file content cache.
@@ -222,8 +245,8 @@ class GeneratorCompositionHandler(CompositionHandler):
     }
     ```
 
-    Should be instantiated with `utils.generators.GeneratorsManager` instance, containing
-    generators collection.
+    Should be instantiated with `utils.generators.GeneratorsManager` instance,
+    containing generators collection.
     """
     DEFINITION_KEY = "!gen"
     ARGS_KEY = "!args"
@@ -249,7 +272,10 @@ class GeneratorCompositionHandler(CompositionHandler):
         try:
             value = self.manager.generate(name, args, kwargs, correlation_id)
         except Exception as err:
-            err.add_note(f"Error occured on composing Generator Composition {json.dumps(obj)}.")
+            err.add_note(
+                "Error occured on composing "
+                f"Generator Composition {json.dumps(obj)}."
+            )
             raise
 
         return CompositionStatus.SUCCESS, value
@@ -259,7 +285,8 @@ class MatcherCompositionHandler(CompositionHandler):
     """Handles matchers compostion.
     Creates and returns matcher.
 
-    Matcher will be instantiated by given name ("!match") and with given args ("!args").
+    Matcher will be instantiated by given name ("!match") and with given
+    args ("!args").
 
     Other keys except "!match" and "!args" will be passed to matcher as
     keyword arguments.
@@ -274,8 +301,8 @@ class MatcherCompositionHandler(CompositionHandler):
     }
     ```
 
-    Should be instantiated with `utils.matcher.MatchersManager` instance, containing
-    matchers collection.
+    Should be instantiated with `utils.matcher.MatchersManager` instance,
+    containing matchers collection.
     """
     DEFINITION_KEY = "!match"
     ARGS_KEY = "!args"
@@ -291,14 +318,18 @@ class MatcherCompositionHandler(CompositionHandler):
         name = obj[self.DEFINITION_KEY]
         args = obj.get("!args", tuple())
         kwargs = dict((
-                            (key, obj[key])
-                            for key in obj.keys()
-                            if key not in (self.DEFINITION_KEY, self.ARGS_KEY)))
+            (key, obj[key])
+            for key in obj.keys()
+            if key not in (self.DEFINITION_KEY, self.ARGS_KEY)
+        ))
 
         try:
             matcher = self.manager.get(name, args=args, kwargs=kwargs)
         except Exception as err:
-            err.add_note(f"Error occured on composing Matcher Composition {json.dumps(obj)}.")
+            err.add_note(
+                "Error occured on composing "
+                f"Matcher Composition {json.dumps(obj)}."
+            )
             raise
 
         return CompositionStatus.SUCCESS, matcher
@@ -309,8 +340,8 @@ class MatcherCompositionHandler(CompositionHandler):
 # Values - handlers __init__ keyword arguments (**kwargs).
 #
 # May be updated from anywhere by standard dict methods
-DEFAULT_COMPOSITION_HANDLERS_COLLECTION: dict[CompositionHandler, dict[str, Any]] = {
-	ReferenceCompositionHandler: {"content_context": None},
+DEFAULT_COMPOSITION_HANDLERS_COLLECTION = {
+    ReferenceCompositionHandler: {"content_context": None},
     FileReferenceCompositionHandler: {"use_cache": False},
     IncludeFileCompositionHandler: {"use_cache": False},
     GeneratorCompositionHandler: {},
