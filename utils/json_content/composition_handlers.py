@@ -107,20 +107,145 @@ class ReferenceCompositionHandler(CompositionHandler):
 
         value = self._copy_value(self.content_context.get(pointer))
 
-        if isinstance(value, dict) and len(obj) > 1:
-            # If ref to dict and there are kwargs - use them to
-            # update referenced value
-            del obj[self.DEFINITION_KEY]
-            value_content = JsonWrapper(value)
-            update_content = JsonWrapper(obj)
-            for ptr in update_content.node_map:
-                cur_value = value_content.get_or_default(ptr, None)
-                if cur_value is not None and isinstance(cur_value, dict):
-                    continue
-                value_content.update(ptr, update_content.get(ptr))
-            value = value_content.get('')
-
         return CompositionStatus.SUCCESS, value
+
+
+class ExtendReferenceCompositionHandler(CompositionHandler):
+    """Handles reference to JSON node - returns value on given pointer
+    and may modify referenced dict value according to given params.
+
+    Reference syntax:
+    ```
+    {
+        "!xref": "/path/to/node",
+        "extend": {
+            "/sub-node4": 100
+        },
+        "delete": ["/sub-node3"],
+        "ifPresent": ["/sub-node"],
+        "ifMissing": ["/sub-node2"],
+    }
+    ```
+    where:
+        `ifPresent` (list, optional): list of pointers in referenced node
+        that expected to present to apply changes. If nodes are missing -
+        handler returns RETRY result. Defaults to None, always apply.
+
+        `isMissing` (list, optional): list of pointers in referenced node
+        that expected to be missing to apply changes. If nodes are present -
+        handler returns RETRY result. Defaults to None, always apply.
+
+        `extend` (dict, optional): dict where keys are pointers in
+        referenced node that should be overwritten with given value.
+        If pointer is missing - will create new node and set value for
+        it. Defaults to None, don't extend anything.
+
+        `delete` (list, optional): list of pointers in referenced node to
+        remove. Defaults to None, don't delete anything.
+
+    Note: pointes should be rooted to referenced value itself, not to the
+    document. E.g.
+    ```{
+        "a": {"b": 100},
+        "my_ref": {
+            "!xref": "/a",            # ref value is {"b": 100}
+            "extend": { "/b": 200 }  # ref to node 'b' using ref value as root
+        }
+    }```
+
+    ifPresent/isMissing params allows to ensure that only expected target
+    value will be modified, but not a unhandled composition (e.g.
+    "!ifMissing": ["/!gen"] - will postpone handling until generator
+    composition resolved at referenced node).
+
+    Should be instantiated with `utils.json_content.json_wrapper.JsonWrapper`
+    instance, to provide context for reference resolution.
+    """
+    DEFINITION_KEY = "!xref"
+    EXTEND_KEY = "extend"
+    DELETE_KEY = "delete"
+    PRESENT_COND_KEY = "ifPresent"
+    MISSING_COND_KEY = "ifMissing"
+
+    def __init__(self, content_context: JsonWrapper):
+        self.content_context: JsonWrapper = content_context
+
+    def compose(self, obj: dict) -> Any:
+        try:
+            pointer: Pointer = Pointer.from_string(obj[self.DEFINITION_KEY])
+            if pointer.path is None:
+                raise ValueError(
+                    "Referencing to document root is not allowed!"
+                )
+        except Exception as err:
+            err.add_note(
+                'Error occured on composing Reference Composition '
+                f'{json.dumps(obj)}.'
+            )
+            raise
+
+        # Pointer is missing in current document - postpone
+        if pointer not in self.content_context:
+            return CompositionStatus.RETRY, None
+
+        value = self._copy_value(self.content_context.get(pointer))
+
+        extend_nodes = obj.get(self.EXTEND_KEY)
+        delete_nodes = obj.get(self.DELETE_KEY)
+
+        # Exit if
+        # - Target key is not a dict
+        # - Or there is nothing to extend/delete
+        if any((
+            not isinstance(value, dict),
+            extend_nodes is None and delete_nodes is None
+        )):
+            return CompositionStatus.SUCCESS, value
+
+        value_content = JsonWrapper(value)
+
+        # Check conditions
+        if not self._check_conditions(
+            value_content,
+            obj.get(self.PRESENT_COND_KEY),
+            obj.get(self.MISSING_COND_KEY)
+        ):
+            return CompositionStatus.RETRY, value
+
+        # Apply changes
+        if delete_nodes:
+            for ptr in delete_nodes:
+                value_content.delete(ptr)
+
+        if extend_nodes:
+            for ptr, extend_value in extend_nodes.items():
+                value_content.update(ptr, extend_value)
+
+        return CompositionStatus.SUCCESS, value_content.get('')
+
+    def _check_conditions(self, content: JsonWrapper,
+                          expected_nodes: list | None,
+                          unexpected_nodes: list | None) -> bool:
+        """Checks that all expected nodes are present and all unexpected
+        nodes are missing in the given content.
+
+        Args:
+            content (JsonWrapper): referenced value (dict).
+            expected_nodes (list | None): list of pointers to present.
+            unexpected_nodes (list | None): list of pointer to be missing.
+
+        Returns:
+            bool: True if both conditions pass, False if not
+        """
+        present_check = True \
+            if expected_nodes is None else \
+            all((ptr in content for ptr in expected_nodes))
+
+        missing_check = True \
+            if unexpected_nodes is None else \
+            all((ptr not in content for ptr in unexpected_nodes))
+
+        return present_check and missing_check
 
 
 class FileReferenceCompositionHandler(CompositionHandler):
@@ -342,6 +467,7 @@ class MatcherCompositionHandler(CompositionHandler):
 # May be updated from anywhere by standard dict methods
 DEFAULT_COMPOSITION_HANDLERS_COLLECTION = {
     ReferenceCompositionHandler: {"content_context": None},
+    ExtendReferenceCompositionHandler: {"content_context": None},
     FileReferenceCompositionHandler: {"use_cache": False},
     IncludeFileCompositionHandler: {"use_cache": False},
     GeneratorCompositionHandler: {},

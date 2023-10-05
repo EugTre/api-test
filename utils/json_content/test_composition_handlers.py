@@ -12,6 +12,7 @@ import utils.generators as gen
 from .json_wrapper import JsonWrapper
 from .composition_handlers import CompositionStatus, \
     ReferenceCompositionHandler, \
+    ExtendReferenceCompositionHandler, \
     FileReferenceCompositionHandler, \
     IncludeFileCompositionHandler, \
     GeneratorCompositionHandler, \
@@ -83,45 +84,10 @@ class TestReferenceCompositionHandler:
         result, value = ref_handler.compose({
             "!ref": "/a",
             "!args": [1, 2, 3],
-            # "stuff": "kek"
+            "stuff": "kek"
         })
         assert result == CompositionStatus.SUCCESS
         assert value == ref_handler.content_context.get("/a")
-
-    @pytest.mark.parametrize("content, ref_composition, expected", [
-        (
-            {"a": {"a1": 100, "a2": True}},
-            {"!ref": "/a", "a1": 300, "a3": "string"},
-            {"a1": 300, "a2": True, "a3": "string"}
-        ),
-        (
-            {"a": {"a1": 100, "a2": {"b1": 300}}},
-            {"!ref": "/a", "a1": 300, "a2": {"b1": 100}},
-            {"a1": 300, "a2": {"b1": 100}}
-        ),
-        (
-            {"a": {"a1": 100, "a2": {"b1": 300}}},
-            {"!ref": "/a", "a2": {"b2": 100}},
-            {"a1": 100, "a2": {"b1": 300, "b2": 100}}
-        ),
-        (
-            {"a": {"a1": 100}},
-            {"!ref": "/a", "a2": {"b2": 100}},
-            {"a1": 100, "a2": {"b2": 100}}
-        )
-    ], ids=[
-        "PlainDictAddUpdate",
-        "NestedDictUpdate",
-        "NestedDictAddUpdate",
-        "AddDict"
-    ])
-    def test_compose_and_merge(self, content, ref_composition, expected):
-        """Ref composition with kwargs update referenced dict value"""
-        ref_handler = ReferenceCompositionHandler(JsonWrapper(content))
-        result, value = ref_handler.compose(ref_composition)
-
-        assert result == CompositionStatus.SUCCESS
-        assert value == expected
 
     # --- Negative
     @pytest.mark.parametrize('input_value', [
@@ -140,6 +106,383 @@ class TestReferenceCompositionHandler:
     def test_compose_on_invalid_pointer_fails(self, ref_handler):
         with pytest.raises(ValueError, match='Invalid JSON Pointer .*'):
             ref_handler.compose({"!ref": "invalid one"})
+
+
+class TestExtendReferenceCompositionHandler:
+    """Tests for ExtendReferenceCompositionHandler"""
+    def test_create(self):
+        assert ExtendReferenceCompositionHandler(JsonWrapper({"a": 1}))
+
+    def test_matches(self):
+        assert ExtendReferenceCompositionHandler(JsonWrapper({"a": 1}))\
+            .match({"!xref": "/a"})
+
+    @pytest.mark.parametrize("content, ref_composition, expected", [
+            (
+                {"a": {"a1": 100, "a2": True}},
+                {"!xref": "/a", "extend": {"/a1": 300}},
+                {"a1": 300, "a2": True}
+            ),
+            (
+                {"a": {"a1": 100, "a2": True}},
+                {"!xref": "/a", "extend": {"/a1": 300, "/a2": 400}},
+                {"a1": 300, "a2": 400}
+            ),
+            (
+                {"a": {"a1": 100, "a2": True}},
+                {"!xref": "/a", "extend": {"/a1": {"b1": 1, "b2": 2}}},
+                {"a1": {"b1": 1, "b2": 2}, "a2": True}
+            ),
+            (
+                {"a": {"a1": 100, "a2": {"b1": 200}}},
+                {"!xref": "/a", "extend": {"/a2/b1": 1}},
+                {"a1": 100, "a2": {"b1": 1}}
+            ),
+        ],
+        ids=[
+            "UpdateSingleField",
+            "UpdateAllFields",
+            "UpdateWithDict",
+            "UpdateInNested"
+        ]
+    )
+    def test_compose_and_update(self, content, ref_composition,
+                                expected):
+        """Extend Ref composition with kwargs update referenced dict value"""
+        ref_handler = ExtendReferenceCompositionHandler(JsonWrapper(content))
+        result, value = ref_handler.compose(ref_composition)
+        assert result == CompositionStatus.SUCCESS
+        assert value == expected
+
+    @pytest.mark.parametrize("content, ref_composition, expected",
+        [
+            (
+                {"a": {"a1": 100}},
+                {"!xref": "/a", "extend": {"/a2": 300}},
+                {"a1": 100, "a2": 300}
+            ),
+            (
+                {"a": {"a1": 100}},
+                {"!xref": "/a", "extend": {"/a2": 200, "/a3": 300}},
+                {"a1": 100, "a2": 200, "a3": 300}
+            ),
+            (
+                {"a": {"a1": {"b1": 1}, "a2": 400}},
+                {"!xref": "/a", "extend": {"/a1/b1": 1, "/a1/b2": 2}},
+                {"a1": {"b1": 1, "b2": 2}, "a2": 400}
+            ),
+        ],
+        ids=[
+            "AppendSingleField",
+            "AppendMultipleFields",
+            "AppedInNested"
+        ]
+    )
+    def test_compose_and_append(self, content, ref_composition, expected):
+        """Extend Ref composition with appending kwargs to referenced
+        dict value"""
+        ref_handler = ExtendReferenceCompositionHandler(JsonWrapper(content))
+        result, value = ref_handler.compose(ref_composition)
+        assert result == CompositionStatus.SUCCESS
+        assert value == expected
+
+    @pytest.mark.parametrize("content, ref_composition, expected",
+        [
+            (
+                {"a": {"a1": 100}},
+                {"!xref": "/a", "extend": {"/a1": 300}},
+                {"a1": 300}
+            ),
+            (
+                {"a": {"a1": 100, "a2": 200}},
+                {"!xref": "/a", "extend": {"/a1": 500, "/a2": 600 }},
+                {"a1": 500, "a2": 600}
+            ),
+            (
+                {"a": {"a1": {"b1": 1}}},
+                {"!xref": "/a", "extend": {"/a1": {"b3": 300}}},
+                {"a1": {"b3": 300}}
+            ),
+            (
+                {"a": {"a1": {"b1": 1}}},
+                {"!xref": "/a", "extend": {"/a1/b1": 300}},
+                {"a1": {"b1": 300}}
+            ),
+        ],
+        ids=[
+            "OverwriteSingleField",
+            "OverwriteMultipleFields",
+            "OverwriteDict",
+            "OverwriteInNested"
+        ]
+    )
+    def test_compose_and_overwrite(self, content, ref_composition, expected):
+        """Extend Ref composition with overwrite referenced dict value"""
+        ref_handler = ExtendReferenceCompositionHandler(JsonWrapper(content))
+        result, value = ref_handler.compose(ref_composition)
+        assert result == CompositionStatus.SUCCESS
+        assert value == expected
+
+    @pytest.mark.parametrize("content, ref_composition, expected",
+        [
+            (
+                {"a": {"a1": 100, "a2": 300}},
+                {"!xref": "/a", "delete": ["/a2"]},
+                {"a1": 100}
+            ),
+            (
+                {"a": {"a1": 100, "a2": 200}},
+                {"!xref": "/a", "delete": ['/a1', '/a2']},
+                {}
+            ),
+            (
+                {"a": {"a1": 100, "a2": {"b1": 1}}},
+                {"!xref": "/a", "delete": ["/a2"]},
+                {"a1": 100}
+            ),
+            (
+                {"a": {"a1": {"b1": 1, "b2": 2}}},
+                {"!xref": "/a", "delete": ["/a1/b2"]},
+                {"a1": {"b1": 1}}
+            ),
+        ],
+        ids=[
+            "DeleteSingleField",
+            "DeleteSeveralFields",
+            "DeleteDictField",
+            "DeleteInNested"
+        ]
+    )
+    def test_compose_and_delete(self, content, ref_composition, expected):
+        """Extend Ref composition with deletion of fields in referenced dict value"""
+        ref_handler = ExtendReferenceCompositionHandler(JsonWrapper(content))
+        result, value = ref_handler.compose(ref_composition)
+        assert result == CompositionStatus.SUCCESS
+        assert value == expected
+
+    @pytest.mark.parametrize("content, ref_composition, expected",
+        [
+            (
+                {"a": {"a1": 100, "a2": 300}},
+                {
+                    "!xref": "/a",
+                    "delete": ["/a1"],
+                    "extend": {
+                        "/a2": 500,
+                        "/a3": 900
+                    }
+                },
+                {"a2": 500, "a3": 900}
+            ),
+            (
+                {"a": {
+                    "a1": {"b1": 1, "b2": 2},
+                    "a2": {"b1": 3, "b2": 4},
+                    "a3": {"b1": 5, "b2": 6}
+                }},
+                {
+                    "!xref": "/a",
+                    "delete": ['/a1/b1', '/a1/b2'],
+                    "extend": {
+                        "/a2/b1": 100,
+                        "/a3/b3": 100
+                    }
+                },
+                {
+                    "a1": {},
+                    "a2": {"b1": 100, "b2": 4},
+                    "a3": {"b1": 5, "b2": 6, "b3": 100}
+                }
+            ),
+            (
+                {"a": {
+                    "a1": {"b1": 1, "b2": 2},
+                    "a2": {"b1": 3, "b2": 4},
+                    "a3": {"b1": 5, "b2": 6}
+                }},
+                {
+                    "!xref": "/a",
+                    "delete": ["/a1"],
+                    "extend": {
+                        "/a2": {"c": 100},
+                        "/a3/b1": 500,
+                        "/a3/b3": 600
+                    }
+                },
+                {
+                    "a2": {"c": 100},
+                    "a3": {"b1": 500, "b2": 6, "b3": 600}
+                }
+            )
+        ],
+        ids=[
+            "Flat",
+            "Nested",
+            "Dicts"
+        ]
+    )
+    def test_compose_and_mixed(self, content, ref_composition, expected):
+        """Extend Ref composition with mixed operations in referenced dict value"""
+        ref_handler = ExtendReferenceCompositionHandler(JsonWrapper(content))
+        result, value = ref_handler.compose(ref_composition)
+        assert result == CompositionStatus.SUCCESS
+        assert value == expected
+
+    @pytest.mark.parametrize("content, ref_composition, expected",
+        [
+            (
+                {"a": {"a1": 100, "a2": 300}},
+                {
+                    "!xref": "/a",
+                    "ifPresent": ["/a1"],
+                    "extend": {"/a3": 900}
+                },
+                {"a1": 100, "a2": 300, "a3": 900}
+            ),
+            (
+                {"a": {"a1": 100, "a2": 300}},
+                {
+                    "!xref": "/a",
+                    "ifMissing": ["/a444"],
+                    "extend": {"/a3": 900}
+                },
+                {"a1": 100, "a2": 300, "a3": 900}
+            ),
+            (
+                {"a": {"a1": 100, "a2": 300}},
+                {
+                    "!xref": "/a",
+                    "ifPresent": ["/a1", "/a2"],
+                    "extend": {"/a3": 900}
+                },
+                {"a1": 100, "a2": 300, "a3": 900}
+            ),
+            (
+                {"a": {"a1": 100, "a2": 300}},
+                {
+                    "!xref": "/a",
+                    "ifMissing": ["/a444", "/b555"],
+                    "extend": {"/a3": 900}
+                },
+                {"a1": 100, "a2": 300, "a3": 900}
+            ),
+            (
+                {"a": {"a1": 100, "a2": 300}},
+                {
+                    "!xref": "/a",
+                    "ifPresent": ["/a1", "/a2"],
+                    "ifMissing": ["/a444", "/b555"],
+                    "extend": {"/a3": 900}
+                },
+                {"a1": 100, "a2": 300, "a3": 900}
+            ),
+        ],
+        ids=[
+            "OnPrecense",
+            "OnMissing",
+            "OnPrecenseMultiple",
+            "OnMissingMultiple",
+            "MixedCondition"
+        ]
+    )
+    def test_compose_on_condition(self, content, ref_composition, expected):
+        """Extend Ref composition with condition for referenced dict value"""
+        ref_handler = ExtendReferenceCompositionHandler(JsonWrapper(content))
+        result, value = ref_handler.compose(ref_composition)
+        assert result == CompositionStatus.SUCCESS
+        assert value == expected
+
+    @pytest.mark.parametrize("content, ref_composition",
+        [
+            (
+                {"a": {"a1": 100}},
+                {
+                    "!xref": "/a",
+                    "ifPresent": ["/a5"],
+                    "extend": {"/a3": 900}
+                }
+            ),
+            (
+                {"a": {"a1": 100}},
+                {
+                    "!xref": "/a",
+                    "ifPresent": ["/a5", "/a6"],
+                    "extend": {"/a3": 900}
+                }
+            ),
+            (
+                {"a": {"a1": 100}},
+                {
+                    "!xref": "/a",
+                    "ifPresent": ["/a1", "/a6"],
+                    "extend": {"/a3": 900}
+                }
+            ),
+            (
+                {"a": {"a1": 100}},
+                {
+                    "!xref": "/a",
+                    "ifMissing": ["/a1"],
+                    "extend": {"/a3": 900}
+                }
+            ),
+            (
+                {"a": {"a1": 100, "a2": 200}},
+                {
+                    "!xref": "/a",
+                    "ifMissing": ["/a1", "/a2"],
+                    "extend": {"/a3": 900}
+                }
+            ),
+            (
+                {"a": {"a1": 100}},
+                {
+                    "!xref": "/a",
+                    "ifMissing": ["/a1", "/a6"],
+                    "extend": {"/a3": 900}
+                }
+            )
+        ],
+        ids=[
+            "ifPresentFails",
+            "ifPresentMultipleFails",
+            "ifPresentOneOfMultipleFails",
+            "ifMissingFails",
+            "ifMissingMultipleFails",
+            "ifMissingOneOfMultipleFails"
+        ]
+    )
+    def test_compose_on_condition_fails(self, content, ref_composition):
+        """Extend Ref composition with failed condition for referenced dict
+        value
+        return RETRY result and does nothing"""
+        ref_handler = ExtendReferenceCompositionHandler(JsonWrapper(content))
+        result, value = ref_handler.compose(ref_composition)
+        assert result == CompositionStatus.RETRY
+        assert value == content['a']
+
+    @pytest.mark.parametrize("ref_composition", [
+        {"!xref": "/a"},
+        {
+            "!xref": "/a",
+            "ifPresent": ["/a"]
+        },
+        {
+            "!xref": "/a",
+            "ifPresent": ["/b"],
+            "ifMissing": ["/a"]
+        }
+    ], ids=[
+        "NoFields",
+        "ValidCondition",
+        "InvalidCondition"
+    ])
+    def test_compose_skip_on_missing_modify_fields(self, ref_composition):
+        content = {"a": {"a1": 100}}
+        ref_handler = ExtendReferenceCompositionHandler(JsonWrapper(content))
+        result, value = ref_handler.compose(ref_composition)
+        assert result == CompositionStatus.SUCCESS
+        assert value == content['a']
 
 
 class TestFileReferenceCompositionHandler:

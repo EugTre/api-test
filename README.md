@@ -95,6 +95,31 @@ Allows to re-use value at given node. Compositor will search for given JSON poin
 
 For common values it's recommended to store values in special node at root called `$defs` and refer to it.  After successful composition of document this node will be automatically removed.
 
+##### Extended Reference to document node
+Handled by: `utils.json_content.composition_handlers.ExtendReferenceCompositionHandler`
+```json
+{
+   "!xref": "/path/to/node",
+   "extend": {
+       "/sub-node4": 100
+   },
+   "delete": ["/sub-node3"],
+   "ifPresent": ["/sub-node"],
+   "ifMissing": ["/sub-node2"]
+}
+```
+Allows to re-use value at given node and to modify referenced dictionary value.
+
+Compositor will search for given JSON pointer and replace composition with copy of found value. If value is a dictionary and if `extend` or `delete` params defined - copied value will be modified (nodes will be updated, added or removed), otherwise `!xref` works exactly as `!ref`.
+
+Note, that pointers listed in `extend` and `delete` params must be constructed relative to referenced value, not to entire document!
+Modifications are done via `JsonWrapper` class, and must follow same logic (e.g. update only existing node or add node to existing dict).
+
+In case if one is referencing to non-static content (e.g. another ref or generator compositions), the `ifPresent` and `ifMissing` params allow to define a list of pointers that expected to present (or to be missing) in referenced value. If conditions are not met, composition will be returned untouched and be waiting until document will be processed before next try.
+
+After successful composition of document this node will be automatically removed.
+
+
 ##### Reference to JSON file
 Handled by: `utils.json_content.composition_handlers.FileReferenceCompositionHandler`
 ```json
@@ -113,7 +138,7 @@ Handled by: `utils.json_content.composition_handlers.IncludeFileCompositionHandl
 ```json
 {
     "!include": "/path/to/file.json",
-    "!compose": True/False,
+    "!compose": true/false,
     "!format": "json"/"text"
 }
 ```

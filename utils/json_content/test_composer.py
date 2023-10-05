@@ -13,6 +13,7 @@ from utils.matchers.matcher import MatchersManager, AnyText, AnyListOf
 from .composer import Composer
 from .json_wrapper import JsonWrapper
 from .composition_handlers import ReferenceCompositionHandler, \
+    ExtendReferenceCompositionHandler, \
     FileReferenceCompositionHandler, \
     IncludeFileCompositionHandler, \
     GeneratorCompositionHandler, \
@@ -36,9 +37,19 @@ def get_handlers():
         ReferenceCompositionHandler: {"content_context": None},
     }
 
+
 def gen_number():
     """Generates a number"""
     return 42
+
+
+def gen_data():
+    """Generates person's' data"""
+    return {
+        "firstname": "Alex",
+        "lastname": "Doe",
+        "age": 33
+    }
 
 
 class TestComposerCreation:
@@ -314,9 +325,68 @@ class TestComposer:
 
         assert wrapper.get('') == expected_content
 
+    def test_compose_with_xref(self):
+        """Compose extend reference composition"""
+        content = {
+            "a": {
+                "a1": 100,
+                "a2": 200
+            },
+            "b": {
+                "!xref": "/a",
+                "extend": {"/a1": 500}
+            }
+        }
+        content_wrapper = JsonWrapper(copy.deepcopy(content))
+        composer = Composer(content_wrapper, handlers={
+            ExtendReferenceCompositionHandler: {"content_context": None}
+        })
+        composer.compose_content()
 
+        assert content_wrapper.get('') == {
+            "a": {
+                "a1": 100,
+                "a2": 200
+            },
+            "b": {
+                "a1": 500,
+                "a2": 200
+            }
+        }
 
+    def test_compose_with_xref_postponed(self):
+        """Compose extend reference composition"""
+        content = {
+            "b": {
+                "!xref": "/x",
+                "ifMissing": ["/!gen"],
+                "extend": {"/firstname": "John"}
+            },
+            "x": {"!gen": "Person"}
+        }
+        content_wrapper = JsonWrapper(copy.deepcopy(content))
 
+        gen_manager = GeneratorsManager()
+        gen_manager.add(gen_data, name="Person")
+
+        composer = Composer(content_wrapper, handlers={
+            ExtendReferenceCompositionHandler: {"content_context": None},
+            GeneratorCompositionHandler: {"manager": gen_manager}
+        })
+        composer.compose_content()
+
+        assert content_wrapper.get('') == {
+            "x": {
+                "firstname": "Alex",
+                "lastname": "Doe",
+                "age": 33
+            },
+            "b": {
+                "firstname": "John",
+                "lastname": "Doe",
+                "age": 33
+            }
+        }
 
     # --- Ref Resolution tests
     @pytest.mark.parametrize("content, expected_content", [

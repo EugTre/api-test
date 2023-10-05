@@ -19,18 +19,19 @@ class Composer:
 
     def __init__(self,
                  content_context: JsonWrapper,
-                 handlers: dict[Type[CompositionHandler], dict]|None = None):
+                 handlers: dict[Type[CompositionHandler], dict] | None = None):
         """Creates an instance of `ReferenceResolver` class.
 
         Args:
             content_context (JsonWrapper): content wrapper to compose.
-            handlers (dict[Type[CompositionHandler], dict] | None, optional): collection
-            of handlers classes and their parameters to use. Defaults to
+            handlers (dict[Type[CompositionHandler], dict] | None, optional):
+            collection of handlers classes and their parameters to use.
+            Defaults to
             'DEFAULT_COMPOSITION_HANDLERS_COLLECTION' from
             `utils.json_content.compositionhandlers`.
 
-            Note that if handler parameter "content_context" is set to None, Composer's
-            content_context will be passed to handler isntead.
+            Note that if handler parameter "content_context" is set to None,
+            Composer's content_context will be passed to handler isntead.
 
             Handlers example
             ```
@@ -52,7 +53,8 @@ class Composer:
 
         for handler, handler_kwargs in handlers.items():
             # Provide content context to handler requesting it.
-            # Copy before change, as dicts passed by reference, and direct change will
+            # Copy before change, as dicts passed by reference,
+            # and direct change will
             # change handlers list forevery other composer created after
             if HANDLER_CONTEXT_KEY in handler_kwargs and \
                     handler_kwargs[HANDLER_CONTEXT_KEY] is None:
@@ -63,15 +65,19 @@ class Composer:
             try:
                 handler_instance = handler(**handler_kwargs)
             except Exception as err:
-                err.add_note('Error occured on Json Content Composer instance creation, '
-                             'during composition handlers preparation.')
+                err.add_note(
+                    'Error occured on Json Content Composer '
+                    'instance creation, '
+                    'during composition handlers preparation.'
+                )
                 raise
             self.handlers.append(handler_instance)
 
         self._target_nodes: list[Pointer] = None
         self.__stack_nodes = []
 
-    def compose_content(self, node_pointer: Pointer|str = '', remove_defs: bool = False):
+    def compose_content(self, node_pointer: Pointer | str = '',
+                        remove_defs: bool = False) -> None:
         """Scans content and converts every composition met to a value.
 
         Method start loop and checks required nodes for compositions.
@@ -108,21 +114,31 @@ class Composer:
 
             for node_ptr in nodes:
                 current_value = self.content.get(node_ptr)
-                new_value = self.scan_and_compose_values(current_value, node_ptr.path)
+                new_value = self.scan_and_compose_values(
+                    current_value, node_ptr.path
+                )
+
                 if current_value != new_value:
                     self.content.update(node_ptr, new_value)
                     values_changed = True
 
-            # If revisited nodes weren't updated on previous pass and there are still
-            # nodes to revisit, then something gone wrong -- recursive reference?
-            if not values_changed and self._target_nodes and self._target_nodes == nodes:
+            # If revisited nodes weren't updated on previous pass and
+            # there are still nodes to revisit,
+            # then something gone wrong -- recursive reference?
+            if all((
+                not values_changed,
+                self._target_nodes and self._target_nodes == nodes
+            )):
                 nodes_info = '\n'.join([
-                    f'- node: "{node}", current value: {self.content.get(node)}'
+                    f'- node: "{node}", '
+                    f'current value: {self.content.get(node)}'
                     for node in self._target_nodes])
-                raise RuntimeError('Unresolved errors occured during content composition '
-                    'for nodes:\n'
+                raise RuntimeError(
+                    'Unresolved errors occured during content '
+                    'composition for nodes:\n'
                     f'{nodes_info}.\n'
-                    'Please, ensure that compositions used in given nodes are valid!\n'
+                    'Please, ensure that compositions used in given '
+                    'nodes are valid!\n'
                     'Possible problems:\n'
                     '- referencing to non-existent nodes;\n'
                     '- recursion references;\n'
@@ -131,14 +147,18 @@ class Composer:
         if remove_defs:
             self.content.delete(DEFS_POINTER)
 
-    def scan_and_compose_values(self, value: Any, node_context: str|tuple|None) -> Any:
-        """Recursively scans deep into given collection and search for compositions.
+    def scan_and_compose_values(self, value: Any,
+                                node_context: str | tuple | None) -> Any:
+        """Recursively scans deep into given collection and search for
+        compositions.
         When found - composes it to value and updates content.
-        Returns resulting value or untouched value, if no composition was found.
+        Returns resulting value or untouched value, if no composition
+        was found.
 
         Args:
             value (Any): value to scan/compose.
-            node_context (str | tuple | None): parent node descriptor to track context.
+            node_context (str | tuple | None): parent node descriptor
+            to track context.
 
         Returns:
             Any: resolved value.
@@ -158,7 +178,11 @@ class Composer:
             handler: CompositionHandler = self._look_for_handler(value)
             if handler:
                 # Composition will be resolved into values
-                value = self._handle_composition(handler, self.__get_current_node_pointer(), value)
+                value = self._handle_composition(
+                    handler,
+                    self.__get_current_node_pointer(),
+                    value
+                )
         elif isinstance(value, list):
             # Loop through list elements and try to compose them
             for i, item_value in enumerate(value):
@@ -185,12 +209,17 @@ class Composer:
 
         return None
 
-    def _handle_composition(self, handler: CompositionHandler, pointer: Pointer, composition: dict):
-        """Converts composition into a value, handling additional logic to track changed nodes"""
+    def _handle_composition(self, handler: CompositionHandler,
+                            pointer: Pointer, composition: dict):
+        """Converts composition into a value, handling additional
+        logic to track changed nodes"""
         try:
             composition_status, result_value = handler.compose(composition)
         except Exception as err:
-            err.add_note(f'Error occured on composing value at pointer "{pointer}".')
+            err.add_note(
+                'Error occured on composing '
+                f'value at pointer "{pointer}".'
+            )
             raise err
 
         if composition_status == CompositionStatus.RETRY:
@@ -213,12 +242,15 @@ class Composer:
 
         return result_value
 
-    def __get_current_node_pointer(self, key: str|int|None = None) -> Pointer:
+    def __get_current_node_pointer(self,
+                                   key: str | int | None = None) -> Pointer:
         """Returns Pointer of currently scanned node"""
-        path = [*self.__stack_nodes, str(key)] if key is not None else self.__stack_nodes
+        path = [*self.__stack_nodes, str(key)] \
+            if key is not None else \
+            self.__stack_nodes
         return Pointer.from_path(path)
 
-    def __append_node_stack(self, node: str|tuple|None):
+    def __append_node_stack(self, node: str | tuple | None):
         """Sets or update node stack"""
         if node is None:
             self.__stack_nodes = []
