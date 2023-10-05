@@ -35,13 +35,29 @@ def prepare_api_clients_configurations(
 ) -> ApiClientsSpecificationCollection:
     """Setups api by configuration provided by --api-config command-line
     argument"""
+
     if not os.path.exists(api_config_file):
         raise FileNotFoundError(
             'Missing API config file provided by `--api-config` option '
             f'with name "{api_config_file}".'
         )
-
     return ApiConfigurationReader(api_config_file).read_configurations()
+
+
+def export_api_config(config: ApiClientsSpecificationCollection,
+                      filename: str) -> None:
+    """Dumps composed API Specs to a file.
+
+    Args:
+        config (ApiClientsSpecificationCollection): collection
+        of composed api config.
+        filename (str): target file to export data to.
+    """
+    with open(filename, mode='w', encoding="utf-8") as file:
+        file.write(f'Source config file: {config.source_file}\n')
+        for cfg, val in config.configs.items():
+            file.write(f'\nAPI: {cfg}\n')
+            _ = [file.write(f'  {line}\n') for line in val.get_repr(True)]
 
 
 # --- Initialization hooks ----
@@ -58,6 +74,13 @@ def pytest_addoption(parser):
         action="store",
         default="config/api_clients.json",
         help="Configuration file for API Clients"
+    )
+    parser.addoption(
+        "--api-config-export",
+        action="store",
+        default="",
+        help="Filename to dump composed configuration to."
+        "If not set - do not dump any data."
     )
 
 
@@ -78,6 +101,11 @@ def pytest_configure(config):
     pytest.api_config = prepare_api_clients_configurations(
         config.getoption("--api-config")
     )
+
+    dump_to_file = config.getoption("--api-config-export")
+    if dump_to_file:
+        export_api_config(pytest.api_config, dump_to_file)
+
 
 # --- Common fixtures ---
 # ----------------------

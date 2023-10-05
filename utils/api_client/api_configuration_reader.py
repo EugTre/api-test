@@ -16,11 +16,12 @@ class ApiConfigurationReader:
         self._config_file = api_base_config_file
 
     def read_configurations(self) -> ApiClientsSpecificationCollection:
-        """Reads and compose configurations from base config file and all nested links.
+        """Reads and compose configurations from base config file and all
+        nested links.
 
         Returns:
-            ApiClientsConfigurationCollection: collection of API specifications,
-            ready-to-use for API Client creation.
+            ApiClientsConfigurationCollection: collection of
+            API specifications, ready-to-use for API Client creation.
         """
         logging.info('Read configuration from "%s".', self._config_file)
 
@@ -36,7 +37,10 @@ class ApiConfigurationReader:
             raise
 
         configs = {
-            api_name_key: self.generate_api_specification(api_name_key, api_config_data)
+            api_name_key: self.generate_api_specification(
+                api_name_key,
+                api_config_data
+            )
             for api_name_key, api_config_data in config_content.items()
         }
 
@@ -48,7 +52,8 @@ class ApiConfigurationReader:
 
     def generate_api_specification(self, api_name: str,
                                    cfg: dict) -> ApiClientSpecification:
-        """Reads, pre-validates and compose configuration for specific API from config.
+        """Reads, pre-validates and compose configuration for specific
+        API from config.
 
         Args:
             api_name (str): name of the API.
@@ -60,22 +65,32 @@ class ApiConfigurationReader:
         logging.info('Generating API specification for API "%s".', api_name)
 
         if not cfg.get('url'):
-            raise ValueError(f'There is no "url" defined for "{api_name}" API Client '
-                             f'in configuration file "{self._config_file}".')
+            raise ValueError(
+                f'There is no "url" defined for "{api_name}" API Client '
+                f'in configuration file "{self._config_file}".'
+            )
 
         # Handle error and append some user-friendly message
         try:
             api_cfg = ApiConfiguration(name=api_name, **cfg)
             request_catalog = self.compile_requests_catalog(api_cfg)
         except Exception as err:
-            details = '\n'.join(err.__notes__) if getattr(err, '__notes__', None) else ''
+            details = '\n'.join(err.__notes__) \
+                if getattr(err, '__notes__', None) else \
+                ''
+
             raise ValueError(
-                f'Error on composing API Specification for "{api_name}" API client.'
+                f'Error on composing API Specification for "{api_name}" '
+                'API client.'
                 f'\nException {err.__class__.__name__}: {err}'
                 f'\nDetails: {details}'
             ) from err
 
-        logging.debug('API specification for "%s" was created successfully.', api_name)
+        logging.debug(
+            'API specification for "%s" was created successfully.',
+            api_name
+        )
+
         return ApiClientSpecification(
             api_config=api_cfg,
             req_catalog=request_catalog
@@ -94,8 +109,11 @@ class ApiConfigurationReader:
         if not api_config.requests:
             return None
 
-        logging.info('Composing Request catalog for "%s" of %s request(s).',
-                      api_config.name, len(api_config.requests))
+        logging.info(
+            'Composing Request catalog for "%s" of %s request(s).',
+            api_config.name, len(api_config.requests)
+        )
+
         requests_catalog = {}
         for request_name, request_data in api_config.requests.items():
             requests_catalog[request_name] = RequestCatalogEntity(

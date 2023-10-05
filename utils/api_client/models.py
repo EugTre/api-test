@@ -96,6 +96,31 @@ class ApiClientSpecification:
             "request_catalog": self.request_catalog
         }
 
+    def get_repr(self, include_catalog: bool = False) -> list[str]:
+        """Returns object representation as list of strings."""
+        ignore = ["request_catalog"]
+
+        output = ['Specification:']
+        for field in dataclass_fields(self):
+            if field.name in ignore:
+                continue
+            output.append(
+                f'  {field.name}: {getattr(self, field.name)}'
+            )
+
+        if not include_catalog:
+            return output
+
+        output.append('Request catalog:')
+        for val in self.request_catalog.values():
+            output.append(f'  {val.name}:')
+            for line in val.request.get_repr():
+                output.append(f'    {line}')
+            for line in val.response.get_repr():
+                output.append(f'    {line}')
+
+        return output
+
 
 # --- Request catalog ---
 @dataclass(slots=True)
@@ -112,6 +137,15 @@ class RequestEntity:
     text: str | None = None
     timeout: int = None
 
+    def get_repr(self) -> list[str]:
+        """Returns instance representation as list of strings"""
+        output = ['Request:']
+        for field in dataclass_fields(self):
+            output.append(
+                f'  {field.name}: {getattr(self, field.name)}'
+            )
+        return output
+
 
 @dataclass(slots=True)
 class ResponseEntity:
@@ -121,6 +155,15 @@ class ResponseEntity:
     json: dict | list = None
     text: str | None = None
     headers: dict = None
+
+    def get_repr(self) -> list[str]:
+        """Returns instance representation as list of strings"""
+        output = ['Response (expected):']
+        for field in dataclass_fields(self):
+            output.append(
+                f'  {field.name}: {getattr(self, field.name)}'
+            )
+        return output
 
 
 @dataclass(frozen=True, slots=True)

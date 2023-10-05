@@ -40,22 +40,31 @@ pip install -r requirements.txt
 7. Install Allure commandline - see https://docs.qameta.io/allure/#_installing_a_commandline
 
 ### Run tests
-For 'DummyAPI' test one need to get `app-id` value for header. Go to https://dummyapi.io/ and Sign In using preferred method, then generate `app-id` and add it as `app-id` header in DummyAPI section of API configuration (see below).
 
-Run **tests from specific file or directory**:
+Run **tests from specific directory** with **Allure** logging:
 ```bash
-pytest .\tests\dummy_api\test_1.py --alluredir=./tmp --clean-alluredir
+pytest .\tests\dog_ceo_api\list_breeds_feature\ --alluredir=./tmp
 ```
 
 Run **all tests**:
 ```bash
-pytest --alluredir=./tmp --clean-alluredir -vv -s
+pytest --alluredir=./tmp
 ```
 
 Check **Allure** report:
 ```bash
 allure serve .\tmp\
 ```
+
+#### Params
+
+- `--clean-alluredir` - cleans Allure dir from previous runs.
+
+- `--api-config=path/to/file` - path to API clients config file (defaults to *config/api_clients.json*).
+
+- `--logging-config=path/to/file` - path to configuration file for logging (defaults to *config/logging.ini*).
+
+- `--api-config-export=path/to/file` -- filename to dump composed api configuration. If not set - do not dump any data.
 
 # <a name='overview'></a>Framework Overview [↑](#toc)
 
@@ -186,7 +195,7 @@ Looks for Matcher object of given class name, instantiate it with given `!args` 
 Other composition parameters will be passed to matcher constructor as keyword arguments.
 
 
-### API Client configuration (api_config.ini)
+### API Client configuration (api_config.json)
 
 *Note*: `Auth` related configurations are very basic, just ignore them except very simple cases like user-pass authentication.
 
@@ -197,6 +206,8 @@ Path to this file should be passed as CLI argument `--api-config` (default is *c
 Each API client should be configured under it's own section, where section name is name of the API used in pytest fixture to retrieve configured `ApiRequestHelper` object:
 ```javascript
 {
+    // Note: JS-like one line comments are allowed in json configs of project!
+
     // $defs section may be used as storage of common elements
     // for referencing from other nodes
     "$defs": {}
@@ -256,7 +267,8 @@ Property | Value Example | Description
 `headers` | *{"Content-Type": "text/html; charset=utf-8"}* | Headers to add in request. Will be combined with base config level headers, overwritting headers with the same name.
 `cookies` | *{"cookie1": "1"}* | Cookies to add in request. Will be combined with base config level cookies, overwritting cookies with the same name.
 `auth` | *["user","passw"]* | Auth params to add in request. Overwrittes base config level auth values.
-`json` | *{"key": "value"}* | Default JSON payload for request.
+`json` | *{"key": "value"}* | Default JSON payload for request. Use `text` or `json`, but not both.
+`text` | *"any text"* | Raw text to be added as request body. Use `text` or `json`, but not both.
 
 #### `response` object
 Property | Value Example | Description
@@ -264,6 +276,7 @@ Property | Value Example | Description
 `status_code` | *200* | Expected status code number for response.
 `schema` | *{...}* | Expected JSON Schema (see https://json-schema.org/) for response.
 `json` | *{"key": "value"}* | Expected JSON payload for response.
+`text` | *"any text"* | Expected response body (in case response is not formatted as JSON).
 `headers` | *{"Content-Type": "text/html; charset=utf-8"}* | Expected headers for response.
 
 ****Note:*** It's recommended to use `!include` composition with `!compose: True` param for including request catalog. This also allows to use catalog-specific `$defs` section to share common values.
@@ -374,6 +387,9 @@ Class wraps API Client of specific configured API with user-friendly interface t
 Almost all methods of class return instance of class, allowing call chaining.
 
 #### Initialize new request
+
+See `utils.api_helpers.api_request_helper` for detailed documentation of methods.
+
 ###### `.by_name(name: str)`
 searches for request with given name in configuration for API, and apply pre-configured values.
 
@@ -422,6 +438,8 @@ Class wraps `requests.Response` object with various verification methods.
 
 Almost all methods of class return instance of class, allowing call chaining.
 
+See `utils.api_helpers.api_response_helper` for detailed documentation of methods.
+
 #### General functions
 `.set_expected()` - sets expected values (status_code, json content, cookies and headers) to test against.
 
@@ -442,6 +460,8 @@ Functions decorated with Allure step and will raise `AssertionError` if test fai
 
 `.is_empty()`/`.is_not_empty()` - tests response's raw body content is empty or not.
 
+`.equals()` - test response's body text to be equal given/expected text.
+
 `.latency_is_lower_than()` - tests response's elapsed time against given value in milliseconds.
 
 #### Response body JSON verification
@@ -451,32 +471,33 @@ Methods that tests for equals are assumed to be used with Matcher objects for sp
 
 Params must be accessed using JSON Pointer syntax (see https://datatracker.ietf.org/doc/html/rfc6901).
 
-`.set_expected()` - sets expected dict|list of JSON to test against.
+`.json.set_expected()` - sets expected dict|list of JSON to test against.
 
-`.equals()` - tests that JSON is equal to given/expected. Asserts on missing/extra keys or non-equal values.
-`.is_like()` - tests that JSON contains all given keys and values as given/expected. Asserts if any given key is missing or value is not equals.
+`.json.equals()` - tests that JSON is equal to given/expected. Asserts on missing/extra keys or non-equal values.
+`.json.is_like()` - tests that JSON contains all given keys and values as given/expected. Asserts if any given key is missing or value is not equals.
 
-`.params_present()`/`.params_not_present()` - tests that all given params are present/absent in JSON.
+`.json.params_present()`/`.json.params_not_present()` - tests that all given params are present/absent in JSON.
 
-`.params_are_empty()`/`.params_are_not_empty()` - tests that all given params are empty (`None`, `[]`, `{}`, `''`) or not.
+`.json.params_are_empty()`/`.json.params_are_not_empty()` - tests that all given params are empty (`None`, `[]`, `{}`, `''`) or not.
 
-`.param_equals()` - tests that given param equals to given value/Matcher. Asserts if not.
+`.json.param_equals()` - tests that given param equals to given value/Matcher. Asserts if not.
+
 #### Response headers verification
 Methods are available under `headers` property of `ApiResponseHelper`. All methods return parent instance of `ApiResponseHelper`, allowing call chaining.
 
 Methods that tests for equals are assumed to be used with Matcher objects for specific data type validation.
 
-`.set_expected()` - sets expected dict of headers to test against.
+`.headers.set_expected()` - sets expected dict of headers to test against.
 
-`.are_like()` - tests that headers have all given/expected keys and it's values. Asserts if keys are missing or values are not equal.
+`.headers.are_like()` - tests that headers have all given/expected keys and it's values. Asserts if keys are missing or values are not equal.
 
-`.equals()`- test that headers are equal to given/expected. Asserts if there are missing/extra keys or values doesn't match.
+`.headers.equals()`- test that headers are equal to given/expected. Asserts if there are missing/extra keys or values doesn't match.
 
-`.present()` / `.not_present()` - tests that all headers from given list are present/missing in response headers.
+`.headers.present()` / `.not_present()` - tests that all headers from given list are present/missing in response headers.
 
-`.header_contains()` - check that given header is present and it's value contains given substring.
+`.headers.header_contains()` - check that given header is present and it's value contains given substring.
 
-`.header_equals()` - check that given header is present and it's value is equal to given.
+`.headers.header_equals()` - check that given header is present and it's value is equal to given.
 
 
 ## <a name='overview_matchers'></a>Matchers [↑](#toc)
