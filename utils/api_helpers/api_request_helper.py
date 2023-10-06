@@ -421,6 +421,7 @@ class ApiRequestHelper:
 
     def perform(self, override_defaults: bool = False,
                 save_cookies: bool = True,
+                check_status_code: bool = True,
                 **request_args) -> ApiResponseHelper:
         """Performs HTTP request with given request parameters
         (headers, cookies, auth, etc.),
@@ -454,6 +455,9 @@ class ApiRequestHelper:
             'auth'. Defaults to False.
             save_cookies (bool, optional): Flag to save response cookies for
             futher use in requests. Default to True.
+            check_status_code(bool, optional): Flat to check status code
+            before returning the response helper instance. Used to fail
+            early and avoid other validations. Defaults to True.
             **request_args: key-values pairs of `requests.request` method
             (headers, cookies, json, etc.)
 
@@ -484,8 +488,13 @@ class ApiRequestHelper:
                                      response.url)
             self.count += 1
 
-        return ApiResponseHelper(response) \
-            .set_expected(expected_response=self.expected).status_code_equals()
+        response_helper = ApiResponseHelper(response) \
+            .set_expected(expected_response=self.expected)
+
+        if not check_status_code:
+            return response_helper
+
+        return response_helper.status_code_equals()
 
     # Private methods
     def __allure_save_request_params(self, request_args: dict) -> None:

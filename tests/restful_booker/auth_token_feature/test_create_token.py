@@ -13,7 +13,8 @@ from utils.api_helpers.api_request_helper import ApiRequestHelper
 from utils.api_client.models import HTTPMethod
 from utils.generators import ParamsGenerator
 
-from .constants import AUTH_REQUEST_PAYLOAD_REFERENCE
+from ..constants import REQ_AUTH
+from .constants import AUTH_REQUEST_PAYLOAD_REFERENCE as PAYLOAD_REF
 
 
 @allure.epic("Restful-Booker API")
@@ -32,7 +33,8 @@ class TestCreateToken:
             pass
 
         with when("CreateToken POST request with creds successfull (200 OK)"):
-            response = api_request.by_name("Auth") \
+            response = \
+                api_request.by_name(REQ_AUTH) \
                 .perform()
 
         with then("token is present in the response"):
@@ -70,7 +72,7 @@ class TestCreateToken:
             pass
 
         with when("HEAD request performed with 200 OK"):
-            response = api_request.by_name("Auth") \
+            response = api_request.by_name(REQ_AUTH) \
                 .with_method(HTTPMethod.HEAD) \
                 .with_json_payload(None) \
                 .perform()
@@ -87,7 +89,7 @@ class TestCreateToken:
             pass
 
         with when("OPTIONS request performed with 200 OK"):
-            response = api_request.by_name("Auth") \
+            response = api_request.by_name(REQ_AUTH) \
                 .with_method(HTTPMethod.OPTIONS) \
                 .with_json_payload(None) \
                 .perform()
@@ -108,7 +110,7 @@ class TestCreateTokenNegative:
     @pytest.mark.parametrize(
         "payload",
         ParamsGenerator.get_empty_null_fields(
-            AUTH_REQUEST_PAYLOAD_REFERENCE
+            PAYLOAD_REF
         )
     )
     def test_empty_fields_fails(self, api_request: ApiRequestHelper,
@@ -139,7 +141,7 @@ class TestCreateTokenNegative:
     @pytest.mark.parametrize(
         "payload",
         ParamsGenerator.get_payloads_with_missing_fields(
-            AUTH_REQUEST_PAYLOAD_REFERENCE
+            PAYLOAD_REF
         )
     )
     def test_missing_fields_fails(self, api_request: ApiRequestHelper,
@@ -170,7 +172,7 @@ class TestCreateTokenNegative:
     @pytest.mark.parametrize(
         "payload",
         ParamsGenerator.get_payloads_with_invalid_types(
-            AUTH_REQUEST_PAYLOAD_REFERENCE
+            PAYLOAD_REF
         )
     )
     def test_invalid_data_types_fails(self, api_request: ApiRequestHelper,

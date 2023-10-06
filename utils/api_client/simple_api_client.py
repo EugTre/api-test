@@ -86,7 +86,7 @@ class BaseApiClient(ABC):
 
         self.logger.log(
             INFO,
-            msg=f"Going to sent '{request_params['method']}' "
+            msg=f"Going to send '{request_params['method']}' "
                 f"request (#{self.request_count}) to {request_params['url']}",
             extra=ApiLogEntity(
                 event_type=ApiRequestLogEventType.PREPARED,
@@ -116,8 +116,8 @@ class BaseApiClient(ABC):
                 response=response_str
             )
         )
-        self.logger.log(DEBUG, "Request: %s", request_str)
-        self.logger.log(DEBUG, "Response: %s", response_str)
+        self.logger.log(INFO, "Request: %s", request_str)
+        self.logger.log(INFO, "Response: %s", response_str)
 
     def log_error(self, exc, response):
         """Logs error info of the unsuccessful request (exception raised)"""

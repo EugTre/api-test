@@ -3,7 +3,8 @@
         "schema": {
             "auth": { "!include": "config/Restful-Booker/schema/auth.json" },
             "auth_bad_creds": { "!include": "config/Restful-Booker/schema/auth_bad_creds.json" },
-            "booking_info": { "!include": "config/Restful-Booker/schema/booking_info.json" }
+            "booking_entry": { "!include": "config/Restful-Booker/schema/booking_entry.json" },
+            "booking_info": { "!ref": "/$defs/schema/booking_entry/properties/booking" }
         },
         "headers": {
             "ok": {
@@ -62,10 +63,26 @@
         }
     },
 
+    "GetBooking": {
+        "request": {
+            "method": "GET",
+            "path": "/booking/{id}",
+            "path_params": {
+                "id": 100
+            }
+        },
+        "response": {
+            "status_code": 200,
+            "schema": {"!ref": "/$defs/schema/booking_info"},
+            "headers": {"!ref": "/$defs/headers/ok"}
+        }
+    },
+
     "CreateBooking": {
         "request": {
             "method": "POST",
             "path": "/booking",
+            "headers": { "!ref": "/$defs/headers/ok" },
             "json": {
                 "!gen": "Booking",
                 "!id": "Create_01"
@@ -73,7 +90,7 @@
         },
         "response": {
             "status_code": 200,
-            "schema": { "!ref": "/$defs/schema/booking_info" },
+            "schema": { "!ref": "/$defs/schema/booking_entry" },
             "headers": { "!ref": "/$defs/headers/ok" },
             "json": {
                 "bookingid": { "!match": "AnyNumber" },
@@ -84,6 +101,7 @@
             }
         }
     },
+
 
     "UpdateBooking": {
         "request": {
@@ -96,11 +114,21 @@
         },
         "response": {
             "status_code": 200,
-            "schema": { "!ref": "/$defs/schema/booking_info/properties/booking" },
+            "schema": { "!ref": "/$defs/schema/booking_entry/properties/booking" },
             "json": {
                 "!gen": "Booking",
                 "!id": "Update_01"
             }
+        }
+    },
+
+    "DeleteBooking": {
+        "request": {
+            "method": "DELETE",
+            "path": "/booking/{id}"
+        },
+        "response": {
+            "status_code": 201
         }
     }
 

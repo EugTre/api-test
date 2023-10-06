@@ -48,7 +48,7 @@ pytest .\tests\dog_ceo_api\list_breeds_feature\ --alluredir=./tmp
 
 Run **all tests**:
 ```bash
-pytest --alluredir=./tmp
+pytest --alluredir=./tmp -n auto
 ```
 
 Check **Allure** report:
@@ -57,6 +57,8 @@ allure serve .\tmp\
 ```
 
 #### Params
+
+- `-n auto` - to run test in parallel on several CPU cores (e.g. `-n 2` will run 2 processes).
 
 - `--clean-alluredir` - cleans Allure dir from previous runs.
 
@@ -460,7 +462,7 @@ Functions decorated with Allure step and will raise `AssertionError` if test fai
 
 `.is_empty()`/`.is_not_empty()` - tests response's raw body content is empty or not.
 
-`.equals()` - test response's body text to be equal given/expected text.
+`.equals()` - test response's body text to be equal to given/expected text.
 
 `.latency_is_lower_than()` - tests response's elapsed time against given value in milliseconds.
 
@@ -502,6 +504,7 @@ Methods that tests for equals are assumed to be used with Matcher objects for sp
 
 ## <a name='overview_matchers'></a>Matchers [↑](#toc)
 Class: `utils.matchers.matcher`
+
 Matchers are special classes that implements specific equality check methods and provide user with ability to make rough comparison with some data.
 
 Matcher may:

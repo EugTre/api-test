@@ -694,7 +694,7 @@ class ApiResponseHelper:
         """
         return self.response_object.headers
 
-    def get_json(self, as_dict: bool = False) -> dict:
+    def get_json(self, as_dict: bool = False) -> JsonContent | dict:
         '''Returns response's JSON value
 
         Args:
@@ -708,7 +708,8 @@ class ApiResponseHelper:
             dict: deserialized JSON data.
         '''
         if self.json.content is None:
-            raise ValueError('JSON is missing in response body.')
+            return None
+            # raise ValueError('JSON is missing in response body.')
 
         return self.json.content.get() if as_dict else self.json.content
 
@@ -749,8 +750,8 @@ class ApiResponseHelper:
 
         with allure.step(f'Response status code is {status_code}'):
             assert status_code == self.response_object.status_code, \
-                   f'Response status code {self.response_object.status_code}' \
-                   f'doesn\'t match to expected code {status_code}.'
+                f'Response status code {self.response_object.status_code} ' \
+                f'doesn\'t match to expected code {status_code}.'
 
         return self
 
@@ -878,7 +879,8 @@ class ApiResponseHelper:
         """
         return self.json.content.get(pointer)
 
-    def __resp__(self) -> str:
+    def __repr__(self) -> str:
         return f'ApiResponseHelper(' \
+            f'{self.response_object.request.method} ' \
             f'status_code={self.response_object.status_code}, ' \
             f'url={self.response_object.url})'
