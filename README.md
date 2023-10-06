@@ -173,7 +173,7 @@ Looks for generator registered as given name and executes generator functions wi
 
 `!args` (list) - list of positional arguments for generator function.
 
-`!id` (str, optional) - tag to mark several compositions to retrieve the very same result of generation function. Use it to ensure that request and response generated values will be the same.
+`!id` (str, optional) - tag to mark several compositions to retrieve the very same result of generation function. Use it to ensure that request and response generated values will be the same. In context of the single document `!id` is used to identify generated result in the generator cache and to set `random.seed`. This means that if generator uses random package, one may retrieve same results using same `!id` across any part of the code (see `utils.generators.GeneratorManager` for details).
 
 Other composition parameters will be passed to generation function as keyword arguments.
 

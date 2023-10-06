@@ -18,6 +18,8 @@ class GeneratorsManager(BasicManager):
 
     Manager also handles cache to ensure calls to same generator with same
     correlation_id will return the very same value.
+    Correlation_id is also used to set `random.seed` before generator
+    function invocation (results in the same output of random)
     """
     generators = []
 
@@ -83,7 +85,7 @@ class GeneratorsManager(BasicManager):
             kwargs (dict, optional): generator's constructor keyword arguments.
             Defaults to None.
             correlation_id (str, optional): id used for caching/retrieving
-            data from cache.
+            data from cache and setting random.seed.
             Defaults to None.
 
         Raises:
@@ -95,11 +97,13 @@ class GeneratorsManager(BasicManager):
         if name not in self.collection:
             raise ValueError(f'Failed to find generator with name "{name}"!')
 
-        # Format cache id and retrieve data from cache if present
+        # If correlation_id is given - check for cache OR set random.seed
         if correlation_id:
-            correlation_id = f'{name}.{correlation_id}'
-            if correlation_id in self.cache:
-                return self.cache[correlation_id]
+            cached_id = f'{name}.{correlation_id}'
+            if cached_id in self.cache:
+                return self.cache[cached_id]
+
+            random.seed(correlation_id)
 
         # Generate new data
         if kwargs is None:
@@ -109,7 +113,7 @@ class GeneratorsManager(BasicManager):
 
         # Cache data if needed
         if correlation_id:
-            self.cache[correlation_id] = value
+            self.cache[cached_id] = value
 
         return value
 

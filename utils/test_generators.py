@@ -139,7 +139,7 @@ class TestGeneratosManager:
             kwargs={'c': 'baz'}
         ) == 'foo/bar/baz/d.default'
 
-    def test_manager_generate_with_correlation_id(self):
+    def test_manager_generate_with_correlation_id_as_cache(self):
         generator = self.random_generator
         reg_name = generator.__name__
         cid = 'FooBar'
@@ -159,6 +159,22 @@ class TestGeneratosManager:
             correlation_id='BazBar',
             kwargs={'range_min': 500, 'range_max': 600}
         ) != generated_value
+
+    def test_manager_generate_with_correlation_id_as_seed(self):
+        generator = self.random_generator
+        reg_name = generator.__name__
+        cid = 'FooBar'
+
+        manager1 = gen.GeneratorsManager(False)
+        manager1.add(generator, reg_name)
+
+        manager2 = gen.GeneratorsManager(False)
+        manager2.add(generator, reg_name)
+
+        generated_value1 = manager1.generate(reg_name, correlation_id=cid)
+        generated_value2 = manager2.generate(reg_name, correlation_id=cid)
+
+        assert generated_value1 == generated_value2
 
     def test_manager_generate_with_args_and_correlation_id(self):
         generator = self.random_generator
