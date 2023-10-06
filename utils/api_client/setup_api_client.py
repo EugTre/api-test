@@ -51,10 +51,13 @@ def setup_api_client(
         logging.debug('-' * 100)
         for line in api_spec.get_repr():
             logging.debug(line)
-        logging.debug(
-            '  Request catalog of %s item(s)',
-            len(api_spec.request_catalog)
-        )
+        if api_spec.request_catalog:
+            logging.debug(
+                '  Request catalog of %s item(s)',
+                len(api_spec.request_catalog)
+            )
+        else:
+            logging.debug('  No Request catalog')
         logging.debug('-' * 100)
 
     return client_class(api_spec.as_dict())

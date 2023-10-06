@@ -880,7 +880,11 @@ class ApiResponseHelper:
         return self.json.content.get(pointer)
 
     def __repr__(self) -> str:
+        method = self.response_object.request.method \
+            if self.response_object.request else \
+            ""
+
         return f'ApiResponseHelper(' \
-            f'{self.response_object.request.method} ' \
+            f'{method} ' \
             f'status_code={self.response_object.status_code}, ' \
             f'url={self.response_object.url})'

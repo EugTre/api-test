@@ -174,7 +174,8 @@ class Pointer:
         Returns:
             Pointer: instance of `Pointer` class
         """
-        if not isinstance(pointer_path, (tuple, list)):
+        if pointer_path is not None and \
+           not isinstance(pointer_path, (tuple, list)):
             raise ValueError(
                 "Pointer path must be list or tuple, but "
                 f'{type(pointer_path)} was given!'
