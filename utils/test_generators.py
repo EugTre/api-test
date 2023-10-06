@@ -334,7 +334,7 @@ class TestParamGenerator:
     ))
     def test_get_empty_null_fields(self, ref, expected):
         """get_empty_null_fields returns valid payload"""
-        value = gen.ParamsGenerator.get_empty_null_fields(
+        value = gen.ParamsGenerator.get_payloads_with_empty_null_fields(
             reference=ref,
             ruleset={
                 "int": [None],
@@ -356,7 +356,7 @@ class TestParamGenerator:
             }, id="/a=None")
         ]
 
-        value = gen.ParamsGenerator.get_empty_null_fields(
+        value = gen.ParamsGenerator.get_payloads_with_empty_null_fields(
             reference=ref,
             skip=['/b'],
             ruleset={"int": [None]}
@@ -406,7 +406,7 @@ class TestParamGenerator:
     ))
     def test_get_payloads_with_invalid_types(self, ref, expected):
         """get_payloads_with_invalid_types returns valid params"""
-        value = gen.ParamsGenerator.get_payloads_with_invalid_types(
+        value = gen.ParamsGenerator.get_payloads_with_invalid_types_fields(
             reference=ref,
             ruleset={
                 "int": ["str"],
@@ -428,7 +428,7 @@ class TestParamGenerator:
             }, id="/a=str")
         ]
 
-        value = gen.ParamsGenerator.get_payloads_with_invalid_types(
+        value = gen.ParamsGenerator.get_payloads_with_invalid_types_fields(
             reference=ref,
             skip=['/b'],
             ruleset={

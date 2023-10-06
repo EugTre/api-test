@@ -16,4 +16,6 @@ REQ_DELETE = "DeleteBooking"
 # CreateBooking:
 FIELD_BOOKING_ID = Pointer.from_string("/bookingid")
 FIELD_BOOKING_INFO = Pointer.from_string("/booking")
+FIELD_TOTAL_PRICE = Pointer.from_string('/totalprice')
+FIELD_BOOKING_DATES = Pointer.from_string('/bookingdates')
 FIELD_ADDITIONAL_NEEDS = Pointer.from_string('/additionalneeds')

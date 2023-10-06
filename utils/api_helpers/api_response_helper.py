@@ -537,7 +537,7 @@ class ResponseBodyJsonValidatior:
 
         return self.response_helper
 
-    @allure.step('Response param "{pointer}" = {value}')
+    # @allure.step('Response param "{pointer}" = {value}')
     def param_equals(self, pointer: str, value: Any) -> 'ApiResponseHelper':
         """Checks that given key has value equal to given.
         Use `utils.matchers` for inaccurate comparison.
@@ -555,15 +555,16 @@ class ResponseBodyJsonValidatior:
         Returns:
             Instance of `ApiResponseHelper` class.
         """
-        self.response_helper.is_not_empty()
+        with allure.step(f'Response param "{pointer}" = {value}'):
+            self.response_helper.is_not_empty()
 
-        assert pointer in self.content, \
-            f'Param "{pointer}" is missing in the response JSON.'
+            assert pointer in self.content, \
+                f'Param "{pointer}" is missing in the response JSON.'
 
-        actual_value = self.content.get(pointer)
-        assert value == actual_value, \
-               f'Value of param "{pointer}" is equal to [{actual_value}], '\
-               f'but expected to be [{value}]'
+            actual_value = self.content.get(pointer)
+            assert value == actual_value, \
+                f'Value of param "{pointer}" is equal to [{actual_value}], '\
+                f'but expected to be [{value}]'
 
         return self
 

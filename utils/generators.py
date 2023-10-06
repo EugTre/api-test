@@ -340,7 +340,11 @@ class ParamsGenerator:
         with rule_value and returns test param with payload and
         readable ID"""
         content.update(ptr, rule_value)
-        id_name = "Empty" if isinstance(rule_value, str) else rule_value
+        id_name = rule_value
+        if isinstance(rule_value, str):
+            id_name = "Empty"
+        elif rule_value is None:
+            id_name = "Null"
         return pytest.param(content.get(''), id=f'{ptr}={id_name}')
 
     @staticmethod
@@ -361,10 +365,11 @@ class ParamsGenerator:
         return pytest.param(content.get(''), id=f'{ptr}=Missing')
 
     @staticmethod
-    def get_empty_null_fields(reference: dict,
-                              skip: list | tuple | None = None,
-                              ruleset: dict = None,
-                              ) -> list[ParameterSet]:
+    def get_payloads_with_empty_null_fields(
+        reference: dict,
+        skip: list | tuple | None = None,
+        ruleset: dict = None,
+    ) -> list[ParameterSet]:
         """Returns list of ParameterSet with payloads
         where one of the fields is empty or null
         according to given rules
@@ -387,7 +392,7 @@ class ParamsGenerator:
         )
 
     @staticmethod
-    def get_payloads_with_invalid_types(
+    def get_payloads_with_invalid_types_fields(
         reference: dict,
         skip: list | tuple | None = None,
         ruleset: dict | None = None
@@ -437,16 +442,39 @@ class ParamsGenerator:
 
 
 @GeneratorsManager.register("Booking")
-def generate_booking():
+def generate_booking(firstname: str | None = None,
+                     lastname: str | None = None,
+                     total_price: int | float | None = None,
+                     deposit_paid: bool | None = None,
+                     booking_date: dict | None = None,
+                     additional_needs: str | None = None):
     """Generates booking entry"""
     return {
-        "firstname": FormDataGenerator.generate_first_name(),
-        "lastname": FormDataGenerator.generate_last_name(),
-        "totalprice": random.randint(1, 1000),
-        "depositpaid": random.choice([True, False]),
-        "bookingdates": {
-            "checkin": Dates.generate_date_after(days_offset=2),
-            "checkout": Dates.generate_date_after(days_offset=(3, 10))
-        },
-        "additionalneeds": FormDataGenerator.generate_sentence(5)
+        "firstname":
+            firstname
+            if firstname is not None else
+            FormDataGenerator.generate_first_name(),
+        "lastname":
+            lastname
+            if lastname is not None else
+            FormDataGenerator.generate_last_name(),
+        "totalprice":
+            total_price
+            if total_price is not None else
+            random.randint(1, 1000),
+        "depositpaid":
+            deposit_paid
+            if deposit_paid is not None else
+            random.choice([True, False]),
+        "bookingdates":
+            booking_date
+            if booking_date is not None else
+            {
+                "checkin": Dates.generate_date_after(days_offset=2),
+                "checkout": Dates.generate_date_after(days_offset=(3, 10))
+            },
+        "additionalneeds":
+            additional_needs
+            if additional_needs is not None else
+            FormDataGenerator.generate_sentence(5)
     }

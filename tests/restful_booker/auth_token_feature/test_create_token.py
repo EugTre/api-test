@@ -109,7 +109,7 @@ class TestCreateTokenNegative:
     # title("No token creation on empty fields")
     @pytest.mark.parametrize(
         "payload",
-        ParamsGenerator.get_empty_null_fields(
+        ParamsGenerator.get_payloads_with_empty_null_fields(
             PAYLOAD_REF
         )
     )
@@ -171,17 +171,18 @@ class TestCreateTokenNegative:
     # title("No token creation on non-string creds")
     @pytest.mark.parametrize(
         "payload",
-        ParamsGenerator.get_payloads_with_invalid_types(
+        ParamsGenerator.get_payloads_with_invalid_types_fields(
             PAYLOAD_REF
         )
     )
     def test_invalid_data_types_fails(self, api_request: ApiRequestHelper,
                                       payload: dict,
                                       test_id):
-        """Token creation fails if credentials are missing"""
+        """Token creation fails if credentials fields have
+        data of invalid types"""
 
         allure.dynamic.title(
-            f"No token creation on invalid fields data types [{test_id}]"
+            f"No token creation on invalid type of data in fields [{test_id}]"
         )
 
         username = payload['username']
