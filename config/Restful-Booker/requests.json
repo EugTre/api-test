@@ -9,6 +9,9 @@
         "headers": {
             "ok": {
                 "Content-Type": "application/json; charset=utf-8"
+            },
+            "text": {
+                "Content-Type": "text/plain; charset=utf-8"
             }
         }
     },
@@ -76,6 +79,23 @@
             "schema": {"!ref": "/$defs/schema/booking_info"},
             "headers": {"!ref": "/$defs/headers/ok"}
         }
+    },
+    "GetBooking_NotFound": {
+        "request": {
+            "!xref": "/GetBooking/request",
+            "extend": {
+                "/path_params": {
+                    "id": 999999999,
+                    "@use": ["id"]
+                }
+            }
+        },
+        "response": {
+            "status_code": 404,
+            "headers": {"!ref": "/$defs/headers/text"},
+            "text": "Not Found"
+        }
+
     },
 
     "CreateBooking": {

@@ -4,7 +4,7 @@ Epic:    'Restful-Booker API'
 Feautre: 'Create Booking'
 Story:   'Booking price'
 """
-
+import pytest
 import allure
 
 from utils.bdd import given, when, then
@@ -64,6 +64,7 @@ class TestCreateBookingPrice:
                     expected_price
                 )
 
+    @pytest.mark.xfail(reason="Negative price is not handled")
     @allure.title("No booking on negative total price")
     @allure.tag("negative")
     def test_negative_price(

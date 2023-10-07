@@ -1,5 +1,6 @@
 """Test related helpers"""
 import os
+import argparse
 import logging.handlers
 from logging.config import fileConfig
 
@@ -81,6 +82,11 @@ def pytest_addoption(parser):
         default="",
         help="Filename to dump composed configuration to."
         "If not set - do not dump any data."
+    )
+    parser.addoption(
+        "--efx",
+        action=argparse.BooleanOptionalAction,
+        help="Flag to Early Fail tests marked as Xfail."
     )
 
 
@@ -169,6 +175,21 @@ def get_api_response_instance(api_request: ApiRequestHelper
 def test_id(request):
     """Returns ID for parametrized test (like 'param1-param2-param3')."""
     return request.node.callspec.id
+
+
+@pytest.fixture(autouse=True)
+def fail_xfail(request):
+    """Early fails tests marked with pytest.mark.xfails if --fail-xfails
+    flag was used."""
+    if not pytest.current_config.getoption("--efx"):
+        return
+
+    xfail_mark = request.node.get_closest_marker("xfail")
+    if not xfail_mark:
+        return
+
+    reason = xfail_mark.kwargs.reason
+    pytest.fail(reason=reason)
 
 
 @pytest.fixture(scope='session')

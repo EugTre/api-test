@@ -4,7 +4,9 @@ from utils.api_client.setup_api_client import setup_api_client
 from utils.api_client.simple_api_client import SimpleApiClient
 from utils.api_helpers.api_request_helper import ApiRequestHelper
 
-from .constants import API_NAME, REQ_AUTH, REQ_DELETE, FIELD_BOOKING_ID
+from .constants import API_NAME, \
+    REQ_AUTH, REQ_CREATE, REQ_DELETE, \
+    FIELD_BOOKING_ID, FIELD_BOOKING_INFO
 
 
 @pytest.fixture(scope='session')
@@ -22,10 +24,32 @@ def api_client() -> SimpleApiClient:
 
 
 @pytest.fixture()
-def auth_token(api_request: ApiRequestHelper) -> str:
+def auth_token(api_request: ApiRequestHelper) -> dict:
     """Creates and returns token"""
     response = api_request.by_name(REQ_AUTH).perform()
     return response.get_json(True)
+
+
+@pytest.fixture
+def created_booking(api_request: ApiRequestHelper) -> dict:
+    """Creates booking"""
+    response = api_request.by_name(REQ_AUTH).perform()
+    token = response.get_json(True)
+    booking = api_request.by_name(REQ_CREATE)\
+        .with_cookies(token).perform()
+
+    prepared = {
+        "token": token,
+        "id": booking.get_json_value(FIELD_BOOKING_ID),
+        "booking": booking.get_json_value(FIELD_BOOKING_INFO)
+    }
+
+    yield prepared
+
+    api_request.by_name(REQ_DELETE) \
+        .with_cookies(token) \
+        .with_path_params(id=prepared['id']) \
+        .perform()
 
 
 @pytest.fixture

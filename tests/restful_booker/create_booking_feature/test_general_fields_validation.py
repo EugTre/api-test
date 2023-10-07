@@ -31,6 +31,7 @@ class TestCreateBookingFieldsValidation:
     # common sense minimum
 
     # title("Empty/null fields")
+    @pytest.mark.xfail(reason="Empty/null fields aren't validated")
     @pytest.mark.parametrize(
         "payload",
         ParamsGenerator.get_payloads_with_empty_null_fields(
@@ -64,6 +65,7 @@ class TestCreateBookingFieldsValidation:
                 .json.params_not_present(FIELD_BOOKING_ID)
 
     # title("Missing fields")
+    @pytest.mark.xfail(reason="Missing fields aren't validated")
     @pytest.mark.parametrize(
         "payload",
         ParamsGenerator.get_payloads_with_missing_fields(
@@ -96,6 +98,7 @@ class TestCreateBookingFieldsValidation:
                 .json.params_not_present(FIELD_BOOKING_ID)
 
     # title("Invalid data")
+    @pytest.mark.xfail(reason="Invalid data types in fields aren't validated")
     @pytest.mark.parametrize(
         "payload",
         ParamsGenerator.get_payloads_with_invalid_types_fields(

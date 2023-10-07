@@ -818,6 +818,7 @@ class ApiResponseHelper:
     @allure.step('Response equals to given')
     def equals(self, text: str | BaseMatcher | None = None) -> Self:
         """Checks that response content equals to given.
+
         Args:
             text (str | BaseMatcher): text to compare with or
             text matcher.

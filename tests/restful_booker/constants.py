@@ -1,7 +1,6 @@
 """Constants for Restful-Booker tests"""
 from utils.json_content.pointer import Pointer
 
-
 API_NAME = "Restful-Booker"
 
 USERNAME = "admin"

@@ -4,7 +4,6 @@ Epic:    'Restful-Booker API'
 Feautre: 'Create Booking'
 Story:   'Booking dates '
 """
-import logging
 import allure
 import pytest
 
@@ -84,6 +83,7 @@ class TestCreateBookingDates:
                     expected_dates
                 )
 
+    @pytest.mark.xfail(reason="Dates mismatch is not handled")
     @allure.title("No booking on checkout date before checkin date")
     @allure.tag("negative")
     def test_checkin_checkout_dates_order(
@@ -110,5 +110,49 @@ class TestCreateBookingDates:
             handle_entry_deletion.append(created_response)
 
         with then("response is 400 Bad Request"):
+            created_response.status_code_equals(400) \
+                .json.params_not_present(FIELD_BOOKING_ID)
+
+    # title("Booking date in invalid formats")
+    @pytest.mark.xfail(reason="Invalid formats validation is not handled")
+    @pytest.mark.parametrize("booking_dates", {
+        ("25.05.2020", "26.05.2020"),
+        ("2020-05", "2020-06"),
+        ("2020", "2021")
+    }, ids=[
+        "DD.MM.YYYY",
+        "YYYY-MM",
+        "YYYY"
+    ])
+    def test_date_invalid_format_fails(
+        self,
+        booking_dates: tuple,
+        api_request: ApiRequestHelper,
+        test_id: str,
+        handle_entry_deletion: list
+    ):
+        """No booking creation if date is in invalid format"""
+
+        allure.dynamic.title(
+            f"No booking created with dates in invalid format [{test_id}]"
+        )
+
+        dates = {
+            "checkin": booking_dates[0],
+            "checkout": booking_dates[1]
+        }
+        with given("booking entry with dates in invalid format "
+                   f"{booking_dates}"):
+            booking = generate_booking(booking_date=dates)
+
+        with when("CreateBooking request perfromed"):
+            created_response = \
+                api_request.by_name(REQ_CREATE) \
+                .with_json_payload(booking) \
+                .perform(check_status_code=False)
+
+            handle_entry_deletion.append(created_response)
+
+        with then("no booking was creaderd and 400 error returned"):
             created_response.status_code_equals(400) \
                 .json.params_not_present(FIELD_BOOKING_ID)
