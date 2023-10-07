@@ -17,7 +17,7 @@ from ..constants import REQ_GET, REQ_CREATE, \
 
 @allure.epic("Restful-Booker API")
 @allure.feature("Create Booking")
-@allure.story('Booking price')
+@allure.story('New booking may be created - price validation')
 class TestCreateBookingPrice:
     """Tests related to 'totalprice' field
     of CreateBooking request validation"""
@@ -64,14 +64,13 @@ class TestCreateBookingPrice:
                     expected_price
                 )
 
-    @pytest.mark.xfail(reason="Negative price is not handled")
+    @pytest.mark.xfail(reason="Negative price is not handled",
+                       **pytest.efx)
     @allure.title("No booking on negative total price")
     @allure.tag("negative")
-    def test_negative_price(
-        self,
-        api_request: ApiRequestHelper,
-        handle_entry_deletion: list
-    ):
+    def test_negative_price(self,
+                            api_request: ApiRequestHelper,
+                            handle_entry_deletion: list):
         """If total price is negative - validation
         error should be returned and no new booking should be created"""
 

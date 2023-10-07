@@ -140,9 +140,10 @@ class TestGetNegative:
                 .equals() \
                 .headers.are_like()
 
-    @pytest.mark.xfail(reason="Leading integer is always parsed")
+    @pytest.mark.xfail(reason="Leading integer is always parsed",
+                       **pytest.efx)
     @allure.title("Get booking by existing ID in non-integer format "
-                  "{booking_id_format} returns 404 Not Found")
+                  "[{booking_id_format}] returns 404 Not Found")
     @pytest.mark.parametrize("booking_id_format", (
         "{id}.0",
         "{id}.0.0.0.rwerrwr",

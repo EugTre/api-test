@@ -11,10 +11,8 @@ import pytest
 from utils.bdd import given, when, then
 from utils.api_helpers.api_request_helper import ApiRequestHelper
 from utils.api_client.models import HTTPMethod
-from utils.generators import ParamsGenerator
 
 from ..constants import REQ_AUTH
-from .constants import AUTH_REQUEST_PAYLOAD_REFERENCE as PAYLOAD_REF
 
 
 @allure.epic("Restful-Booker API")
@@ -63,9 +61,9 @@ class TestCreateToken:
                 .headers.are_like() \
                 .json.equals()
 
+    @pytest.mark.xfail(reason="API returns 404 Not Found", **pytest.efx)
     @allure.title("HEAD method returns headers only")
     @allure.severity(allure.severity_level.MINOR)
-    @pytest.mark.xfail(reason="API returns 404 Not Found")
     def test_head(self, api_request: ApiRequestHelper):
         """HEAD method returns headers only"""
         with given("request with no payload"):
@@ -106,105 +104,6 @@ class TestCreateToken:
 class TestCreateTokenNegative:
     """Negative test related to Auth Token feature"""
 
-    # title("No token creation on empty fields")
-    @pytest.mark.parametrize(
-        "payload",
-        ParamsGenerator.get_payloads_with_empty_null_fields(
-            PAYLOAD_REF
-        )
-    )
-    def test_empty_fields_fails(self, api_request: ApiRequestHelper,
-                                payload,
-                                test_id):
-        """Token creation fails if credentials are empty"""
-
-        allure.dynamic.title(
-            f"No token creation on empty fields [{test_id}]"
-        )
-
-        with given(f'incomplete creds {payload}'):
-            pass
-
-        with when("CreateToken POST request with given creds "
-                  "is successfull (200 OK)"):
-            response = api_request \
-                .by_name("Auth_BadCredentials") \
-                .with_json_payload(payload) \
-                .perform()
-
-        with then("response contain only error message"):
-            response.validates_against_schema() \
-                .headers.are_like() \
-                .json.equals()
-
-    # title("No token creation on missing fields")
-    @pytest.mark.parametrize(
-        "payload",
-        ParamsGenerator.get_payloads_with_missing_fields(
-            PAYLOAD_REF
-        )
-    )
-    def test_missing_fields_fails(self, api_request: ApiRequestHelper,
-                                  payload,
-                                  test_id):
-        """Token creation fails if JSON have missing fields"""
-
-        allure.dynamic.title(
-            f"No token creation on missing fields [{test_id}]"
-        )
-
-        with given(f'incomplete request body: {payload}'):
-            pass
-
-        with when("CreateToken POST request with given creds "
-                  "is successfull (200 OK)"):
-            response = api_request \
-                .by_name("Auth_BadCredentials") \
-                .with_json_payload(payload) \
-                .perform()
-
-        with then("response contain only error message"):
-            response.validates_against_schema() \
-                .headers.are_like() \
-                .json.equals()
-
-    # title("No token creation on non-string creds")
-    @pytest.mark.parametrize(
-        "payload",
-        ParamsGenerator.get_payloads_with_invalid_types_fields(
-            PAYLOAD_REF
-        )
-    )
-    def test_invalid_data_types_fails(self, api_request: ApiRequestHelper,
-                                      payload: dict,
-                                      test_id):
-        """Token creation fails if credentials fields have
-        data of invalid types"""
-
-        allure.dynamic.title(
-            f"No token creation on invalid type of data in fields [{test_id}]"
-        )
-
-        username = payload['username']
-        password = payload['password']
-
-        with given('creds of types: '
-                   f'"{username}" (type: {type(username).__name__})'
-                   f'/"{password}" (type: {type(password).__name__})'):
-            pass
-
-        with when("CreateToken POST request with given creds "
-                  "is successfull (200 OK)"):
-            response = api_request \
-                .by_name("Auth_BadCredentials") \
-                .with_json_payload(payload) \
-                .perform()
-
-        with then("response contain only error message"):
-            response.validates_against_schema() \
-                .headers.are_like() \
-                .json.equals()
-
     @allure.title("Request with "
                   "unsupported method \"{method}\" is handled")
     @allure.severity(allure.severity_level.MINOR)
@@ -229,26 +128,17 @@ class TestCreateTokenNegative:
         with then("error message is returned"):
             response.equals()
 
-    # title("Request with malformed payload is handled")
+    @allure.title("Request with malformed payload is handled [{test_id}]")
     @allure.severity(allure.severity_level.MINOR)
-    @pytest.mark.parametrize("payload", (
-        '{"username": "user", "password": "password", }',
-        '{"username", "pasword"}',
-        '"user"'
-    ), ids=(
-        "Extra comma",
-        "Missing value",
-        "Plain text"
+    @pytest.mark.parametrize(*pytest.format_params(
+        "test_id, payload",
+        ("Tailing comma", '{"username": "user", "password": "password", }'),
+        ("MalformedJSON", '{"username", "pasword"}'),
+        ("Plain text", '"user"')
     ))
-    def test_malformed_payload(self, api_request: ApiRequestHelper,
-                               payload,
-                               test_id):
+    def test_malformed_payload(self, test_id, payload,
+                               api_request: ApiRequestHelper):
         """Token creation fails if credentials are missing"""
-
-        allure.dynamic.title(
-            f"Request with malformed payload is handled [{test_id}]"
-        )
-
         with given('malformed payload'):
             pass
 

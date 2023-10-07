@@ -112,6 +112,20 @@ def pytest_configure(config):
     if dump_to_file:
         export_api_config(pytest.api_config, dump_to_file)
 
+    def prepare_params(params, *values):
+        output_params = []
+        params_count = len(params.split(','))
+        for v in values:
+            if len(v) != params_count:
+                raise ValueError(
+                    "Params count and value arg count doesnt match"
+                )
+            output_params.append(pytest.param(*v, id=v[0]))
+        return (params, output_params)
+
+    pytest.format_params = prepare_params
+    pytest.efx = {"run": not config.getoption("--efx")}
+
 
 # --- Common fixtures ---
 # ----------------------
@@ -171,27 +185,6 @@ def get_api_response_instance(api_request: ApiRequestHelper
 
 
 # --- Other fixtures ----
-@pytest.fixture
-def test_id(request):
-    """Returns ID for parametrized test (like 'param1-param2-param3')."""
-    return request.node.callspec.id
-
-
-@pytest.fixture(autouse=True)
-def fail_xfail(request):
-    """Early fails tests marked with pytest.mark.xfails if --fail-xfails
-    flag was used."""
-    if not pytest.current_config.getoption("--efx"):
-        return
-
-    xfail_mark = request.node.get_closest_marker("xfail")
-    if not xfail_mark:
-        return
-
-    reason = xfail_mark.kwargs.reason
-    pytest.fail(reason=reason)
-
-
 @pytest.fixture(scope='session')
 def helper() -> Helper:
     """Returns `Helper` class object to use inside tests/fixtures"""

@@ -340,12 +340,13 @@ class ParamsGenerator:
         with rule_value and returns test param with payload and
         readable ID"""
         content.update(ptr, rule_value)
-        id_name = rule_value
+        id_desc = rule_value
         if isinstance(rule_value, str):
-            id_name = "Empty"
+            id_desc = "Empty"
         elif rule_value is None:
-            id_name = "Null"
-        return pytest.param(content.get(''), id=f'{ptr}={id_name}')
+            id_desc = "Null"
+        id_name = f'{ptr}={id_desc}'
+        return pytest.param(id_name, content.get(''), id=id_name)
 
     @staticmethod
     def _mixed_types_fields(content, ptr, rule_value):
@@ -353,8 +354,9 @@ class ParamsGenerator:
         with rule_value and returns test param with payload and
         readable ID"""
         content.update(ptr, rule_value)
-        id_name = type(rule_value).__name__
-        return pytest.param(content.get(''), id=f'{ptr}={id_name}')
+        id_desc = type(rule_value).__name__
+        id_name = f'{ptr}={id_desc}'
+        return pytest.param(id_name, content.get(''), id=id_name)
 
     @staticmethod
     def _missing_fields(content, ptr):
@@ -362,7 +364,8 @@ class ParamsGenerator:
         and returns test param with payload and
         readable ID"""
         content.delete(ptr)
-        return pytest.param(content.get(''), id=f'{ptr}=Missing')
+        id_name = f'{ptr}=Missing'
+        return pytest.param(id_name, content.get(''), id=id_name)
 
     @staticmethod
     def get_payloads_with_empty_null_fields(
@@ -382,7 +385,8 @@ class ParamsGenerator:
             for specific type of fields. Defaults to None.
 
         Returns:
-            list[ParameterSet]: list of pytest params for test.
+            list[ParameterSet]: list of pytest params for test
+            as "test_id, payload" tuple
         """
         if ruleset is None:
             ruleset = ParamsGenerator.empty_null_ruleset
@@ -408,7 +412,8 @@ class ParamsGenerator:
             for specific type of fields. Defaults to None.
 
         Returns:
-            list[ParameterSet]: list of pytest params for test.
+            list[ParameterSet]: list of pytest params for test
+            as "test_id, payload" tuple
         """
         if ruleset is None:
             ruleset = ParamsGenerator.data_types_ruleset
@@ -430,11 +435,12 @@ class ParamsGenerator:
             skipped during generation. Defaults to None.
 
         Returns:
-            list[ParameterSet]: list of pytest params for test.
+            list[ParameterSet]: list of pytest params for test
+            as "test_id, payload" tuple
         """
 
         return [
-            pytest.param({}, id="NoFields"),
+            pytest.param("NoFields", {}, id="NoFields"),
             *ParamsGenerator._apply_for(
                 reference, skip, ParamsGenerator._missing_fields, None
             )

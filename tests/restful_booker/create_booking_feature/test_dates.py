@@ -17,31 +17,24 @@ from ..constants import REQ_GET, REQ_CREATE, \
 
 @allure.epic("Restful-Booker API")
 @allure.feature("Create Booking")
-@allure.story('Booking dates')
+@allure.story('New booking may be created - dates validation')
 class TestCreateBookingDates:
     """Validation of dates fields"""
 
-    # title("Booking date in valid ISO formats")
-    @pytest.mark.parametrize("booking_dates", {
-        ("2027 05 25", "2027 05 26"),
-        ("05/25/2027", "05/26/2027"),
-        ("2027-05-25T00:00:00.000Z", "2027-05-26T00:00:00.000Z"),
-    }, ids=[
-        "YYYY MM DD",
-        "MM/DD/YYYY",
-        "ISO8601_Datetime"
-    ])
+    @allure.title("Booking created with dates in format "
+                  "[{test_id}]")
+    @pytest.mark.parametrize(*pytest.format_params(
+        "test_id, booking_dates",
+        ("YYYY MM DD", ("2027 05 25", "2027 05 26")),
+        ("MM/DD/YYYY", ("05/25/2027", "05/26/2027")),
+        ("ISO8601_Datetime",
+         ("2027-05-25T00:00:00.000Z", "2027-05-26T00:00:00.000Z"))
+    ))
     def test_date_format(self,
-                         booking_dates: tuple,
+                         test_id, booking_dates: tuple,
                          api_request: ApiRequestHelper,
-                         test_id: str,
                          handle_entry_deletion: list):
         """Create booking with valid dates in various formats"""
-
-        allure.dynamic.title(
-            f"Booking created with dates in format [{test_id}]"
-        )
-
         dates = {
             "checkin": booking_dates[0],
             "checkout": booking_dates[1]
@@ -83,7 +76,8 @@ class TestCreateBookingDates:
                     expected_dates
                 )
 
-    @pytest.mark.xfail(reason="Dates mismatch is not handled")
+    @pytest.mark.xfail(reason="Dates mismatch is not handled",
+                       **pytest.efx)
     @allure.title("No booking on checkout date before checkin date")
     @allure.tag("negative")
     def test_checkin_checkout_dates_order(
@@ -113,30 +107,23 @@ class TestCreateBookingDates:
             created_response.status_code_equals(400) \
                 .json.params_not_present(FIELD_BOOKING_ID)
 
-    # title("Booking date in invalid formats")
-    @pytest.mark.xfail(reason="Invalid formats validation is not handled")
-    @pytest.mark.parametrize("booking_dates", {
-        ("25.05.2020", "26.05.2020"),
-        ("2020-05", "2020-06"),
-        ("2020", "2021")
-    }, ids=[
-        "DD.MM.YYYY",
-        "YYYY-MM",
-        "YYYY"
-    ])
+    @pytest.mark.xfail(reason="Invalid formats validation is not handled",
+                       **pytest.efx)
+    @allure.title("No booking created with dates "
+                  "in invalid format [{test_id}]")
+    @pytest.mark.parametrize(*pytest.format_params(
+        "test_id, booking_dates",
+        ("DD.MM.YYYY",  ("25.05.2020", "26.05.2020")),
+        ("YYYY-MM",     ("2020-05", "2020-06")),
+        ("YYYY",       ("2020", "2021"))
+    ))
     def test_date_invalid_format_fails(
         self,
-        booking_dates: tuple,
+        test_id, booking_dates: tuple,
         api_request: ApiRequestHelper,
-        test_id: str,
         handle_entry_deletion: list
     ):
         """No booking creation if date is in invalid format"""
-
-        allure.dynamic.title(
-            f"No booking created with dates in invalid format [{test_id}]"
-        )
-
         dates = {
             "checkin": booking_dates[0],
             "checkout": booking_dates[1]
