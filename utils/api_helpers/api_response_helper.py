@@ -405,7 +405,6 @@ class ResponseBodyJsonValidatior:
     # -------
     # Params validation
     # -------
-    @allure.step('Response has params "{pointers}"')
     def params_present(self, *pointers: str) -> 'ApiResponseHelper':
         """Checks that param is present in response
 
@@ -419,15 +418,15 @@ class ResponseBodyJsonValidatior:
         Returns:
             Instance of `ApiResponseHelper` class.
         """
-        self.response_helper.is_not_empty()
+        with allure.step(f'Response has params "{pointers}"'):
+            self.response_helper.is_not_empty()
 
-        failed = [ptr for ptr in pointers if ptr not in self.content]
-        assert not failed, 'Params are not present, ' \
-            f'but expected to be: {", ".join(failed)}'
+            failed = [ptr for ptr in pointers if ptr not in self.content]
+            assert not failed, 'Params are not present, ' \
+                f'but expected to be: {", ".join(failed)}'
 
         return self.response_helper
 
-    @allure.step('Response doesn\t has params "{pointers}"')
     def params_not_present(self, *pointers: str) -> 'ApiResponseHelper':
         """Checks that param is not present in response.
 
@@ -441,15 +440,15 @@ class ResponseBodyJsonValidatior:
         Returns:
             Instance of `ApiResponseHelper` class.
         """
-        self.response_helper.is_not_empty()
+        with allure.step('Response doesn\t has params "{pointers}"'):
+            self.response_helper.is_not_empty()
 
-        failed = [ptr for ptr in pointers if ptr in self.content]
-        assert not failed, 'Params are present, ' \
-            f'but not expected to be: {", ".join(failed)}'
+            failed = [ptr for ptr in pointers if ptr in self.content]
+            assert not failed, 'Params are present, ' \
+                f'but not expected to be: {", ".join(failed)}'
 
         return self.response_helper
 
-    @allure.step('Response has non-empty params "{pointers}"')
     def params_are_not_empty(self, *pointers: str) -> 'ApiResponseHelper':
         """Checks that value at given keylist is not empty or null.
 
@@ -463,34 +462,35 @@ class ResponseBodyJsonValidatior:
         Returns:
             Instance of `ApiResponseHelper` class.
         """
-        self.response_helper.is_not_empty()
+        with allure.step('Response has non-empty params "{pointers}"'):
+            self.response_helper.is_not_empty()
 
-        failed = []
-        for ptr in pointers:
-            if ptr not in self.content:
-                failed.append(f'param "{ptr}" is missing')
-                continue
+            failed = []
+            for ptr in pointers:
+                if ptr not in self.content:
+                    failed.append(f'param "{ptr}" is missing')
+                    continue
 
-            value = self.content.get(ptr)
-            # Empty is None or empty str/dict/list
-            if any((
-                value is None,
-                isinstance(value, (str, dict, list)) and not value
-            )):
-                value_msg = f'"{value}"' \
-                            if isinstance(value, str) else \
-                            str(value)
-                failed.append(f'param "{ptr}" is empty (value={value_msg})')
+                value = self.content.get(ptr)
+                # Empty is None or empty str/dict/list
+                if any((
+                    value is None,
+                    isinstance(value, (str, dict, list)) and not value
+                )):
+                    value_msg = f'"{value}"' \
+                                if isinstance(value, str) else \
+                                str(value)
+                    failed.append(f'param "{ptr}" is empty '
+                                  f'(value={value_msg})')
 
-        failed_explanation = "\n- ".join(failed) if failed else None
-        assert not failed, \
-            'Params are empty or missing, but expected to present and ' \
-            'be not empty:\n' \
-            f'- {failed_explanation}'
+            failed_explanation = "\n- ".join(failed) if failed else None
+            assert not failed, \
+                'Params are empty or missing, but expected to present and ' \
+                'be not empty:\n' \
+                f'- {failed_explanation}'
 
         return self.response_helper
 
-    @allure.step('Response has empty params "{pointers}"')
     def params_are_empty(self, *pointers: str) -> 'ApiResponseHelper':
         """Checks that value at given keylist is empty.
 
@@ -506,38 +506,39 @@ class ResponseBodyJsonValidatior:
         Returns:
             Instance of `ApiResponseHelper` class.
         """
-        self.response_helper.is_not_empty()
+        with allure.step('Response has empty params "{pointers}"'):
+            self.response_helper.is_not_empty()
 
-        failed = []
-        for ptr in pointers:
-            if ptr not in self.content:
-                failed.append(f'param "{ptr}" is missing')
-                continue
+            failed = []
+            for ptr in pointers:
+                if ptr not in self.content:
+                    failed.append(f'param "{ptr}" is missing')
+                    continue
 
-            value = self.content.get(ptr)
-            # Non empty is:
-            #   any bool/number
-            #   itarbale with non-zero length
-            if any((
-                isinstance(value, (bool, int, float)),
-                isinstance(value, (str, dict, list)) and value
-            )):
-                value_msg = f'"{value}"' \
-                            if isinstance(value, str) else \
-                            str(value)
-                failed.append(
-                    f'param "{ptr}" is not empty (value={value_msg})'
-                )
+                value = self.content.get(ptr)
+                # Non empty is:
+                #   any bool/number
+                #   itarbale with non-zero length
+                if any((
+                    isinstance(value, (bool, int, float)),
+                    isinstance(value, (str, dict, list)) and value
+                )):
+                    value_msg = f'"{value}"' \
+                                if isinstance(value, str) else \
+                                str(value)
+                    failed.append(
+                        f'param "{ptr}" is not empty (value={value_msg})'
+                    )
 
-        failed_explanation = "\n- ".join(failed) if failed else None
-        assert not failed, \
-            'Params are not empty or missing, but expected to present and ' \
-            'be empty:\n' \
-            f'- {failed_explanation}'
+            failed_explanation = "\n- ".join(failed) if failed else None
+            assert not failed, \
+                'Params are not empty or missing, ' \
+                'but expected to present and ' \
+                'be empty:\n' \
+                f'- {failed_explanation}'
 
         return self.response_helper
 
-    # @allure.step('Response param "{pointer}" = {value}')
     def param_equals(self, pointer: str, value: Any) -> 'ApiResponseHelper':
         """Checks that given key has value equal to given.
         Use `utils.matchers` for inaccurate comparison.
