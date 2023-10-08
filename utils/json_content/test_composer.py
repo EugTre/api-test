@@ -141,7 +141,7 @@ class TestComposer:
         content = {
             "a": {
                 "!include": str(json_file),
-                "!compose": True
+                "$compose": True
             }
         }
         content_wrapper = JsonWrapper(content)
@@ -334,7 +334,7 @@ class TestComposer:
             },
             "b": {
                 "!xref": "/a",
-                "extend": {"/a1": 500}
+                "$extend": {"/a1": 500}
             }
         }
         content_wrapper = JsonWrapper(copy.deepcopy(content))
@@ -359,8 +359,8 @@ class TestComposer:
         content = {
             "b": {
                 "!xref": "/x",
-                "ifMissing": ["/!gen"],
-                "extend": {"/firstname": "John"}
+                "$ifMissing": ["/!gen"],
+                "$extend": {"/firstname": "John"}
             },
             "x": {"!gen": "Person"}
         }
@@ -429,10 +429,10 @@ class TestComposer:
         ([
             {"id": 1, "posts": [1,2,44,55]},
             {"id": 2, "posts": []},
-            {"id": 30, "posts": {"!ref":"/0/posts"}},
-            {"id": 31, "posts": [{"!ref":"/0/posts/0"}, {"!ref":"/0/posts/1"}]},
-            {"id": 32, "posts": [{"!ref":"/0/posts/0"}, {"!ref":"/0/posts/2"}]},
-            {"!ref":"/1"}
+            {"id": 30, "posts": {"!ref": "/0/posts"}},
+            {"id": 31, "posts": [{"!ref": "/0/posts/0"}, {"!ref": "/0/posts/1"}]},
+            {"id": 32, "posts": [{"!ref": "/0/posts/0"}, {"!ref": "/0/posts/2"}]},
+            {"!ref": "/1"}
         ], [
             {"id": 1, "posts": [1,2,44,55]},
             {"id": 2, "posts": []},
@@ -493,7 +493,7 @@ class TestComposer:
         ({ "a": {"!match": "FooBar"}}, ValueError, 'Failed to find matcher.*'),
         # Generator with invalid params
         ({
-            "a": {"!gen": "Number", "!args": [1,2,3], "Foo": "Bar"}
+            "a": {"!gen": "Number", "$args": [1,2,3], "Foo": "Bar"}
         }, TypeError, '.*'),
         ([{"!ref": ""}], ValueError, 'Referencing to document root is not allowed!.*')
     ])

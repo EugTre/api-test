@@ -83,7 +83,7 @@
     "GetBooking_NotFound": {
         "request": {
             "!xref": "/GetBooking/request",
-            "extend": {
+            "$extend": {
                 "/path_params": {
                     "id": 999999999,
                     "@use": ["id"]
@@ -105,7 +105,7 @@
             "headers": { "!ref": "/$defs/headers/ok" },
             "json": {
                 "!gen": "Booking",
-                "!id": "Create_01"
+                "$id": "Create_01"
             }
         },
         "response": {
@@ -116,7 +116,7 @@
                 "bookingid": { "!match": "AnyNumber" },
                 "booking": {
                     "!gen": "Booking",
-                    "!id": "Create_01"
+                    "$id": "Create_01"
                 }
             }
         }
@@ -128,7 +128,7 @@
             "path": "/booking/{id}",
             "json": {
                 "!gen": "Booking",
-                "!id": "Update_01"
+                "$id": "Update_01"
             }
         },
         "response": {
@@ -136,7 +136,7 @@
             "schema": { "!ref": "/$defs/schema/booking_entry/properties/booking" },
             "json": {
                 "!gen": "Booking",
-                "!id": "Update_01"
+                "$id": "Update_01"
             }
         }
     },

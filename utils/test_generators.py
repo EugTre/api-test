@@ -291,18 +291,15 @@ class TestParamGenerator:
                 "b": "str"
             },
             [
-                pytest.param({
-                    "a": None,
-                    "b": "str"
-                }, id="/a=None"),
-                pytest.param({
-                    "a": 1,
-                    "b": None
-                }, id="/b=None"),
-                pytest.param({
-                    "a": 1,
-                    "b": ""
-                }, id="/b=Empty")
+                pytest.param("/a=Null",
+                             {"a": None, "b": "str"},
+                             id="/a=Null"),
+                pytest.param("/b=Null",
+                             {"a": 1, "b": None},
+                             id="/b=Null"),
+                pytest.param("/b=Empty",
+                             {"a": 1, "b": ""},
+                             id="/b=Empty")
             ]
         ),
         (
@@ -313,22 +310,18 @@ class TestParamGenerator:
                 }
             },
             [
-                pytest.param({
-                    "a": None,
-                    "b": {"c": 2}
-                }, id="/a=None"),
-                pytest.param({
-                    "a": 1,
-                    "b": None
-                }, id="/b=None"),
-                pytest.param({
-                    "a": 1,
-                    "b": {}
-                }, id="/b={}"),
-                pytest.param({
-                    "a": 1,
-                    "b": {"c": None}
-                }, id="/b/c=None")
+                pytest.param("/a=Null",
+                             {"a": None, "b": {"c": 2}},
+                             id="/a=Null"),
+                pytest.param("/b=Null",
+                             {"a": 1,"b": None},
+                             id="/b=Null"),
+                pytest.param("/b={}",
+                             {"a": 1, "b": {}},
+                             id="/b={}"),
+                pytest.param("/b/c=Null",
+                             {"a": 1, "b": {"c": None}},
+                             id="/b/c=Null")
             ]
         )
     ))
@@ -350,10 +343,9 @@ class TestParamGenerator:
         and do not touch unwanted field"""
         ref = {"a": 1, "b": "str"}
         expected = [
-            pytest.param({
-                "a": None,
-                "b": "str"
-            }, id="/a=None")
+            pytest.param("/a=Null",
+                         {"a": None, "b": "str"},
+                         id="/a=Null")
         ]
 
         value = gen.ParamsGenerator.get_payloads_with_empty_null_fields(
@@ -371,14 +363,12 @@ class TestParamGenerator:
                 "b": "str"
             },
             [
-                pytest.param({
-                    "a": "str",
-                    "b": "str"
-                }, id="/a=str"),
-                pytest.param({
-                    "a": 1,
-                    "b": 123
-                }, id="/b=int")
+                pytest.param("/a=str",
+                             {"a": "str", "b": "str"},
+                             id="/a=str"),
+                pytest.param("/b=int",
+                             {"a": 1,"b": 123},
+                             id="/b=int")
             ]
         ),
         (
@@ -389,18 +379,15 @@ class TestParamGenerator:
                 }
             },
             [
-                pytest.param({
-                    "a": "str",
-                    "b": {"c": 2}
-                }, id="/a=str"),
-                pytest.param({
-                    "a": 1,
-                    "b": 123
-                }, id="/b=int"),
-                pytest.param({
-                    "a": 1,
-                    "b": {"c": "str"}
-                }, id="/b/c=str")
+                pytest.param("/a=str",
+                             {"a": "str", "b": {"c": 2}},
+                             id="/a=str"),
+                pytest.param("/b=int",
+                             {"a": 1, "b": 123},
+                             id="/b=int"),
+                pytest.param("/b/c=str",
+                             {"a": 1, "b": {"c": "str"}},
+                             id="/b/c=str")
             ]
         )
     ))
@@ -422,10 +409,9 @@ class TestParamGenerator:
         and do not touch unwanted field"""
         ref = {"a": 1, "b": "str"}
         expected = [
-            pytest.param({
-                "a": "str",
-                "b": "str"
-            }, id="/a=str")
+            pytest.param("/a=str",
+                         {"a": "str","b": "str"},
+                         id="/a=str")
         ]
 
         value = gen.ParamsGenerator.get_payloads_with_invalid_types_fields(
@@ -447,13 +433,9 @@ class TestParamGenerator:
                 "b": "str"
             },
             [
-                pytest.param({}, id="NoFields"),
-                pytest.param({
-                    "b": "str"
-                }, id="/a=Missing"),
-                pytest.param({
-                    "a": 1,
-                }, id="/b=Missing")
+                pytest.param("NoFields", {}, id="NoFields"),
+                pytest.param("/a=Missing", {"b": "str"}, id="/a=Missing"),
+                pytest.param("/b=Missing", {"a": 1}, id="/b=Missing")
             ]
         ),
         (
@@ -464,17 +446,10 @@ class TestParamGenerator:
                 }
             },
             [
-                pytest.param({}, id="NoFields"),
-                pytest.param({
-                    "b": {"c": 2}
-                }, id="/a=Missing"),
-                pytest.param({
-                    "a": 1,
-                }, id="/b=Missing"),
-                pytest.param({
-                    "a": 1,
-                    "b": {}
-                }, id="/b/c=Missing")
+                pytest.param("NoFields", {}, id="NoFields"),
+                pytest.param("/a=Missing", {"b": {"c": 2}}, id="/a=Missing"),
+                pytest.param("/b=Missing", {"a": 1,}, id="/b=Missing"),
+                pytest.param("/b/c=Missing", {"a": 1,"b": {}}, id="/b/c=Missing")
             ]
         )
     ))
@@ -491,10 +466,10 @@ class TestParamGenerator:
         and do not touch unwanted field"""
         ref = {"a": 1, "b": "str"}
         expected = [
-            pytest.param({}, id="NoFields"),
-            pytest.param({
-                "b": "str"
-            }, id="/a=Missing")
+            pytest.param("NoFields", {}, id="NoFields"),
+            pytest.param("/a=Missing",
+                         {"b": "str"},
+                         id="/a=Missing")
         ]
 
         value = gen.ParamsGenerator.get_payloads_with_missing_fields(

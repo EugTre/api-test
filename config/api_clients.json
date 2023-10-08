@@ -14,7 +14,7 @@
         "timeout": 30,
         "requests": {
             "!include": "config/DOG.CEO/requests.json",
-            "!compose": true
+            "$compose": true
         }
     },
     "Restful-Booker": {
@@ -25,7 +25,7 @@
         "timeout": 30,
         "requests": {
             "!include": "config/Restful-Booker/requests.json",
-            "!compose": true
+            "$compose": true
         }
     }
 }

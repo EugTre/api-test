@@ -62,6 +62,8 @@ allure serve .\tmp\
 
 - `--clean-alluredir` - cleans Allure dir from previous runs.
 
+- `--efx` - flag to skip run of the tests marked as `xfail`.
+
 - `--api-config=path/to/file` - path to API clients config file (defaults to *config/api_clients.json*).
 
 - `--logging-config=path/to/file` - path to configuration file for logging (defaults to *config/logging.ini*).
@@ -111,22 +113,22 @@ Handled by: `utils.json_content.composition_handlers.ExtendReferenceCompositionH
 ```json
 {
    "!xref": "/path/to/node",
-   "extend": {
+   "$extend": {
        "/sub-node4": 100
    },
-   "delete": ["/sub-node3"],
-   "ifPresent": ["/sub-node"],
-   "ifMissing": ["/sub-node2"]
+   "$delete": ["/sub-node3"],
+   "$ifPresent": ["/sub-node"],
+   "$ifMissing": ["/sub-node2"]
 }
 ```
 Allows to re-use value at given node and to modify referenced dictionary value.
 
-Compositor will search for given JSON pointer and replace composition with copy of found value. If value is a dictionary and if `extend` or `delete` params defined - copied value will be modified (nodes will be updated, added or removed), otherwise `!xref` works exactly as `!ref`.
+Compositor will search for given JSON pointer and replace composition with copy of found value. If value is a dictionary and if `$extend` or `$delete` params defined - copied value will be modified (nodes will be updated, added or removed), otherwise `!xref` works exactly as `!ref`.
 
-Note, that pointers listed in `extend` and `delete` params must be constructed relative to referenced value, not to entire document!
+Note, that pointers listed in `$extend` and `$delete` params must be constructed relative to referenced value, not to entire document!
 Modifications are done via `JsonWrapper` class, and must follow same logic (e.g. update only existing node or add node to existing dict).
 
-In case if one is referencing to non-static content (e.g. another ref or generator compositions), the `ifPresent` and `ifMissing` params allow to define a list of pointers that expected to present (or to be missing) in referenced value. If conditions are not met, composition will be returned untouched and be waiting until document will be processed before next try.
+In case if one is referencing to non-static content (e.g. another ref or generator compositions), the `$ifPresent` and `$ifMissing` params allow to define a list of pointers that expected to present (or to be missing) in referenced value. If conditions are not met, composition will be returned untouched and be waiting until document will be processed before next try.
 
 After successful composition of document this node will be automatically removed.
 
@@ -146,30 +148,30 @@ Handler supports caching of the content, this might be helpful if same file is u
 
 ##### Include content from file
 Handled by: `utils.json_content.composition_handlers.IncludeFileCompositionHandler`
-```json
+```js
 {
     "!include": "/path/to/file.json",
-    "!compose": true/false,
-    "!format": "json"/"text"
+    "$compose": true   // orfalse, optional
+    "$format": "json"  // or "text", optional
 }
 ```
 Reads content of given file and replace composition with it. Similar to previous composition, but provide way to configure import of content.
 
-`!compose` flag (optional, defaults to `False`): if set to `False` - content will be added as is; otherwise - content will be composed in it's own context and only after that resulting content will be added to current document.
+`$compose` flag (optional, defaults to `False`): if set to `False` - content will be added as is; otherwise - content will be composed in it's own context and only after that resulting content will be added to current document.
 
-`!format` (optional, defaults to `None`) - sets expected format of data in file, if not set - format is guessed by file extension.
+`$format` (optional, defaults to `None`) - sets expected format of data in file, if not set - format is guessed by file extension.
 
 ##### Generator
 Handled by: `utils.json_content.composition_handlers.GeneratorCompositionHandler`
 ```java
 {
     "!gen": "GeneratorName",
-    "!args": [],
-    "!id": "any_text",
+    "$args": [],
+    "$id": "any_text",
     "kwargs": "value"
 }
 ```
-Looks for generator registered as given name and executes generator functions with given arguments (`!args`) and keyword arguments (any parameter without `!`). Then replaces composition with generated data.
+Looks for generator registered as given name and executes generator functions with given arguments (`$args`) and keyword arguments (any parameter without `!` or `$`). Then replaces composition with generated data.
 
 `!gen` (str) - name of the generator in the `GeneratorManager`.
 
@@ -184,15 +186,15 @@ Handled by: `utils.json_content.composition_handlers.MatcherCompositionHandler`
 ```json
 {
     "!match": "AnyTextLike",
-    "!args": [".*"],
+    "$args": [".*"],
     "case_sensitive": true
 }
 ```
-Looks for Matcher object of given class name, instantiate it with given `!args` and keyword args (any parameter without `!`). Then replaces composition with matcher object.
+Looks for Matcher object of given class name, instantiate it with given `$args` and keyword args (any parameter without `!`/`$`). Then replaces composition with matcher object.
 
 `!match` (str) - name of the matcher..
 
-`!args` (list) - list of positional arguments for matcher constructor.
+`$args` (list) - list of positional arguments for matcher constructor.
 
 Other composition parameters will be passed to matcher constructor as keyword arguments.
 
@@ -229,7 +231,7 @@ Each API client should be configured under it's own section, where section name 
         // - Request catalog as external file
         "requests": {
             "!include": "config/DummyAPI/requests.json",
-            "!compse": true
+            "$compse": true
         },
         // - Headers to include with every request to API
         "headers": {

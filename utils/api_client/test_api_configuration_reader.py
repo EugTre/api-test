@@ -169,7 +169,7 @@ def test_api_config_reader_request_catalog_with_references(get_file):
             "url": "http://example.com",
             "requests": {
                 "!include": str(req_cat_file),
-                "!compose": True
+                "$compose": True
             }
         }
     })
@@ -217,7 +217,7 @@ def test_api_config_reader_request_catalog_with_file_references(get_file):
             "url": "http://example.com",
             "requests": {
                 "!include": str(req_cat_file),
-                "!compose": True
+                "$compose": True
             }
         }
     })

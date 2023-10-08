@@ -32,13 +32,16 @@ def get_ref_handler() -> ReferenceCompositionHandler:
         }
     }))
 
+
 @pytest.fixture(name='file_ref_handler', scope='session')
 def get_file_ref_handler() -> FileReferenceCompositionHandler:
     return FileReferenceCompositionHandler()
 
+
 @pytest.fixture(name='include_file_handler', scope='session')
 def get_include_file_handler() -> IncludeFileCompositionHandler:
     return IncludeFileCompositionHandler()
+
 
 @pytest.fixture(name='generator_handler', scope='session')
 def get_generator_handler() -> GeneratorCompositionHandler:
@@ -83,7 +86,7 @@ class TestReferenceCompositionHandler:
         """Composition args are ignored"""
         result, value = ref_handler.compose({
             "!ref": "/a",
-            "!args": [1, 2, 3],
+            "$args": [1, 2, 3],
             "stuff": "kek"
         })
         assert result == CompositionStatus.SUCCESS
@@ -120,22 +123,22 @@ class TestExtendReferenceCompositionHandler:
     @pytest.mark.parametrize("content, ref_composition, expected", [
             (
                 {"a": {"a1": 100, "a2": True}},
-                {"!xref": "/a", "extend": {"/a1": 300}},
+                {"!xref": "/a", "$extend": {"/a1": 300}},
                 {"a1": 300, "a2": True}
             ),
             (
                 {"a": {"a1": 100, "a2": True}},
-                {"!xref": "/a", "extend": {"/a1": 300, "/a2": 400}},
+                {"!xref": "/a", "$extend": {"/a1": 300, "/a2": 400}},
                 {"a1": 300, "a2": 400}
             ),
             (
                 {"a": {"a1": 100, "a2": True}},
-                {"!xref": "/a", "extend": {"/a1": {"b1": 1, "b2": 2}}},
+                {"!xref": "/a", "$extend": {"/a1": {"b1": 1, "b2": 2}}},
                 {"a1": {"b1": 1, "b2": 2}, "a2": True}
             ),
             (
                 {"a": {"a1": 100, "a2": {"b1": 200}}},
-                {"!xref": "/a", "extend": {"/a2/b1": 1}},
+                {"!xref": "/a", "$extend": {"/a2/b1": 1}},
                 {"a1": 100, "a2": {"b1": 1}}
             ),
         ],
@@ -158,17 +161,17 @@ class TestExtendReferenceCompositionHandler:
         [
             (
                 {"a": {"a1": 100}},
-                {"!xref": "/a", "extend": {"/a2": 300}},
+                {"!xref": "/a", "$extend": {"/a2": 300}},
                 {"a1": 100, "a2": 300}
             ),
             (
                 {"a": {"a1": 100}},
-                {"!xref": "/a", "extend": {"/a2": 200, "/a3": 300}},
+                {"!xref": "/a", "$extend": {"/a2": 200, "/a3": 300}},
                 {"a1": 100, "a2": 200, "a3": 300}
             ),
             (
                 {"a": {"a1": {"b1": 1}, "a2": 400}},
-                {"!xref": "/a", "extend": {"/a1/b1": 1, "/a1/b2": 2}},
+                {"!xref": "/a", "$extend": {"/a1/b1": 1, "/a1/b2": 2}},
                 {"a1": {"b1": 1, "b2": 2}, "a2": 400}
             ),
         ],
@@ -190,22 +193,22 @@ class TestExtendReferenceCompositionHandler:
         [
             (
                 {"a": {"a1": 100}},
-                {"!xref": "/a", "extend": {"/a1": 300}},
+                {"!xref": "/a", "$extend": {"/a1": 300}},
                 {"a1": 300}
             ),
             (
                 {"a": {"a1": 100, "a2": 200}},
-                {"!xref": "/a", "extend": {"/a1": 500, "/a2": 600 }},
+                {"!xref": "/a", "$extend": {"/a1": 500, "/a2": 600 }},
                 {"a1": 500, "a2": 600}
             ),
             (
                 {"a": {"a1": {"b1": 1}}},
-                {"!xref": "/a", "extend": {"/a1": {"b3": 300}}},
+                {"!xref": "/a", "$extend": {"/a1": {"b3": 300}}},
                 {"a1": {"b3": 300}}
             ),
             (
                 {"a": {"a1": {"b1": 1}}},
-                {"!xref": "/a", "extend": {"/a1/b1": 300}},
+                {"!xref": "/a", "$extend": {"/a1/b1": 300}},
                 {"a1": {"b1": 300}}
             ),
         ],
@@ -227,22 +230,22 @@ class TestExtendReferenceCompositionHandler:
         [
             (
                 {"a": {"a1": 100, "a2": 300}},
-                {"!xref": "/a", "delete": ["/a2"]},
+                {"!xref": "/a", "$delete": ["/a2"]},
                 {"a1": 100}
             ),
             (
                 {"a": {"a1": 100, "a2": 200}},
-                {"!xref": "/a", "delete": ['/a1', '/a2']},
+                {"!xref": "/a", "$delete": ['/a1', '/a2']},
                 {}
             ),
             (
                 {"a": {"a1": 100, "a2": {"b1": 1}}},
-                {"!xref": "/a", "delete": ["/a2"]},
+                {"!xref": "/a", "$delete": ["/a2"]},
                 {"a1": 100}
             ),
             (
                 {"a": {"a1": {"b1": 1, "b2": 2}}},
-                {"!xref": "/a", "delete": ["/a1/b2"]},
+                {"!xref": "/a", "$delete": ["/a1/b2"]},
                 {"a1": {"b1": 1}}
             ),
         ],
@@ -266,8 +269,8 @@ class TestExtendReferenceCompositionHandler:
                 {"a": {"a1": 100, "a2": 300}},
                 {
                     "!xref": "/a",
-                    "delete": ["/a1"],
-                    "extend": {
+                    "$delete": ["/a1"],
+                    "$extend": {
                         "/a2": 500,
                         "/a3": 900
                     }
@@ -282,8 +285,8 @@ class TestExtendReferenceCompositionHandler:
                 }},
                 {
                     "!xref": "/a",
-                    "delete": ['/a1/b1', '/a1/b2'],
-                    "extend": {
+                    "$delete": ['/a1/b1', '/a1/b2'],
+                    "$extend": {
                         "/a2/b1": 100,
                         "/a3/b3": 100
                     }
@@ -302,8 +305,8 @@ class TestExtendReferenceCompositionHandler:
                 }},
                 {
                     "!xref": "/a",
-                    "delete": ["/a1"],
-                    "extend": {
+                    "$delete": ["/a1"],
+                    "$extend": {
                         "/a2": {"c": 100},
                         "/a3/b1": 500,
                         "/a3/b3": 600
@@ -334,8 +337,8 @@ class TestExtendReferenceCompositionHandler:
                 {"a": {"a1": 100, "a2": 300}},
                 {
                     "!xref": "/a",
-                    "ifPresent": ["/a1"],
-                    "extend": {"/a3": 900}
+                    "$ifPresent": ["/a1"],
+                    "$extend": {"/a3": 900}
                 },
                 {"a1": 100, "a2": 300, "a3": 900}
             ),
@@ -343,8 +346,8 @@ class TestExtendReferenceCompositionHandler:
                 {"a": {"a1": 100, "a2": 300}},
                 {
                     "!xref": "/a",
-                    "ifMissing": ["/a444"],
-                    "extend": {"/a3": 900}
+                    "$ifMissing": ["/a444"],
+                    "$extend": {"/a3": 900}
                 },
                 {"a1": 100, "a2": 300, "a3": 900}
             ),
@@ -352,8 +355,8 @@ class TestExtendReferenceCompositionHandler:
                 {"a": {"a1": 100, "a2": 300}},
                 {
                     "!xref": "/a",
-                    "ifPresent": ["/a1", "/a2"],
-                    "extend": {"/a3": 900}
+                    "$ifPresent": ["/a1", "/a2"],
+                    "$extend": {"/a3": 900}
                 },
                 {"a1": 100, "a2": 300, "a3": 900}
             ),
@@ -361,8 +364,8 @@ class TestExtendReferenceCompositionHandler:
                 {"a": {"a1": 100, "a2": 300}},
                 {
                     "!xref": "/a",
-                    "ifMissing": ["/a444", "/b555"],
-                    "extend": {"/a3": 900}
+                    "$ifMissing": ["/a444", "/b555"],
+                    "$extend": {"/a3": 900}
                 },
                 {"a1": 100, "a2": 300, "a3": 900}
             ),
@@ -370,9 +373,9 @@ class TestExtendReferenceCompositionHandler:
                 {"a": {"a1": 100, "a2": 300}},
                 {
                     "!xref": "/a",
-                    "ifPresent": ["/a1", "/a2"],
-                    "ifMissing": ["/a444", "/b555"],
-                    "extend": {"/a3": 900}
+                    "$ifPresent": ["/a1", "/a2"],
+                    "$ifMissing": ["/a444", "/b555"],
+                    "$extend": {"/a3": 900}
                 },
                 {"a1": 100, "a2": 300, "a3": 900}
             ),
@@ -398,48 +401,48 @@ class TestExtendReferenceCompositionHandler:
                 {"a": {"a1": 100}},
                 {
                     "!xref": "/a",
-                    "ifPresent": ["/a5"],
-                    "extend": {"/a3": 900}
+                    "$ifPresent": ["/a5"],
+                    "$extend": {"/a3": 900}
                 }
             ),
             (
                 {"a": {"a1": 100}},
                 {
                     "!xref": "/a",
-                    "ifPresent": ["/a5", "/a6"],
-                    "extend": {"/a3": 900}
+                    "$ifPresent": ["/a5", "/a6"],
+                    "$extend": {"/a3": 900}
                 }
             ),
             (
                 {"a": {"a1": 100}},
                 {
                     "!xref": "/a",
-                    "ifPresent": ["/a1", "/a6"],
-                    "extend": {"/a3": 900}
+                    "$ifPresent": ["/a1", "/a6"],
+                    "$extend": {"/a3": 900}
                 }
             ),
             (
                 {"a": {"a1": 100}},
                 {
                     "!xref": "/a",
-                    "ifMissing": ["/a1"],
-                    "extend": {"/a3": 900}
+                    "$ifMissing": ["/a1"],
+                    "$extend": {"/a3": 900}
                 }
             ),
             (
                 {"a": {"a1": 100, "a2": 200}},
                 {
                     "!xref": "/a",
-                    "ifMissing": ["/a1", "/a2"],
-                    "extend": {"/a3": 900}
+                    "$ifMissing": ["/a1", "/a2"],
+                    "$extend": {"/a3": 900}
                 }
             ),
             (
                 {"a": {"a1": 100}},
                 {
                     "!xref": "/a",
-                    "ifMissing": ["/a1", "/a6"],
-                    "extend": {"/a3": 900}
+                    "$ifMissing": ["/a1", "/a6"],
+                    "$extend": {"/a3": 900}
                 }
             )
         ],
@@ -465,12 +468,12 @@ class TestExtendReferenceCompositionHandler:
         {"!xref": "/a"},
         {
             "!xref": "/a",
-            "ifPresent": ["/a"]
+            "$ifPresent": ["/a"]
         },
         {
             "!xref": "/a",
-            "ifPresent": ["/b"],
-            "ifMissing": ["/a"]
+            "$ifPresent": ["/b"],
+            "$ifMissing": ["/a"]
         }
     ], ids=[
         "NoFields",
@@ -529,7 +532,7 @@ class TestFileReferenceCompositionHandler:
         json_file.append_as_json(content)
         result, value = file_ref_handler.compose({
             "!file": str(json_file),
-            "!args": [1,2,3],
+            "$args": [1, 2, 3],
             "size": 100500
         })
 
@@ -594,7 +597,7 @@ class TestIncludeFileCompositionHandler:
         json_file.append_as_json(content)
         result, value = include_file_handler.compose({
             "!include": str(json_file),
-            "!args": [1,2,3],
+            "$args": [1, 2, 3],
             "size": 100500
         })
 
@@ -608,7 +611,7 @@ class TestIncludeFileCompositionHandler:
 
         result, value = include_file_handler.compose({
             "!include": str(file),
-            "!format": "json"
+            "$format": "json"
         })
         assert result == CompositionStatus.COMPLETED
         assert value == content
@@ -620,7 +623,7 @@ class TestIncludeFileCompositionHandler:
 
         result, value = include_file_handler.compose({
             "!include": str(file),
-            "!format": "txt"
+            "$format": "txt"
         })
         assert result == CompositionStatus.COMPLETED
         assert value == content
@@ -634,7 +637,7 @@ class TestIncludeFileCompositionHandler:
 
         result, value = include_file_handler.compose({
             "!include": str(json_file),
-            "!compose": True
+            "$compose": True
         })
 
         assert result == CompositionStatus.COMPOSE_IN_SEPARATE_CONTEXT
@@ -677,41 +680,41 @@ class TestGeneratorCompositionHandler:
     def test_matches(self, generator_handler):
         assert generator_handler.match({
             "!gen": "FirstName",
-            "!args": [1,2,3],
+            "$args": [1, 2, 3],
             "kwarg1": 1
         })
 
     @pytest.mark.parametrize("input_value, expected", [
         ({"!gen": "RandomNumber"}, int),
         ({"!gen": "FirstName"}, str),
-        ({"!gen": "RandomInRange", "!args": [50, 100]}, int),
+        ({"!gen": "RandomInRange", "$args": [50, 100]}, int),
         ({"!gen": "RandomInRange", "minimum": 50, "maximum": 55}, int)
     ])
     def test_compose(self, input_value, expected, generator_handler):
-        composition_result, composed_value = generator_handler.compose(input_value)
+        composition_result, composed_value = \
+            generator_handler.compose(input_value)
         assert composition_result == CompositionStatus.SUCCESS
         assert isinstance(composed_value, expected)
 
-    def test_compose_with_same_correlation_id_identical_result(self,
-                                generator_handler: GeneratorCompositionHandler):
+    def test_compose_with_same_correlation_id_identical_result(
+        self, generator_handler: GeneratorCompositionHandler):
         cid = "FooBar"
         result, value1 = generator_handler.compose({
             "!gen": "RandomNumber",
-            "!id": cid
+            "$id": cid
         })
         assert result == CompositionStatus.SUCCESS
 
         result, value2 = generator_handler.compose({
             "!gen": "RandomNumber",
-            "!id": cid
+            "$id": cid
         })
         assert result == CompositionStatus.SUCCESS
         assert value1 == value2
 
-
     # --- Negative
     @pytest.mark.parametrize('input_value', [
-        {"!genz": "Anything", "!args": [1,2,3], "kwarg1": 1},
+        {"!genz": "Anything", "$args": [1, 2, 3], "kwarg1": 1},
         {"gen": "Anything"}
     ])
     def test_match_fails(self, input_value, generator_handler):
@@ -721,14 +724,14 @@ class TestGeneratorCompositionHandler:
         with pytest.raises(ValueError, match='Failed to find generator with name .*'):
             generator_handler.compose({
                 "!gen": "Unknown",
-                "!args": [1,2,3]
+                "$args": [1, 2, 3]
             })
 
     def test_compose_with_unexpected_args_fails(self, generator_handler):
         with pytest.raises(TypeError):
             generator_handler.compose({
                 "!gen": "RandomNumber",
-                "!args": [1,2,3],
+                "$args": [1, 2, 3],
                 "size": 100500
             })
 
@@ -744,17 +747,17 @@ class TestMatcherCompositionHandler:
         handler = MatcherCompositionHandler(self.manager)
         assert handler.match({
             "!match": "Anything",
-            "!args": [1,2,3],
+            "$args": [1, 2, 3],
             "kwarg1": 1
         })
 
     @pytest.mark.parametrize("input_value, expected", [
         ({"!match": "Anything"}, match.Anything()),
         ({"!match": "AnyText"}, match.AnyText()),
-        ({"!match": "AnyTextLike", "!args": [".*"]}, match.AnyTextLike('.*')),
-        ({"!match": "AnyNumberGreaterThan", "!args": [10]}, match.AnyNumberGreaterThan(10)),
+        ({"!match": "AnyTextLike", "$args": [".*"]}, match.AnyTextLike('.*')),
+        ({"!match": "AnyNumberGreaterThan", "$args": [10]}, match.AnyNumberGreaterThan(10)),
         ({"!match": "AnyNumberGreaterThan", "number": 10}, match.AnyNumberGreaterThan(10)),
-        ({"!match": "AnyListOf", "!args": [5, "str"]}, match.AnyListOf(5, '')),
+        ({"!match": "AnyListOf", "$args": [5, "str"]}, match.AnyListOf(5, '')),
         ({"!match": "AnyListOf", "size": 5, "item_type": 3},
          match.AnyListOf(size=5, item_type=3))
     ])
@@ -767,7 +770,7 @@ class TestMatcherCompositionHandler:
 
     # --- Negative
     @pytest.mark.parametrize('input_value', [
-        {"!matchx": "Anything", "!args": [1,2,3], "kwarg1": 1},
+        {"!matchx": "Anything", "$args": [1, 2, 3], "kwarg1": 1},
         {"match": "Anything"}
     ])
     def test_match_fails(self, input_value):
@@ -779,5 +782,5 @@ class TestMatcherCompositionHandler:
         with pytest.raises(ValueError, match='Failed to find matcher with name .*'):
             handler.compose({
                 "!match": "UnknownMatcher",
-                "!args": [1,2,3]
+                "$args": [1, 2, 3]
             })
