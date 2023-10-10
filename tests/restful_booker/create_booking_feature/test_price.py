@@ -2,7 +2,7 @@
 Tests for Restful-Booker API: https://restful-booker.herokuapp.com/
 Epic:    'Restful-Booker API'
 Feautre: 'Create Booking'
-Story:   'Booking price'
+Story:   'Booking price validation'
 """
 import pytest
 import allure
@@ -17,7 +17,7 @@ from ..constants import REQ_GET, REQ_CREATE, \
 
 @allure.epic("Restful-Booker API")
 @allure.feature("Create Booking")
-@allure.story('New booking may be created - price validation')
+@allure.story('Booking price validation')
 class TestCreateBookingPrice:
     """Tests related to 'totalprice' field
     of CreateBooking request validation"""
@@ -25,7 +25,7 @@ class TestCreateBookingPrice:
     @allure.title("Booking price should be saved as integer")
     def test_price_as_float(self,
                             api_request: ApiRequestHelper,
-                            handle_entry_deletion: list):
+                            handle_entry: list):
         """If booking price is defined as float - it should be
         saved as integer (decimal part omitted)"""
 
@@ -41,7 +41,7 @@ class TestCreateBookingPrice:
                 .with_json_payload(booking) \
                 .perform()
 
-            handle_entry_deletion.append(created_response)
+            handle_entry.append(created_response)
 
         with then("new booking is created and total price "
                   "is integer"):
@@ -70,7 +70,7 @@ class TestCreateBookingPrice:
     @allure.tag("negative")
     def test_negative_price(self,
                             api_request: ApiRequestHelper,
-                            handle_entry_deletion: list):
+                            handle_entry: list):
         """If total price is negative - validation
         error should be returned and no new booking should be created"""
 
@@ -83,7 +83,7 @@ class TestCreateBookingPrice:
                 api_request.by_name(REQ_CREATE) \
                 .with_json_payload(booking) \
                 .perform(check_status_code=False)
-            handle_entry_deletion.append(created_response)
+            handle_entry.append(created_response)
 
         with then("response is 400 Bad Request and "
                   "no new booking was created"):

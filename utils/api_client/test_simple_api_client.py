@@ -583,4 +583,4 @@ class TestSimpleApiClientLogging:
         assert succes_request_log_recored.request == \
             client_with_logger.request_object_to_str(response.request)
         assert succes_request_log_recored.response == \
-            client_with_logger.response_object_to_str(response)
+            client_with_logger.convert_response_object(response)

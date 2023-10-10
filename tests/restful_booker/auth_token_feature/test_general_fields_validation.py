@@ -19,7 +19,7 @@ from .constants import AUTH_REQUEST_PAYLOAD_REFERENCE as PAYLOAD_REF
 @allure.feature("Auth Token")
 @allure.story('Token creation')
 @allure.tag('negative')
-class TestCreateTokenNegative:
+class TestCreateTokenFieldsValidationNegative:
     """Negative test related to Auth Token feature"""
 
     @allure.title("No token creation on empty fields [{test_id}]")

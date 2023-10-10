@@ -2,7 +2,7 @@
 Tests for Restful-Booker API: https://restful-booker.herokuapp.com/
 Epic:    'Restful-Booker API'
 Feautre: 'Create Booking'
-Story:   'Input data validation'
+Story:   'General input data validation'
 """
 
 import allure
@@ -20,7 +20,7 @@ from .constants import CREATE_REQUEST_PAYLOAD_REFERENCE as PAYLOAD_REF
 
 @allure.epic("Restful-Booker API")
 @allure.feature("Create Booking")
-@allure.story('New booking may be created - fields validation')
+@allure.story('General input data validation')
 @allure.tag('negative')
 class TestCreateBookingFieldsValidation:
     """Tests related to CreateBooking feature, negative tests"""
@@ -42,7 +42,7 @@ class TestCreateBookingFieldsValidation:
     )
     def test_empty_fields(self, test_id: str, payload: dict,
                           api_request: ApiRequestHelper,
-                          handle_entry_deletion: dict):
+                          handle_entry: dict):
         """Entry creation fails if field is empty string or null"""
         with given(f'incomplete payload with {test_id}'):
             pass
@@ -53,7 +53,7 @@ class TestCreateBookingFieldsValidation:
                 .with_json_payload(payload) \
                 .perform(check_status_code=False)
 
-            handle_entry_deletion.append(created_response)
+            handle_entry.append(created_response)
 
         with then("response is 400 Bad Request and "
                   "no new booking was created"):
@@ -71,7 +71,7 @@ class TestCreateBookingFieldsValidation:
     )
     def test_missing_fields(self, test_id: str, payload: dict,
                             api_request: ApiRequestHelper,
-                            handle_entry_deletion: dict):
+                            handle_entry: dict):
         """Entry creation fails if field is missing"""
         with given(f'incomplete payload with {test_id}'):
             pass
@@ -82,7 +82,7 @@ class TestCreateBookingFieldsValidation:
                 .with_json_payload(payload) \
                 .perform(check_status_code=False)
 
-            handle_entry_deletion.append(created_response)
+            handle_entry.append(created_response)
 
         with then("response is 400 Bad Request and "
                   "no new booking was created"):
@@ -104,7 +104,7 @@ class TestCreateBookingFieldsValidation:
     )
     def test_invalid_data_fields(self, test_id: str, payload: dict,
                                  api_request: ApiRequestHelper,
-                                 handle_entry_deletion: dict):
+                                 handle_entry: dict):
         """Entry creation fails if field contain invalid data
         types"""
 
@@ -122,7 +122,7 @@ class TestCreateBookingFieldsValidation:
                 .with_json_payload(payload) \
                 .perform(check_status_code=False)
 
-            handle_entry_deletion.append(created_response)
+            handle_entry.append(created_response)
 
         with then("response is 400 Bad Request and "
                   "no new booking was created"):

@@ -2,7 +2,7 @@
 import os
 import uuid
 import logging
-from logging import ERROR, INFO, DEBUG
+from logging import ERROR, INFO
 from abc import ABC, abstractmethod
 
 import requests
@@ -102,7 +102,7 @@ class BaseApiClient(ABC):
             return
 
         request_str = self.request_object_to_str(response.request)
-        response_str = self.response_object_to_str(response)
+        response_str = self.convert_response_object(response)
         self.logger.log(
             INFO,
             msg=f"Request (#{self.request_count}) "
@@ -133,7 +133,7 @@ class BaseApiClient(ABC):
                 request_id=self.request_count,
                 client_id=self.client_id,
                 request=self.request_object_to_str(response.request),
-                response=self.response_object_to_str(response)
+                response=self.convert_response_object(response)
             )
         )
 
@@ -168,7 +168,9 @@ class BaseApiClient(ABC):
         return str(fields)
 
     @staticmethod
-    def response_object_to_str(response: requests.Response) -> str:
+    def convert_response_object(response: requests.Response, /,
+                                to_string: bool | None = None,
+                                to_dict: bool | None = None) -> str:
         """Converts response object to dict of parameters
 
         Args:
@@ -179,6 +181,9 @@ class BaseApiClient(ABC):
         """
         if response is None:
             return None
+
+        if to_string is None and to_dict is None:
+            to_string = True
 
         fields = {
             'status_code': response.status_code,
@@ -193,7 +198,10 @@ class BaseApiClient(ABC):
             'is_redirect': response.is_redirect
         }
 
-        return str(fields)
+        if to_string:
+            return str(fields)
+
+        return fields
 
 
 class SimpleApiClient(BaseApiClient):

@@ -23,7 +23,7 @@ class TestCreateBooking:
 
     @allure.title("Non-Authenticated user can create booking")
     def test_create_booking_no_auth(self, api_request: ApiRequestHelper,
-                                    handle_entry_deletion: list):
+                                    handle_entry: list):
         """Non-authenticated user can create bookings new bookings
         with valid params"""
 
@@ -35,7 +35,7 @@ class TestCreateBooking:
                 api_request.by_name(REQ_CREATE) \
                 .perform()
 
-            handle_entry_deletion.append(created_booking_response)
+            handle_entry.append(created_booking_response)
 
         with then("response contains booking id and booking info"):
             created_booking_response \
@@ -58,7 +58,7 @@ class TestCreateBooking:
     def test_create_booking_auth(self,
                                  api_request: ApiRequestHelper,
                                  auth_token: str,
-                                 handle_entry_deletion: list):
+                                 handle_entry: list):
         """Authenticated user can create bookings new bookings
         with valid params"""
 
@@ -71,7 +71,7 @@ class TestCreateBooking:
                 .with_cookies(auth_token) \
                 .perform()
 
-            handle_entry_deletion.append(created_booking_response)
+            handle_entry.append(created_booking_response)
 
         with then("response contains booking id and booking info"):
             created_booking_response \
@@ -151,7 +151,7 @@ class TestCreateBookingNegative:
     ))
     def test_head_method(self, api_request: ApiRequestHelper,
                          method: HTTPMethod,
-                         handle_entry_deletion: list):
+                         handle_entry: list):
         """Unsupported method should return 400-like error code"""
 
         with given(f"{method} request with valid payload"):
@@ -163,7 +163,7 @@ class TestCreateBookingNegative:
                 .with_method(method) \
                 .with_expected(status_code=404) \
                 .perform()
-            handle_entry_deletion.append(response)
+            handle_entry.append(response)
 
         with then("response is empty"):
             response.equals('Not Found')

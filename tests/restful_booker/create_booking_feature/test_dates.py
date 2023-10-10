@@ -17,7 +17,7 @@ from ..constants import REQ_GET, REQ_CREATE, \
 
 @allure.epic("Restful-Booker API")
 @allure.feature("Create Booking")
-@allure.story('New booking may be created - dates validation')
+@allure.story('Booking dates validation')
 class TestCreateBookingDates:
     """Validation of dates fields"""
 
@@ -33,7 +33,7 @@ class TestCreateBookingDates:
     def test_date_format(self,
                          test_id, booking_dates: tuple,
                          api_request: ApiRequestHelper,
-                         handle_entry_deletion: list):
+                         handle_entry: list):
         """Create booking with valid dates in various formats"""
         dates = {
             "checkin": booking_dates[0],
@@ -53,7 +53,7 @@ class TestCreateBookingDates:
                 .with_json_payload(booking) \
                 .perform()
 
-            handle_entry_deletion.append(created_response)
+            handle_entry.append(created_response)
 
         with then("new booking is created and total price "
                   "is integer"):
@@ -83,7 +83,7 @@ class TestCreateBookingDates:
     def test_checkin_checkout_dates_order(
         self,
         api_request: ApiRequestHelper,
-        handle_entry_deletion: list
+        handle_entry: list
     ):
         """If checkout date is before checkin date - validation
         error should be returned and no new booking should be created"""
@@ -101,7 +101,7 @@ class TestCreateBookingDates:
                 api_request.by_name(REQ_CREATE) \
                 .with_json_payload(booking) \
                 .perform(check_status_code=False)
-            handle_entry_deletion.append(created_response)
+            handle_entry.append(created_response)
 
         with then("response is 400 Bad Request"):
             created_response.status_code_equals(400) \
@@ -121,7 +121,7 @@ class TestCreateBookingDates:
         self,
         test_id, booking_dates: tuple,
         api_request: ApiRequestHelper,
-        handle_entry_deletion: list
+        handle_entry: list
     ):
         """No booking creation if date is in invalid format"""
         dates = {
@@ -138,7 +138,7 @@ class TestCreateBookingDates:
                 .with_json_payload(booking) \
                 .perform(check_status_code=False)
 
-            handle_entry_deletion.append(created_response)
+            handle_entry.append(created_response)
 
         with then("no booking was creaderd and 400 error returned"):
             created_response.status_code_equals(400) \

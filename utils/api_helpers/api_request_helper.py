@@ -31,7 +31,8 @@ class ApiRequestHelper:
     count = 1
     PATH_PATTERN = re.compile(r'{([a-zA-Z0-9_]*)}')
 
-    def __init__(self, api_client: SimpleApiClient):
+    def __init__(self, api_client: SimpleApiClient,
+                 track_request_count: bool = True):
         """Creates instance of `ApiRequestHelper` class.
 
         Args:
@@ -39,6 +40,8 @@ class ApiRequestHelper:
         """
         self.api_client = api_client
         self.name = ''
+        self.track_request_count = track_request_count
+
         self.request: RequestEntity | None = None
         self.expected: ResponseEntity | None = None
         self.session_cookies: RequestsCookieJar = RequestsCookieJar()
@@ -51,7 +54,6 @@ class ApiRequestHelper:
         self.expected = None
 
     # Request setup
-    @allure.step('Request "{name}" from catalog')
     def by_name(self, name: str) -> Self:
         """Selects request from API Client's catalogue by request name.
         Invocation of the method resets instance's properties.
@@ -192,7 +194,6 @@ class ApiRequestHelper:
         return self
 
     @expect_initialized
-    @allure.step('Request with custom query params')
     def with_query_params(self, **query_params) -> Self:
         """Adds params which should be added as URL query params.
         Appends/overwrites defaults params if defined for request.
@@ -470,23 +471,29 @@ class ApiRequestHelper:
             Self: instance of class `ApiRequestHelper`
         """
         args = self.prepare_request_params(request_args)
-        self.__allure_save_request_params(args)
 
-        request_step_info = f' "{self.name}"' if self.name else ''
+        request_idx = self.count if self.track_request_count else ''
+        request_step_info = f' from catalog "{self.name}"' if self.name else ''
         with allure.step(
-            f'Request {self.count}{request_step_info} was performed '
-            f'[method: {self.request.method}, url: {self.request.path}]'
+            f'Request {request_idx}{request_step_info} was performed '
+            f'[method: {args["method"]}, url: {args["path"]}]'
         ):
-            response = self.api_client.request(
+            response = self.__perform(
                 override_defaults=override_defaults,
                 **args
             )
-            if save_cookies:
-                self.session_cookies = response.cookies.copy()
 
-            allure.dynamic.parameter(f'Request {self.count} completed',
-                                     response.url)
             self.count += 1
+
+            self.__track_response(
+                **self.api_client.convert_response_object(
+                    response,
+                    to_dict=True
+                )
+            )
+
+        if save_cookies:
+            self.session_cookies = response.cookies.copy()
 
         response_helper = ApiResponseHelper(response) \
             .set_expected(expected_response=self.expected)
@@ -497,33 +504,19 @@ class ApiRequestHelper:
         return response_helper.status_code_equals()
 
     # Private methods
-    def __allure_save_request_params(self, request_args: dict) -> None:
-        """Saves request data as Allure parameters.
+    @allure.step("Request to API")
+    def __perform(self, override_defaults, **request_args):
+        return self.api_client.request(
+            override_defaults=override_defaults,
+            **request_args
+        )
 
-        Args:
-            path (str): request URI.
-            request_args (dict): request parameters.
-        """
-        request_name = f' (pre-configured, "{self.name}")'if self.name else ''
-        param_name = f'Request {self.count}{request_name}'
-        param_value = {
-            'method': request_args['method'],
-            'path': request_args['path'],
-            'query': request_args.get('query_params', ''),
-            'params': {
-                key: value for key, value in request_args.items()
-                if value is not None and key not in (
-                    'method', 'path', 'query_params'
-                )
-            }
-        }
-
-        allure.dynamic.parameter(param_name, param_value)
-
-        if self.request.json is not None:
-            allure.dynamic.parameter(f'Request {self.count} - JSON payload',
-                                     self.request.json)
+    @allure.step("Response from API")
+    def __track_response(self, **kwargs):
+        """Method is used to track response details in Allure report"""
 
     def __repr__(self) -> str:
         return f'{self.__class__.__name__}' \
-               f'(Client: {self.api_client.client_id.api_name})'
+               f'(Client: {self.api_client.client_id.api_name}, ' \
+               f'requests done: {self.count}, ' \
+               f'session_cookies: {self.session_cookies})'

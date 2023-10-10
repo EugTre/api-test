@@ -112,7 +112,7 @@ def pytest_configure(config):
     if dump_to_file:
         export_api_config(pytest.api_config, dump_to_file)
 
-    def prepare_params(params, *values):
+    def format_params(params, *values):
         output_params = []
         params_count = len(params.split(','))
         for v in values:
@@ -123,7 +123,7 @@ def pytest_configure(config):
             output_params.append(pytest.param(*v, id=v[0]))
         return (params, output_params)
 
-    pytest.format_params = prepare_params
+    pytest.format_params = format_params
     pytest.efx = {"run": not config.getoption("--efx")}
 
 

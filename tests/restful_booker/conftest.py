@@ -1,4 +1,5 @@
 """Test configuration for Restful-Booker API"""
+import allure
 import pytest
 from utils.api_client.setup_api_client import setup_api_client
 from utils.api_client.simple_api_client import SimpleApiClient
@@ -10,7 +11,7 @@ from .constants import API_NAME, \
 
 
 @pytest.fixture(scope='session')
-def api_client() -> SimpleApiClient:
+def api_client() -> BaseApiClient:
     '''Returns object inherited from `BaseApiClient` class.
 
        Actual class and options are selected by given name
@@ -23,44 +24,48 @@ def api_client() -> SimpleApiClient:
     )
 
 
-@pytest.fixture()
-def auth_token(api_request: ApiRequestHelper) -> dict:
+@allure.title("Get Auth Token")
+@pytest.fixture(scope="session")
+def auth_token(api_client: BaseApiClient) -> dict:
     """Creates and returns token"""
-    response = api_request.by_name(REQ_AUTH).perform()
-    return response.get_json(True)
+    return ApiRequestHelper(api_client, track_request_count=False)\
+        .by_name(REQ_AUTH)\
+        .perform()\
+        .get_json(True)
 
 
-@pytest.fixture
-def created_booking(api_request: ApiRequestHelper) -> dict:
+@allure.title("Create New Booking")
+@pytest.fixture(scope="session")
+def created_booking(api_client: BaseApiClient, auth_token: dict) -> dict:
     """Creates booking"""
-    response = api_request.by_name(REQ_AUTH).perform()
-    token = response.get_json(True)
-    booking = api_request.by_name(REQ_CREATE)\
-        .with_cookies(token).perform()
+    api = ApiRequestHelper(api_client, track_request_count=False)
+    booking = api.by_name(REQ_CREATE)\
+        .with_cookies(auth_token)\
+        .perform()
 
     prepared = {
-        "token": token,
+        "token": auth_token,
         "id": booking.get_json_value(FIELD_BOOKING_ID),
         "booking": booking.get_json_value(FIELD_BOOKING_INFO)
     }
 
     yield prepared
 
-    api_request.by_name(REQ_DELETE) \
-        .with_cookies(token) \
+    api.by_name(REQ_DELETE) \
+        .with_cookies(auth_token) \
         .with_path_params(id=prepared['id']) \
         .perform()
 
 
-@pytest.fixture
-def handle_entry_deletion(api_request: ApiRequestHelper) -> list:
+@allure.title("Handle Booking Entry")
+@pytest.fixture(scope='session')
+def handle_entry(api_client: BaseApiClient, auth_token: dict) -> list:
     """Handles deletion of booking created in the
     test."""
     response_collection = []
     yield response_collection
 
-    # Filter response if it doesn't contain any json (e.g.
-    # failed request)
+    # Filter response if it doesn't contain any json
     response_collection = [
         resp
         for resp in response_collection
@@ -70,10 +75,10 @@ def handle_entry_deletion(api_request: ApiRequestHelper) -> list:
     if not response_collection:
         return
 
-    auth = api_request.by_name(REQ_AUTH).perform()
+    api = ApiRequestHelper(api_client, track_request_count=False)
     for created_response in response_collection:
         booking_id = created_response.get_json_value(FIELD_BOOKING_ID)
-        api_request.by_name(REQ_DELETE) \
-            .with_cookies(auth.get_json(True)) \
+        api.by_name(REQ_DELETE) \
+            .with_cookies(auth_token) \
             .with_path_params(id=booking_id) \
             .perform()
