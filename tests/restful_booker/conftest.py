@@ -2,7 +2,7 @@
 import allure
 import pytest
 from utils.api_client.setup_api_client import setup_api_client
-from utils.api_client.simple_api_client import SimpleApiClient
+from utils.api_client.simple_api_client import BaseApiClient
 from utils.api_helpers.api_request_helper import ApiRequestHelper
 
 from .constants import API_NAME, \

@@ -6,11 +6,12 @@ from dataclasses import dataclass
 
 from utils.basic_manager import BasicManager
 
+
 # --- Manager ---
 # ---------------
 class MatchersManager(BasicManager):
-    """Class to register and provide access to matcher objects from various points
-    in the framework (e.g. for compiler procedures).
+    """Class to register and provide access to matcher objects
+    from various points in the framework (e.g. for compiler procedures).
     """
     matchers = []
 
@@ -18,20 +19,23 @@ class MatchersManager(BasicManager):
         """Creates instance of Matchers Manager class.
 
         Args:
-            include_known_matchers (bool, optional): Flag to automatically register all
-            known matchers to collection. Known matchers are matchers inherited from
-            BaseMatcher. Defaults to True.
+            include_known_matchers (bool, optional): Flag to automatically
+            register all known matchers to collection.
+            Known matchers are matchers inherited from BaseMatcher.
+            Defaults to True.
         """
         super().__init__()
         if include_known_matchers:
             self.add_all(MatchersManager.matchers)
 
-    def add(self, item: 'BaseMatcher', name: str | None = None, override: bool = False):
+    def add(self, item: 'BaseMatcher', name: str | None = None,
+            override: bool = False):
         """Registers given matcher under given name.
 
         Args:
             matcher (AbstractMatcher): matcher class.
-            name (str, optional): registration name. Defaults to class.__name__.
+            name (str, optional): registration name.
+            Defaults to class.__name__.
 
         Raises:
             ValueError: when name already occupied.
@@ -43,18 +47,20 @@ class MatchersManager(BasicManager):
         """Registers given collection of matchers.
 
         Args:
-            matchers (list | tuple): collection of matchers where each element is
-            'class<cls>' or ('class<cls>', 'name<str>').
+            matchers (list | tuple): collection of matchers where each
+            element is 'class<cls>' or ('class<cls>', 'name<str>').
         """
         return super().add_all(items, override)
 
-    def get(self, name: str, args:tuple=(), kwargs:dict=None) -> 'BaseMatcher':
+    def get(self, name: str, args: tuple = (),
+            kwargs: dict = None) -> 'BaseMatcher':
         """Creates an instance of registerd matcher object by it's name and
         with given args/kwargs.
 
         Args:
             name (str): registered name of the matcher.
-            args (tuple, optional): matcher's constructor arguments. Defaults to ().
+            args (tuple, optional): matcher's constructor arguments.
+            Defaults to ().
             kwargs (dict, optional): matcher's constructor keyword arguments.
             Defaults to None.
 
@@ -78,9 +84,12 @@ class MatchersManager(BasicManager):
         if issubclass(item, BaseMatcher):
             return
 
-        raise ValueError(f'Registraion failed for item "{item}" at {self.__class__.__name__}. '
-                         f'Only subclass items of class "{BaseMatcher.__name__}" '
-                         f'are allowed!')
+        raise ValueError(
+            'Registraion failed for item '
+            f'"{item}" at {self.__class__.__name__}. '
+            f'Only subclass items of class "{BaseMatcher.__name__}" '
+            f'are allowed!'
+        )
 
 
 # --- Base Matcher class ---
@@ -99,7 +108,8 @@ class BaseMatcher(ABC):
         not_matching_fields = []
         for field in self.__dataclass_fields__.values():
             if isinstance(field.type, (typing._SpecialForm, type(typing.Any))):
-                # Ignore Any and typing of SpecialForm (parameterless Union, ClassVar)
+                # Ignore Any and typing of SpecialForm
+                # (parameterless Union, ClassVar)
                 continue
 
             field_type = field.type
@@ -115,7 +125,10 @@ class BaseMatcher(ABC):
 
             value = getattr(self, field.name)
             if not isinstance(value, field_type):
-                value_repr = f'"{value}"' if isinstance(value, str) else str(value)
+                value_repr = f'"{value}"' \
+                    if isinstance(value, str) else \
+                    str(value)
+
                 not_matching_fields.append(
                     f'"{field.name}" = {value_repr} ({type(value)}) doesn\'t '
                     f'match expected type(s) {field_type}'
@@ -124,8 +137,8 @@ class BaseMatcher(ABC):
         # pylint: enable=no-member, protected-access
         if not_matching_fields:
             details = ',\n - '.join(not_matching_fields)
-            raise TypeError("Matcher initialized with invalid types of parameters:\n - "
-                            f"{details}")
+            raise TypeError("Matcher initialized with invalid types "
+                            f"of parameters:\n - {details}")
 
     @abstractmethod
     def __eq__(self, other):
@@ -138,13 +151,15 @@ class BaseMatcher(ABC):
     @staticmethod
     @abstractmethod
     def assertrepr_compare(left, right) -> list[str]:
-        """Return full list of string as explanation of why values are not equal"""
+        """Return full list of string as explanation of why values
+        are not equal"""
         return []
 
     @staticmethod
     @abstractmethod
     def assertrepr_compare_brief(left, right) -> list[str]:
-        """Return shortened list of string as explanation of why values are not equal"""
+        """Return shortened list of string as explanation of why values
+        are not equal"""
         return []
 
     @staticmethod
@@ -155,6 +170,7 @@ class BaseMatcher(ABC):
         if isinstance(list_or_dict, (list, dict)) and len(repr_str) > 55:
             repr_str = f'{repr_str[:35]} ...{repr_str[-20:]}'
         return repr_str
+
 
 @dataclass(frozen=True, eq=False, repr=False)
 class Anything(BaseMatcher):

@@ -21,7 +21,7 @@
         "url": "https://restful-booker.herokuapp.com/",
         "endpoint": "/",
         "client": {"!ref": "/$defs/client"},
-        "logger": {"!ref": "/$defs/api_logger"},
+        // "logger": {"!ref": "/$defs/api_logger"},
         "timeout": 30,
         "requests": {
             "!include": "config/Restful-Booker/requests.json",

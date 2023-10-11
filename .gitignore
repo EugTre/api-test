@@ -4,6 +4,7 @@
 __pycache__/
 headers_authorized.json
 /tmp
+/allure-report
 /htmlcov
 /.coverage
 logging.db

@@ -422,14 +422,14 @@ class TestApiResponseHelperHeaders:
                 "origin": match.AnyTextLike(".*something.*"),
                 "redirects":  match.AnyTextLike(".*allowedd.*")
             },
-            r'Response headers are not like given:.*header ".*" not found.*'
+            r'Response headers are not like expected:.*header ".*" not found.*'
         ),
         (
             {
                 "accept": match.AnyTextLike(".*image/png.*"),
                 "accept-charset":  match.AnyTextLike(".*xcode.*")
             },
-            r'Response headers are not like given:.*header\'s value .*'
+            r'Response headers are not like expected:.*header\'s value .*'
             r'doesn\'t match to expected .*'
         ),
         (
@@ -437,7 +437,7 @@ class TestApiResponseHelperHeaders:
                 "accept": match.AnyTextLike(".*image/png.*"),
                 "origin": match.AnyTextLike(".*somewhere.*")
             },
-            r'Response headers are not like given:.*header\'s value .*'
+            r'Response headers are not like expected:.*header\'s value .*'
             r'doesn\'t match to expected .*header ".*" not found.*'
         ),
         (
@@ -445,7 +445,7 @@ class TestApiResponseHelperHeaders:
                 "Accept": match.AnyTextLike(".*Text/HTML.*", case_sensitive=True),
                 "Accept-Charset": match.AnyTextLike(".*UNICODE.*", case_sensitive=True)
             },
-            r'Response headers are not like given:.*header\'s value .*'
+            r'Response headers are not like expected:.*header\'s value .*'
             r'doesn\'t match to expected .*'
         )
     ])
@@ -511,7 +511,7 @@ class TestApiResponseHelperJson:
 
     def test_equals_asserts(self, api_response_simple: ApiResponseHelper):
         with pytest.raises(AssertionError,
-                           match='Response\'s JSON is not equal to given one.*'):
+                           match='Response\'s JSON is not equal to expected.*'):
             api_response_simple.json.equals({"status": "success"})
 
     def test_equals_ignoring(self, api_response_detailed: ApiResponseHelper):
@@ -545,7 +545,7 @@ class TestApiResponseHelperJson:
 
     def test_is_like_for_missing_keys_fail(self, api_response_detailed: ApiResponseHelper):
         with pytest.raises(AssertionError,
-                match='JSON content is not like given:.*'):
+                match='JSON content is not like expected:.*'):
             api_response_detailed.json.is_like({
                 'info': {
                     'status': 344,
@@ -555,7 +555,7 @@ class TestApiResponseHelperJson:
 
     def test_is_like_comparison_fail(self, api_response_detailed: ApiResponseHelper):
         with pytest.raises(AssertionError,
-                match='JSON content is not like given:.*'):
+                match='JSON content is not like expected:.*'):
             api_response_detailed.json.is_like({
                 'status': 34125,
                 'message': "Message"

@@ -12,7 +12,7 @@ from utils.bdd import given, when, then
 from utils.api_helpers.api_request_helper import ApiRequestHelper
 from utils.api_client.models import HTTPMethod
 
-from ..constants import REQ_AUTH
+from ..constants import REQ_AUTH, USERNAME
 
 
 @allure.epic("Restful-Booker API")
@@ -39,14 +39,19 @@ class TestCreateToken:
             response.validates_against_schema() \
                 .headers.are_like()
 
-    @allure.title("Does not creates token with unsuitable creds")
-    def test_create_fails(self, api_request: ApiRequestHelper):
+    @allure.title("Does not creates token with unsuitable creds [{test_id}]")
+    @pytest.mark.parametrize(*pytest.format_params(
+        "test_id, username, password",
+        ("Unregistered", "MyUser", "MyPassword"),
+        ("InvalidPassword", USERNAME, "MyPassword")
+    ))
+    def test_create_fails(self, test_id, username, password,
+                          api_request: ApiRequestHelper):
         """Token can not be created when not registered creds
         are used"""
 
-        with given("valid username and password"):
-            username = "MyUser"
-            password = "MyPassword"
+        with given(f"unsuitable creds: '{username}'/'{password}'"):
+            pass
 
         with when("CreateToken POST request with creds successfull (200 OK)"):
             response = api_request.by_name("Auth_BadCredentials") \
