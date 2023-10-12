@@ -3,14 +3,15 @@
     // for referencing from other nodes
     "$defs": {
         "client": "utils.api_client.simple_api_client.SimpleApiClient",
+        "client_session": "utils.api_client.simple_api_client.SessionApiClient",
         "api_logger": "api_test"
     },
 
     "DOG.CEO": {
         "url": "https://dog.ceo/",
         "endpoint": "/api",
-        "client": {"!ref": "/$defs/client"},
-        // "logger": {"!ref": "/$defs/api_logger"},
+        "client": {"!ref": "/$defs/client_session"},
+        //"logger": {"!ref": "/$defs/api_logger"},
         "timeout": 30,
         "requests": {
             "!include": "config/DOG.CEO/requests.json",
@@ -20,8 +21,8 @@
     "Restful-Booker": {
         "url": "https://restful-booker.herokuapp.com/",
         "endpoint": "/",
-        "client": {"!ref": "/$defs/client"},
-        // "logger": {"!ref": "/$defs/api_logger"},
+        "client": {"!ref": "/$defs/client_session"},
+        //"logger": {"!ref": "/$defs/api_logger"},
         "timeout": 30,
         "requests": {
             "!include": "config/Restful-Booker/requests.json",

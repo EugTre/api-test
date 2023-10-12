@@ -129,7 +129,7 @@ class TestApiRequestHelper:
             path='user',
             headers=header,
             query_params=query_param,
-            cookies=RequestsCookieJar()
+            cookies=None
         )
         expected_response_code = 200
 
@@ -176,7 +176,7 @@ class TestApiRequestHelper:
         assert api.request == RequestEntity(
             method=HTTPMethod.GET,
             path="",
-            cookies=RequestsCookieJar()
+            cookies=None
         )
         assert api.expected == ResponseEntity(status_code=200)
 
@@ -426,7 +426,7 @@ class TestApiRequestHelper:
             'Foo': 'Bar',
             'Test': '123'
         })
-        api.session_cookies = session_cookies
+        api.reuse_cookies = session_cookies
 
         api.by_name(REQUEST_NAME_1)
         req_params = api.prepare_request_params()
@@ -439,7 +439,7 @@ class TestApiRequestHelper:
         pre-defined for request"""
         session_cookies = RequestsCookieJar()
         session_cookies.set('BySession', 'test')
-        api.session_cookies = session_cookies
+        api.reuse_cookies = session_cookies
 
         api.by_name(REQUEST_NAME_2) \
             .with_path_params(node=123, id=456)
@@ -459,13 +459,13 @@ class TestApiRequestHelper:
         defined for request & method"""
         session_cookies = RequestsCookieJar()
         session_cookies.set('BySession', 'test1')
-        api.session_cookies = session_cookies
+        api.reuse_cookies = session_cookies
 
         api.by_name(REQUEST_NAME_2) \
             .with_path_params(node=123, id=456) \
             .with_cookies({"ByMethod": "test2"})
         req_params = api.prepare_request_params({
-            'cookies':{"ByMethod2": "test3"}
+            'cookies': {"ByMethod2": "test3"}
         })
 
         expected_cookies = RequestsCookieJar()

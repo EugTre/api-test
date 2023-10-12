@@ -38,9 +38,79 @@ class BaseApiClient(ABC):
         if api_spec_as_dict.get('logger_name') is not None:
             self.logger = logging.getLogger(api_spec_as_dict['logger_name'])
 
+    def request(self, method: str | HTTPMethod,
+                path: str,
+                override_defaults: bool = False,
+                **params) -> requests.Response | None:
+        """Performs request with given method and paramerters to given
+        path of API.
+        Send request and response data to logger.
+
+        Each request will be extended with defaults parameters (headers,
+        cookies, auth, timeout) from config file (e.g. api_config.ini).
+        By default method-level headers/cookies will be merged with
+        request defaults, overwritting existing values.
+
+        'override_defaults' flag logic depends on actual implementation,
+        but in general it allows to ommit request_defaults values in
+        one way or another.
+
+        Args:
+            method (str or `HTTPMethod` enum): method to make a request ('get',
+            'post', etc.)
+            path (str): path relative to API base url (e.g. 'v1/check')
+            override_defaults(bool): flag to override default values
+            of API Client. If True - values passed in **params will override
+            API Client's defaults. However for params that
+            not passed - defaults will still apply.
+            params(): additional keyword arguments for request.
+
+        Returns:
+            `requests.Response:`: :class:`Response <Response>` object
+        """
+        if isinstance(method, HTTPMethod):
+            method = method.value
+
+        request_params = self.prepare_request_params(
+            method, path,
+            override_defaults,
+            **params
+        )
+
+        self.log_request(request_params)
+        response = None
+        try:
+            response = self._perform_request(**request_params)
+        except Exception as exc:
+            self.log_error(exc, response)
+            raise
+
+        self.log_response(response)
+        self.request_count += 1
+
+        return response
+
     @abstractmethod
-    def request(self, method, path, override_defaults, **kwargs):
-        """Makes HTTP request, wrapping actual lib request fucntion call"""
+    def _perform_request(self, **kwargs) -> requests.Response | None:
+        """Actually makes request using class-specific way"""
+
+    @abstractmethod
+    def prepare_request_params(self, method: str, path: str,
+                               override_defaults: bool, **params) -> dict:
+        """Compose request parameters into a dictionary.
+        Sets defaults to `timeout` parameter if missign to
+        `self.default_timeout`.
+
+        Args:
+            method (str): method name ('get', 'post', etc.).
+            path (str): path relative to API base url (e.g. 'v1/check').
+            override_defaults (bool): flag to override params if given;
+            if True - given params will be used as is; otherwise given
+            params will be appended/set with values from request_defaults.
+
+        Returns:
+            dict: dictionary of the request parameters.
+        """
 
     def get_api_url(self):
         """Return fully qualified API url (url + endpoint)"""
@@ -208,54 +278,16 @@ class SimpleApiClient(BaseApiClient):
     """Basic API Client class and base class for inheritence.
     Wraps `requests` module with little custom logic and logging of
     request & response.
+
+    Do not uses session and each new request performed
+    in separate connection and context.
+
+    Request default params will be combined with given params
+    before each requests.
     """
-    def request(self, method: str | HTTPMethod,
-                path: str,
-                override_defaults: bool = False,
-                **params) -> requests.Response | None:
-        """Performs request with given method and paramerters to given
-        path of API.
-        Send request and response data to logger.
 
-        Each request will be extended with defaults parameters (headers,
-        cookies, auth, timeout) from config file (e.g. api_config.ini).
-        If 'override_defaults' flag set to True - only missing parameters
-        will be set to defaults (e.g. if 'override_defaults' is True,
-        default headers is set and request invoked with headers - only
-        passed headers will be used)
-
-        Args:
-            method (str or `HTTPMethod` enum): method to make a request ('get',
-            'post', etc.)
-            path (str): path relative to API base url (e.g. 'v1/check')
-            override_defaults(bool): flag to override default values
-            of API Client. If True - values passed in **params will override
-            API Client's defaults. However for params that
-            not passed - defaults will still apply.
-            params(): additional keyword arguments for request.
-
-        Returns:
-            `requests.Response:`: :class:`Response <Response>` object
-        """
-        if isinstance(method, HTTPMethod):
-            method = method.value
-
-        request_params = self.prepare_request_params(
-            method, path, override_defaults, **params
-        )
-
-        self.log_request(request_params)
-        response = None
-        try:
-            response = requests.request(**request_params)
-        except Exception as exc:
-            self.log_error(exc, response)
-            raise
-
-        self.log_response(response)
-        self.request_count += 1
-
-        return response
+    def _perform_request(self, **kwargs) -> requests.Response | None:
+        return requests.request(**kwargs)
 
     def prepare_request_params(self, method: str, path: str,
                                override_defaults: bool, **params) -> dict:
@@ -327,3 +359,59 @@ class SimpleApiClient(BaseApiClient):
         for key, value in default_value.items():
             if key not in request_value:
                 request_value[key] = value
+
+
+class SessionApiClient(BaseApiClient):
+    """Basic API Client class and base class for inheritence.
+    Wraps `requests` module with little custom logic and logging of
+    request & response.
+
+    Uses single TCP session for all requests to API (plus persisting cookies).
+    Request defaults applies to session and used by each request made.
+
+    To nullify session level cookies/headers use `override_defaults` flag
+    and pass cookies=None/headers=None to `request` method.
+    """
+    def __init__(self, api_spec_as_dict: dict):
+        super().__init__(api_spec_as_dict)
+
+        self.session = requests.Session()
+        if self.request_defaults['cookies']:
+            self.session.cookies.update(self.request_defaults['cookies'])
+        if self.request_defaults['headers']:
+            self.session.headers.update(self.request_defaults['headers'])
+        self.session.auth = self.request_defaults.get('auth', None)
+
+    def _perform_request(self, **kwargs) -> requests.Response | None:
+        return self.session.request(**kwargs)
+
+    def prepare_request_params(self, method: str, path: str,
+                               override_defaults: bool, **params) -> dict:
+        """Compose request parameters into a dictionary.
+        Sets defaults to `timeout` parameter if missign to
+        `self.default_timeout`.
+
+        Args:
+            method (str): method name ('get', 'post', etc.).
+            path (str): path relative to API base url (e.g. 'v1/check').
+            override_defaults (bool): flag to override params if given;
+            if True - given params will be used as is; otherwise given
+            params will be appended/set with values from request_defaults.
+
+        Returns:
+            dict: dictionary of the request parameters.
+        """
+        request_params = {
+            'method': method.lower(),
+            'url': self.compose_url(path),
+            **params
+        }
+
+        if 'timeout' not in request_params:
+            request_params['timeout'] = self.request_defaults.get('timeout')
+
+        # Get rid of None params, to avoid overriding session params
+        if not override_defaults:
+            return {k: v for k, v in request_params.items() if v is not None}
+
+        return request_params

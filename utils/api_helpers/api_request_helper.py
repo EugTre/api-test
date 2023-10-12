@@ -44,7 +44,7 @@ class ApiRequestHelper:
 
         self.request: RequestEntity | None = None
         self.expected: ResponseEntity | None = None
-        self.session_cookies: RequestsCookieJar = RequestsCookieJar()
+        self.reuse_cookies: RequestsCookieJar | None = None
 
     def _reset(self):
         """Resets all properties to defaults.
@@ -91,7 +91,9 @@ class ApiRequestHelper:
                     req_cfg.request.query_params[default_param_name]
 
         # Prepare cookies
-        cookies = self.session_cookies
+        cookies = self.reuse_cookies \
+            if self.reuse_cookies is not None else \
+            RequestsCookieJar()
         if req_cfg.request.cookies is not None:
             cookies.update(req_cfg.request.cookies)
 
@@ -122,9 +124,11 @@ class ApiRequestHelper:
 
         self.request = RequestEntity(
             method=method,
-            path=path if path is not None else '',
-            cookies=self.session_cookies
+            path=path if path is not None else ''
         )
+        if self.reuse_cookies is not None:
+            self.request.cookies = self.reuse_cookies
+
         self.expected = ResponseEntity(status_code=200)
 
         return self
@@ -260,7 +264,9 @@ class ApiRequestHelper:
         Returns:
             Self: instance of class `ApiRequestHelper`
         """
-        if overwrite or self.request.cookies is None:
+        if self.request.cookies is None:
+            self.request.cookies = RequestsCookieJar()
+        elif overwrite:
             self.request.cookies.clear()
 
         self.request.cookies.update(cookies)
@@ -350,6 +356,7 @@ class ApiRequestHelper:
             Self: dict
         """
         self.check_for_missing_path_params()
+
         if not request_args:
             request_args = {}
 
@@ -361,26 +368,23 @@ class ApiRequestHelper:
         request_args['method'] = request_args.get(
             'method', self.request.method
         )
-        request_args['params'] = self.request.query_params
-        request_args['json'] = self.request.json
-        request_args['data'] = self.request.text
+        request_args['params'] = request_args.get(
+            'params', self.request.query_params
+        )
+        request_args['json'] = request_args.get('json', self.request.json)
+        request_args['data'] = request_args.get('data', self.request.text)
 
-        # Ensure that given args will be appended to current requests settings
-        request_args['headers'] = \
-            self.request.headers | request_args.get('headers', {}) \
-            if self.request.headers else \
-            request_args.get('headers')
+        # Ensure that given headers/cookies will be appended to current
+        # requests settings
+        if self.request.headers:
+            self.request.headers.update(request_args.get('headers', {}))
+            request_args['headers'] = self.request.headers
 
         if self.request.cookies:
             self.request.cookies.update(request_args.get('cookies', {}))
-        request_args['cookies'] = \
-            self.request.cookies \
-            if self.request.cookies else \
-            request_args.get('cookies')
+            request_args['cookies'] = self.request.cookies
 
-        request_args['auth'] = (request_args['auth']
-                                if request_args.get('auth') else
-                                self.request.auth)
+        request_args['auth'] = request_args.get('auth', self.request.auth)
 
         return request_args
 
@@ -421,8 +425,8 @@ class ApiRequestHelper:
         return True
 
     def perform(self, override_defaults: bool = False,
-                save_cookies: bool = True,
                 check_status_code: bool = True,
+                save_cookies: bool = False,
                 **request_args) -> ApiResponseHelper:
         """Performs HTTP request with given request parameters
         (headers, cookies, auth, etc.),
@@ -493,7 +497,7 @@ class ApiRequestHelper:
             )
 
         if save_cookies:
-            self.session_cookies = response.cookies.copy()
+            self.reuse_cookies = response.cookies.copy()
 
         response_helper = ApiResponseHelper(response) \
             .set_expected(expected_response=self.expected)
@@ -519,4 +523,4 @@ class ApiRequestHelper:
         return f'{self.__class__.__name__}' \
                f'(Client: {self.api_client.client_id.api_name}, ' \
                f'requests done: {self.count}, ' \
-               f'session_cookies: {self.session_cookies})'
+               f'saved cookies: {self.reuse_cookies})'
