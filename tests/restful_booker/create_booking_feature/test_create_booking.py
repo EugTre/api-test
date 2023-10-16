@@ -10,9 +10,12 @@ import allure
 from utils.bdd import given, when, then
 from utils.api_helpers.api_request_helper import ApiRequestHelper
 from utils.api_client.models import HTTPMethod
-
-from ..constants import REQ_GET, REQ_CREATE, \
-    FIELD_BOOKING_ID, FIELD_BOOKING_INFO
+from utils.generators import GeneratorsManager
+from ..constants import (
+    REQ_GET,
+    REQ_CREATE,
+    FIELD_BOOKING_ID
+)
 
 
 @allure.epic("Restful-Booker API")
@@ -23,8 +26,9 @@ class TestCreateBooking:
 
     @allure.title("Non-Authenticated user can create booking")
     def test_create_booking_no_auth(self, api_request: ApiRequestHelper,
-                                    handle_entry: list):
-        """Non-authenticated user can create bookings new bookings
+                                    handle_entry: list,
+                                    generator_manager: GeneratorsManager):
+        """Non-authenticated user can create new bookings
         with valid params"""
 
         with given("non-authenticated user with valid request payload"):
@@ -45,8 +49,10 @@ class TestCreateBooking:
         with then("booking entry is created and may be obtained"):
             booking_id = \
                 created_booking_response.get_json_value(FIELD_BOOKING_ID)
-            booking_entry = \
-                created_booking_response.get_json_value(FIELD_BOOKING_INFO)
+            booking_entry = generator_manager.generate(
+                "Booking",
+                correlation_id="Create_01"
+            )
 
             api_request.by_name(REQ_GET) \
                 .with_path_params(id=booking_id) \
@@ -58,8 +64,9 @@ class TestCreateBooking:
     def test_create_booking_auth(self,
                                  api_request: ApiRequestHelper,
                                  auth_token: str,
-                                 handle_entry: list):
-        """Authenticated user can create bookings new bookings
+                                 handle_entry: list,
+                                 generator_manager: GeneratorsManager):
+        """Authenticated user can create new bookings
         with valid params"""
 
         with given("authenticated user with valid request payload"):
@@ -81,8 +88,10 @@ class TestCreateBooking:
         with then("booking entry is created and may be obtained"):
             booking_id = \
                 created_booking_response.get_json_value(FIELD_BOOKING_ID)
-            booking_entry = \
-                created_booking_response.get_json_value(FIELD_BOOKING_INFO)
+            booking_entry = generator_manager.generate(
+                "Booking",
+                correlation_id="Create_01"
+            )
 
             api_request.by_name(REQ_GET) \
                 .with_path_params(id=booking_id) \

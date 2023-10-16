@@ -11,6 +11,7 @@ from utils.api_client.models import ApiClientsSpecificationCollection
 from utils.api_client.setup_api_client import setup_api_client
 from utils.api_client.api_configuration_reader import ApiConfigurationReader
 
+from utils.generators import GeneratorsManager
 from utils.helper import Helper
 from utils.log_database_handler import DatabaseHandler
 
@@ -189,3 +190,9 @@ def get_api_response_instance(api_request: ApiRequestHelper
 def helper() -> Helper:
     """Returns `Helper` class object to use inside tests/fixtures"""
     return Helper()
+
+
+@pytest.fixture(scope='session')
+def generator_manager() -> GeneratorsManager:
+    """Returns instance of GeneratorsManager to use in tests"""
+    return GeneratorsManager()

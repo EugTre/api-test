@@ -11,8 +11,12 @@ from utils.bdd import given, when, then
 from utils.api_helpers.api_request_helper import ApiRequestHelper
 from utils.generators import generate_booking
 
-from ..constants import REQ_GET, REQ_CREATE, \
-    FIELD_BOOKING_ID, FIELD_BOOKING_DATES
+from ..constants import (
+    REQ_GET,
+    REQ_CREATE,
+    FIELD_BOOKING_ID,
+    FIELD_BOOKING_DATES
+)
 
 
 @allure.epic("Restful-Booker API")
@@ -27,8 +31,8 @@ class TestCreateBookingDates:
         "test_id, booking_dates",
         ("YYYY MM DD", ("2027 05 25", "2027 05 26")),
         ("MM/DD/YYYY", ("05/25/2027", "05/26/2027")),
-        ("ISO8601_Datetime",
-         ("2027-05-25T00:00:00.000Z", "2027-05-26T00:00:00.000Z"))
+        ("ISO8601_Datetime", ("2027-05-25T00:00:00.000Z",
+                              "2027-05-26T00:00:00.000Z"))
     ))
     def test_date_format(self,
                          test_id, booking_dates: tuple,
